@@ -10,6 +10,9 @@ const config = {
       smartypants: {
         ellipses: true,
         dashes: "oldschool"
+      },
+      layout: {
+        blog: "src/routes/blog/mdsvex.svelte"
       }
     }),
     vitePreprocess({})
