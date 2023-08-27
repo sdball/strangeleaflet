@@ -1,3 +1,4 @@
+import { vitePreprocess } from "@sveltejs/kit/vite";
 import adapter from "@sveltejs/adapter-auto";
 import { mdsvex } from "mdsvex";
 
@@ -10,7 +11,8 @@ const config = {
         ellipses: true,
         dashes: "oldschool"
       }
-    })
+    }),
+    vitePreprocess({})
   ],
   kit: {
     // adapter-auto only supports some environments, see https://kit.svelte.dev/docs/adapter-auto for a list.
