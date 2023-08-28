@@ -7,6 +7,7 @@
 <svg {width} {height} viewBox="0 0 340 400" xmlns="http://www.w3.org/2000/svg">
   <path
     id="Rectangle"
+    class="dark:fill-gray-600"
     fill="#ffffff"
     fill-rule="evenodd"
     stroke="#646464"
@@ -16,6 +17,7 @@
     <g id="white">
       <path
         id="path1"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -23,6 +25,7 @@
       />
       <path
         id="Rectangle-copy-3"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -30,6 +33,7 @@
       />
       <path
         id="Rectangle-copy-7"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -37,6 +41,7 @@
       />
       <path
         id="Rectangle-copy-5"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -44,6 +49,7 @@
       />
       <path
         id="Rectangle-copy-15"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -51,6 +57,7 @@
       />
       <path
         id="Rectangle-copy-13"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -58,6 +65,7 @@
       />
       <path
         id="Rectangle-copy-11"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -65,6 +73,7 @@
       />
       <path
         id="Rectangle-copy-9"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -72,6 +81,7 @@
       />
       <path
         id="Rectangle-copy-19"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -79,6 +89,7 @@
       />
       <path
         id="Rectangle-copy-17"
+        class="dark:fill-slate-700"
         fill="#fff4f4"
         fill-rule="evenodd"
         stroke="none"
@@ -88,6 +99,7 @@
     <g id="blue">
       <path
         id="Rectangle-copy"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -95,6 +107,7 @@
       />
       <path
         id="Rectangle-copy-2"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -102,6 +115,7 @@
       />
       <path
         id="Rectangle-copy-6"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -109,6 +123,7 @@
       />
       <path
         id="Rectangle-copy-4"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -116,6 +131,7 @@
       />
       <path
         id="Rectangle-copy-14"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -123,6 +139,7 @@
       />
       <path
         id="Rectangle-copy-12"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -130,6 +147,7 @@
       />
       <path
         id="Rectangle-copy-10"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -137,6 +155,7 @@
       />
       <path
         id="Rectangle-copy-8"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -144,6 +163,7 @@
       />
       <path
         id="Rectangle-copy-18"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -151,6 +171,7 @@
       />
       <path
         id="Rectangle-copy-16"
+        class="dark:fill-cyan-900"
         fill="#b3d7dd"
         fill-rule="evenodd"
         stroke="none"
@@ -161,6 +182,7 @@
   <g id="SL-copy">
     <path
       id="--"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -168,6 +190,7 @@
     />
     <path
       id="------"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -175,6 +198,7 @@
     />
     <path
       id="-------"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -182,6 +206,7 @@
     />
     <path
       id="path2"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -189,6 +214,7 @@
     />
     <path
       id="path3"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -196,6 +222,7 @@
     />
     <path
       id="-"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -203,6 +230,7 @@
     />
     <path
       id="path4"
+      class="dark:fill-gray-500"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
