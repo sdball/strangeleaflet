@@ -1,7 +1,7 @@
 <script>
-  export let scale = 1;
-  let width = 340 * scale;
-  let height = 400 * scale;
+  export let scale = "1";
+  let width = 340 * Number(scale);
+  let height = 400 * Number(scale);
 </script>
 
 <svg {width} {height} viewBox="0 0 340 400" xmlns="http://www.w3.org/2000/svg">
