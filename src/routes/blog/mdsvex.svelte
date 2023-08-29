@@ -20,11 +20,9 @@
 <DarkMode />
 
 {#if layout === "blog"}
-  <main class="mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal">
-    <article class="all-prose">
-      <h1>{title}</h1>
-      <p>Published: {formatDate(date)}</p>
-      <slot />
-    </article>
-  </main>
+  <article class="all-prose mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal">
+    <h1>{title}</h1>
+    <p>Published: {formatDate(date)}</p>
+    <slot />
+  </article>
 {/if}
