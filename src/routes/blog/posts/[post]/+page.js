@@ -4,8 +4,8 @@ export const load = async ({ params }) => {
   try {
     const post = (
       await Promise.all([
-        import(`../../../lib/posts/${params.post}.svx`).catch((err) => null),
-        import(`../../../lib/posts/${params.post}/index.svx`).catch((err) => null)
+        import(`../../../../lib/blog/posts/${params.post}.svx`).catch((err) => null),
+        import(`../../../../lib/blog/posts/${params.post}/index.svx`).catch((err) => null)
       ])
     ).find((p) => !!p);
     const { title, date } = post.metadata;
