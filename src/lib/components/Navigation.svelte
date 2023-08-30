@@ -8,7 +8,7 @@
   <NavBrand href="/">
     <StrangeLeafletSvg scale="0.1" />
     {#if showSiteName}
-      <span class="ml-3 self-center whitespace-nowrap text-xl font-semibold dark:text-white"
+      <span class="ml-3 self-center whitespace-nowrap text-xl font-extrabold dark:text-white"
         >Strange Leaflet</span
       >
     {/if}
