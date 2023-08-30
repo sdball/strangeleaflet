@@ -5,12 +5,12 @@ layout: blog
 ---
 
 <script>
-  import StrangeLeaflet from "$lib/components/StrangeLeaflet.svelte"
+  import StrangeLeafletSvg from "$lib/components/StrangeLeafletSvg.svelte"
   const x = 123;
 </script>
 
 <div class="flex justify-around">
-  <StrangeLeaflet />
+  <StrangeLeafletSvg />
 </div>
 
 Hello.
@@ -18,3 +18,9 @@ Hello.
 I am content.
 
 Number: {x}
+
+```javascript
+let x = 3;
+let y = 4;
+console.log(x + y);
+```

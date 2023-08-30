@@ -1,3 +1,10 @@
+/**
+ *
+ * @param {Response} r
+ * @returns {Object}
+ */
+const json = (r) => r.json();
+
 import { error } from "@sveltejs/kit";
 
 export const load = async ({ params }) => {

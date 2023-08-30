@@ -4,7 +4,15 @@
   let height = 400 * Number(scale);
 </script>
 
-<svg {width} {height} viewBox="0 0 340 400" xmlns="http://www.w3.org/2000/svg">
+<svg
+  role="img"
+  aria-label="Strange Leaflet Logo"
+  aria-details="Stylized printer paper with the letters SL in ASCII art."
+  {width}
+  {height}
+  viewBox="0 0 340 400"
+  xmlns="http://www.w3.org/2000/svg"
+>
   <path
     id="Rectangle"
     class="dark:fill-gray-600"
