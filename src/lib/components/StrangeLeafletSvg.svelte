@@ -190,7 +190,7 @@
   <g id="SL-copy">
     <path
       id="--"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -198,7 +198,7 @@
     />
     <path
       id="------"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -206,7 +206,7 @@
     />
     <path
       id="-------"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -214,7 +214,7 @@
     />
     <path
       id="path2"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -222,7 +222,7 @@
     />
     <path
       id="path3"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -230,7 +230,7 @@
     />
     <path
       id="-"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"
@@ -238,7 +238,7 @@
     />
     <path
       id="path4"
-      class="dark:fill-gray-500"
+      class="dark:fill-gray-100"
       fill="#141414"
       fill-rule="evenodd"
       stroke="none"

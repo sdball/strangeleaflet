@@ -1,18 +1,11 @@
-/**
- *
- * @param {Response} r
- * @returns {Object}
- */
-const json = (r) => r.json();
-
 import { error } from "@sveltejs/kit";
 
 export const load = async ({ params }) => {
   try {
     const post = (
       await Promise.all([
-        import(`../../../../lib/blog/posts/${params.post}.svx`).catch((err) => null),
-        import(`../../../../lib/blog/posts/${params.post}/index.svx`).catch((err) => null)
+        import(`../../../lib/blog/posts/${params.post}.svx`).catch((err) => null),
+        import(`../../../lib/blog/posts/${params.post}/index.svx`).catch((err) => null)
       ])
     ).find((p) => !!p);
     const { title, date } = post.metadata;
