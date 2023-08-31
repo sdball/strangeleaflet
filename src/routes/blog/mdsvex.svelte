@@ -13,6 +13,11 @@
    */
   export let layout;
 
+  /**
+   * @type [string]
+   */
+  export let categories;
+
   import { formatDate } from "$lib/blog/formatDateTime";
   import Navigation from "$lib/components/Navigation.svelte";
 </script>
@@ -25,6 +30,8 @@
   >
     <h1>{title}</h1>
     <p>Published: {formatDate(date)}</p>
+    <p>Categories: {categories}</p>
+    <hr />
     <slot />
   </article>
 {/if}
