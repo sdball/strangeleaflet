@@ -7,7 +7,7 @@
 <Navigation />
 
 <main
-  class="prose dark:prose-invert mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
+  class="prose dark:prose-invert mt-12 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
 >
   <Heading class="mt-9">Strange Leaflet</Heading>
   <P>Hi there. Uh. Not much to see on the frontpage yet.</P>

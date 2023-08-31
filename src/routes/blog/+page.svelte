@@ -8,7 +8,7 @@
 <Navigation />
 
 <main
-  class="prose dark:prose-invert py-4 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
+  class="prose dark:prose-invert mt-12 pb-20 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
 >
   <h1>Posts</h1>
   <ul>
