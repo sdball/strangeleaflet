@@ -1,0 +1,35 @@
+---
+layout: blog
+title: Music for coding - October 2019
+date: 2019-10-29T00:18:50.000Z
+categories:
+  - music
+---
+
+Like working to music? I do! Here's what I've been listening to lately.
+
+# Recent Albums
+
+- [Pinout (Original Soundtrack) [feat. Susanna Lundgren] by Douglas Holmquist](https://music.apple.com/us/album/pinout-original-soundtrack-feat-susanna-lundgren/1165340586)
+- [In a Tidal Wave of Mystery (Deluxe Edition) by Capital Cities](https://music.apple.com/us/album/in-a-tidal-wave-of-mystery-deluxe-edition/1440858619)
+- [Rollercoaster - EP by Bean](https://music.apple.com/us/album/rollercoaster-ep/883424223)
+- [Lost In Translation (Original Motion Picture Soundtrack) by Various Artists](https://music.apple.com/us/album/lost-in-translation-original-motion-picture-soundtrack/164362427)
+- [Old West Saloon Piano, Vol. 1 by Squeek Steele](https://music.apple.com/us/album/old-west-saloon-piano-vol-1/521471044)
+- [San Frandisco - Single by Dom Dolla](https://music.apple.com/us/album/san-frandisco-single/1479872567)
+- [Chasing Midnight - EP by Moog](https://music.apple.com/us/album/chasing-midnight-ep/981952367)
+- [Civilization by Sweeps](https://music.apple.com/us/album/civilization/1408837601)
+- [Life by Jinsang](https://music.apple.com/us/album/life/1444751467)
+
+# Recent Playlists
+
+## Late Night Synth
+
+<iframe allow="autoplay *; encrypted-media *;" frameborder="0" height="450" style="width:100%;max-width:660px;overflow:hidden;background:transparent;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="https://embed.music.apple.com/us/playlist/late-night-synth/pl.u-KdlBFDrXmV"></iframe>
+
+## Magnetic Music
+
+<iframe allow="autoplay *; encrypted-media *;" frameborder="0" height="450" style="width:100%;max-width:660px;overflow:hidden;background:transparent;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="https://embed.music.apple.com/us/playlist/magnetic-music/pl.u-xLEPtE4lp9"></iframe>
+
+## Code Journey
+
+<iframe allow="autoplay *; encrypted-media *;" frameborder="0" height="450" style="width:100%;max-width:660px;overflow:hidden;background:transparent;" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="https://embed.music.apple.com/us/playlist/code-journey/pl.u-o1WgFXWd0p"></iframe>

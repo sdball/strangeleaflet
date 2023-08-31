@@ -1,0 +1,19 @@
+---
+layout: blog
+title: "Friday Lunch Links — #2"
+date: 2019-11-10T03:34:12.000Z
+categories:
+  - links
+---
+
+[Dark Matter: A Primer](https://arxiv.org/pdf/1006.2483v2.pdf) (PDF) — An excellent academic paper detailing the numerous pieces of evidence we've accumulated on the actual, measurable existence of dark matter.
+
+Too dry? Here's [an excellent Reddit comment](https://www.reddit.com/r/askscience/comments/drggcs/why_do_cosmologists_hypothesize_the_existence_of/f6izyaa/) (citing the above paper) that breaks down the evidence into more plain English.
+
+[Maps](https://www.jasondavies.com/maps/) — All kinds of global map projections with explanations. Most of the maps are interactive and some are [pretty fun to explore](https://www.jasondavies.com/maps/hammer-retroazimuthal/).
+
+[APIs all the way down](https://youtu.be/hBpbEsAG4es) — An excellent talk on communication by [Miki Rezentes](https://twitter.com/mikirez) from Gig City Elixir 2019
+
+[Writing a program that writes itself](https://juliu.is/quine-quine/) — Quines are fun!
+
+[Want to know the easiest way to save time? Use `make`!](https://www.freecodecamp.org/news/want-to-know-the-easiest-way-to-save-time-use-make-eec453adf7fe/) — `make` is often a forgotten tool in the command line toolbox. But it's powerful, useful, and making a comeback.
