@@ -20,7 +20,7 @@ export const GET = async () => {
       };
     })
     .sort((a, b) => {
-      return a.metadata.date - b.metadata.date;
+      return b.metadata.date - a.metadata.date;
     });
   return json(posts);
 };
