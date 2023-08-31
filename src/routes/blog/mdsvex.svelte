@@ -26,7 +26,7 @@
 
 {#if layout === "blog"}
   <article
-    class="prose dark:prose-invert mx-auto max-w-[90ch] px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
+    class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
   >
     <h1>{title}</h1>
     <p>Published: {formatDate(date)}</p>
