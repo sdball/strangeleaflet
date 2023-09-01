@@ -1,0 +1,358 @@
+---
+layout: blog
+title: From awk to a Dockerized Ruby Script
+date: 2021-08-08T22:11:57Z
+categories:
+  - programming
+  - command line
+---
+
+For a programming project I wanted to easily get a list of the printable ASCII
+characters such that I could easily loop through them and do some work with
+each individual ASCII character.
+
+That seems simple enough! But I didn't quite find anything that did what I
+wanted.
+
+I found the very cool `ascii` program available via homebrew but as awesome as
+it is it does not have an output that is simply a list of the printable ASCII.
+
+I found printable ASCII lists online of course, but I didn't want to simply cut
+and paste into a text file.
+
+So I turned to scripting out something and AWK is a great one for simple
+scripts.
+
+```awk
+$ awk 'BEGIN { for(i=32;i<=126;i++) printf "%c\n", i; }'
+
+!
+"
+#
+$
+%
+&
+'
+(
+)
+*
++
+,
+-
+.
+/
+0
+1
+-- etc --
+```
+
+That's nice and all but I didn't want to keep making myself go to ctrl-r to use that data output.
+
+So throw that into `$HOME/bin/printable-ascii` and done?
+
+Well no. As I wrote that into a script I figured, since I'm making this an
+actual script I might as well take the rare opportunity these days to write
+some Ruby!
+
+```ruby
+$ ruby -e "32.upto(126) { |n| puts n.chr }"
+
+!
+"
+#
+$
+%
+&
+'
+(
+)
+*
++
+,
+-
+.
+/
+0
+1
+-- etc --
+```
+
+There, nice and expressive as we all expect Ruby to be.
+
+## A Real Ruby Script
+
+But hold on. Since I'm bothering to put this into a script via Ruby I could
+output other interesting data as well. Like it would be coold to be able to run
+a script a see not only the ASCII but the decimal, octal, hexadecimal, and
+binary representations of the characters.
+
+It's all been a minute since I wrote a nice command line tool in Ruby and
+[OptionParser](https://ruby-doc.org/stdlib-3.0.2/libdoc/optparse/rdoc/OptionParser.html)
+is such a fantastic library in the Ruby standard library. It'd be a really
+refreshing change of programming pace compared to my daily programming work to
+be able to write something small and useful using only a good language with a
+good standard library.
+
+A bit of scripting later and tada! `printable-ascii` 0.0.1. That version didn't
+even hit the repo because I was still writing it in my dotfiles ~/bin
+directory.
+
+But it was starting to be really cool. ASCII is such a neat slice of data and
+I'd never really parsed through it directly that much.
+
+When I added the JSON output I just had to take this cool little script to its own repo! Fiat [sdball/printable-ascii](https://github.com/sdball/printable-ascii) and [printable-ascii v1.0.0](https://github.com/sdball/printable-ascii/releases/tag/v1.0.0)
+
+Did I stop there? I did not.
+
+## Homebrew
+
+I thought it would be fun to see if I could get this script into homebrew. Can
+a Ruby script even be added to homebrew? Turns out yes and it's pretty easy
+thanks to GitHub providing and hosting tar.gz files. ❤️GitHub!
+
+```ruby
+class PrintableAscii < Formula
+  desc "Output all printable ASCII characters in various representations and formats"
+  homepage "https://github.com/sdball/printable-ascii"
+  url "https://github.com/sdball/printable-ascii/archive/refs/tags/v2.1.0.tar.gz"
+  sha256 "cf0b2dfa7c1e0eb851be312c3e53d4f67ad68d46c58d8983f61afeb56588b061"
+  license "MIT"
+
+  def install
+    bin.install "bin/printable-ascii"
+  end
+
+  test do
+    ascii_json = [
+      { "character" => " " },
+      { "character" => "!" },
+      { "character" => "\"" },
+      { "character" => "#" },
+      { "character" => "$" },
+      { "character" => "%" },
+      { "character" => "&" },
+      { "character" => "'" },
+      { "character" => "(" },
+      { "character" => ")" },
+      { "character" => "*" },
+      { "character" => "+" },
+      { "character" => "," },
+      { "character" => "-" },
+      { "character" => "." },
+      { "character" => "/" },
+      { "character" => "0" },
+      { "character" => "1" },
+      { "character" => "2" },
+      { "character" => "3" },
+      { "character" => "4" },
+      { "character" => "5" },
+      { "character" => "6" },
+      { "character" => "7" },
+      { "character" => "8" },
+      { "character" => "9" },
+      { "character" => ":" },
+      { "character" => ";" },
+      { "character" => "<" },
+      { "character" => "=" },
+      { "character" => ">" },
+      { "character" => "?" },
+      { "character" => "@" },
+      { "character" => "A" },
+      { "character" => "B" },
+      { "character" => "C" },
+      { "character" => "D" },
+      { "character" => "E" },
+      { "character" => "F" },
+      { "character" => "G" },
+      { "character" => "H" },
+      { "character" => "I" },
+      { "character" => "J" },
+      { "character" => "K" },
+      { "character" => "L" },
+      { "character" => "M" },
+      { "character" => "N" },
+      { "character" => "O" },
+      { "character" => "P" },
+      { "character" => "Q" },
+      { "character" => "R" },
+      { "character" => "S" },
+      { "character" => "T" },
+      { "character" => "U" },
+      { "character" => "V" },
+      { "character" => "W" },
+      { "character" => "X" },
+      { "character" => "Y" },
+      { "character" => "Z" },
+      { "character" => "[" },
+      { "character" => "\\" },
+      { "character" => "]" },
+      { "character" => "^" },
+      { "character" => "_" },
+      { "character" => "`" },
+      { "character" => "a" },
+      { "character" => "b" },
+      { "character" => "c" },
+      { "character" => "d" },
+      { "character" => "e" },
+      { "character" => "f" },
+      { "character" => "g" },
+      { "character" => "h" },
+      { "character" => "i" },
+      { "character" => "j" },
+      { "character" => "k" },
+      { "character" => "l" },
+      { "character" => "m" },
+      { "character" => "n" },
+      { "character" => "o" },
+      { "character" => "p" },
+      { "character" => "q" },
+      { "character" => "r" },
+      { "character" => "s" },
+      { "character" => "t" },
+      { "character" => "u" },
+      { "character" => "v" },
+      { "character" => "w" },
+      { "character" => "x" },
+      { "character" => "y" },
+      { "character" => "z" },
+      { "character" => "{" },
+      { "character" => "|" },
+      { "character" => "}" },
+      { "character" => "~" },
+    ]
+
+    assert_equal ascii_json, JSON.parse(shell_output("#{bin}/printable-ascii --json"))
+  end
+end
+```
+
+The real core of the magic is `bin.install "bin/printable-ascii"`. That
+installs the `printable-ascii` script into homebrew's bin as an executable.
+
+```bash
+$ brew install --formula ./Formula/printable-ascii.rb
+==> Downloading https://github.com/sdball/printable-ascii/archive/refs/tags/v2.1.0.tar.gz
+Already downloaded: /Users/sdball/Library/Caches/Homebrew/downloads/1f5ded4652929fb1c8ca5ffdb1a733cdfa3e65e6bf447893ef59803f7f6919b9--printable-ascii-2.1.0.tar.gz
+🍺  /opt/homebrew/Cellar/printable-ascii/2.1.0: 5 files, 22KB, built in 1 second
+Removing: /Users/sdball/Library/Caches/Homebrew/printable-ascii--2.0.0.tar.gz... (6.3KB)
+```
+
+Right on! Maybe someday it'll really be in Homebrew but for now it's easy enough to install directly with the formula.
+
+## Docker
+
+Since Homebrew would require cloning the repo and then manually installing from
+the formula file I should be able to pretty easily wrap up this script into a
+Docker image! Then anyone could easily run this silly script as long as they
+have Docker installed. Who doesn't love running arbitrary scripts from the
+Internet via Docker?
+
+Since I've been helping out as part of the DevOps team at work lately I had some hot loaded Docker knowledge ready to roll. I just need an image with Ruby, copy in the script somewhere, and set the script as the ENTRYPOINT.
+
+Then with `docker run` any arguments passed to the docker run command will be passed to the script itself. ✨Docker!
+
+I quickly found the [official Ruby Docker image](https://hub.docker.com/_/ruby/) and just grabbed the first image I saw referenced in their README
+
+```dockerfile
+FROM ruby:2.5
+
+# throw errors if Gemfile has been modified since Gemfile.lock
+RUN bundle config --global frozen 1
+
+WORKDIR /usr/src/app
+
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+
+COPY . .
+
+CMD ["./your-daemon-or-script.rb"]
+```
+
+I slimmed that down a bit since I don't have any need for bundler or Gemfiles. Here's what produced the 1.0.0 Docker image for printable-ascii
+
+```dockerfile
+FROM ruby:2.5
+WORKDIR /usr/src/app
+COPY bin/printable-ascii ./
+ENTRYPOINT ["./printable-ascii"]
+```
+
+Easy peasy and it worked great!
+
+## GitHub Actions
+
+Build a Docker image from my own laptop and publish to Docker Hub? That's so archaic! What kind of DevOps newbie am I if I let myself live with that kind of publishing story?
+
+GitHub Actions to the rescue! I whipped up a GitHub Actions workflow to publish
+to both Docker Hub and GitHub's own container registry whenever I publish a new
+version of the script. It even checks that the script's declared version matches the release that's going to be published.
+
+It's a _bit_ weird in that it means that the Docker image OF the script has the same version as the script itself. If I rev the script itself then it all makes sense because a new Docker image will contain the new script. But if I only update the Docker image then I don't have a reasonable way to only change its version.
+
+Thankfully this script and Dockerfile are very simple so I can simply keep them in sync and only update the Docker image when there's a new version of the script to release.
+
+But in practice for more complex relationships between the utility being provided by the Docker image and the Docker image itself it seems like there's an opportunity for more metadata. Like a dual versioning of the image and its contents represented in a good, consistent way on Docker Hub.
+
+## That Docker image is way too huge
+
+After I setup the GitHub Action I went back to look at my Docker Hub stats and WOW over 300MB for this script's image! That's no good at all!
+
+I figured there had to be a slimmer Ruby image to work with. The default I was using probably has all kinda of superfluous (for me) utilities and libraries to support all kinds of projects.
+
+After a bit of reading in Ruby's official docker image I found there's both a `-slim` and an `-alpine` version of the Ruby image to use. Since my script is really really Ruby and its standard library alone I was certain the `-alpine` image would work great.
+
+Alpine is a special Linux distribution designed to create small Docker images.
+
+Success! Using the Alpine version brought the image down to ~30MB! Roughly 10% of the original size!
+
+```dockerfile
+FROM ruby:3.0-alpine
+WORKDIR /usr/src/app
+COPY bin/printable-ascii ./
+ENTRYPOINT ["./printable-ascii"]
+```
+
+It works wonderfully! Anyone with Docker can get printable ASCII anytime
+
+```bash
+$ docker run sdball/printable-ascii --json --decimal --binary --hexadecimal --octal --range A-C | jq '.'
+```
+
+```javascript
+[
+  {
+    character: "A",
+    decimal: "65",
+    binary: "1000001",
+    hexadecimal: "41",
+    octal: "101"
+  },
+  {
+    character: "B",
+    decimal: "66",
+    binary: "1000010",
+    hexadecimal: "42",
+    octal: "102"
+  },
+  {
+    character: "C",
+    decimal: "67",
+    binary: "1000011",
+    hexadecimal: "43",
+    octal: "103"
+  }
+];
+```
+
+## Features on features
+
+Working on this simple toy script has been an absolute joy so I've continued to add more features that no one needs. Not even me! I just think they're neat!
+
+A `--range` option to allow supplying one or more ranges of printable ASCII characters
+
+A `--random NUMBER` option to pick `NUMBER` of random printable ASCII characters
+
+And I've got plans for more silly options ha ha! Printable ASCII for all!
+
+Maybe someday I'll actually get back to the project where I needed a list of printable ASCII in the first place.
