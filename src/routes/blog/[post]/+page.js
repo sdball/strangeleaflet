@@ -1,5 +1,9 @@
 import { error } from "@sveltejs/kit";
 
+/**
+ *
+ * @param {{params: { post: string }}} param0
+ */
 export const load = async ({ params }) => {
   try {
     const post = (
