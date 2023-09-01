@@ -17,7 +17,10 @@
     supposed to be some dotmatrix paper with "SL" in ASCII banner text.</P
   >
   <StrangeLeafletSvg />
-  <P>Cool right? I hope so because did I mention I made it from scratch?</P>
+  <P
+    >Cool right? I hope so because did I mention I made it from scratch? Also check out how it
+    changes when you switch light/dark modes.</P
+  >
   <P
     >Oh also since this whole site is running on Svelte/SvelteKit it was, like, almost no code to
     implement the animation for switching between pages. I hope it isn't too annoying.</P
