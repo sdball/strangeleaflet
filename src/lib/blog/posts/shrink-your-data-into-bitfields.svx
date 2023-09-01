@@ -72,15 +72,15 @@ Take the "candy" for example. Right now it could be any string, any string at al
 | butterfingers      |                 13 |
 | cookies            |                  7 |
 
-But if we know we have a limited set of possible candies then we don't need the ability to have any string.
+But if we know we have a limited set of possible candies then we don't need the ability to have any string. For example, if we have ten or fewer possible candies we can use a single integer digit to represent them all.
 
 | Candy              | Number | Bytes |
 | ------------------ | :----: | ----: |
-| peppermint patties |   0    |     8 |
-| m&ms               |   1    |     8 |
-| reese's pieces     |   2    |     8 |
-| butterfingers      |   3    |     8 |
-| cookies            |   4    |     8 |
+| peppermint patties |   0    |     1 |
+| m&ms               |   1    |     1 |
+| reese's pieces     |   2    |     1 |
+| butterfingers      |   3    |     1 |
+| cookies            |   4    |     1 |
 
 That means we if replace "peppermint patties" in our data with `0` (our arbitrary agreed upon value to represent that candy) then we can cut our byte usage down a bit.
 
@@ -283,16 +283,16 @@ The number of bits you need for a field is enough to represent the power of two 
 
 Let's say we want a bitfield to hold days of the month. There are 31 possible values from 1 to 31. Let's see how many bits we'd need to hold that data.
 
-| Number of Bits | Available Values | Range |
-| :------------: | :--------------: | :---: |
-|       1        |        2         |  0-1  |
-|       2        |        4         |  0-3  |
-|       3        |        8         |  0-7  |
-|       4        |        16        | 0-15  |
-|       5        |        32        | 0-31  |
-|       6        |        64        | 0-63  |
-|       7        |       128        | 0-127 |
-|       8        |       256        | 0-255 |
+| Number of Bits | Available Values |         Range |
+| :------------: | :--------------: | :-----------: |
+|      $1$       |        $2$       |    $0\ldots1$ |
+|      $2$       |        $4$       |    $0\ldots3$ |
+|      $3$       |        $8$       |    $0\ldots7$ |
+|      $4$       |       $16$       |   $0\ldots15$ |
+|      $5$       |       $32$       |   $0\ldots31$ |
+|      $6$       |       $64$       |   $0\ldots63$ |
+|      $7$       |      $128$       |  $0\ldots127$ |
+|      $8$       |      $256$       |  $0\ldots255$ |
 
 Hey there we go! Using 5 bits gives us a bucket of 32 spaces which is just a little more than we need to hold any of the 31 possible days in a month.
 
@@ -368,7 +368,7 @@ Made up of these components
 
 | Priority |  Location   | Status |   Candy |
 | :------- | :---------: | :----: | ------: |
-| $$11$$   | $$1000111$$ | $$1$$  | $$000$$ |
+| $11$   | $1000111$ | $1$  | $000$ |
 
 Would that save us space? Yes! Because we can represent that long string of bits as an integer of whatever base we like!
 
@@ -404,10 +404,10 @@ Let's convert them individually to base-2
 
 | Field    | Base-10 |      Base-2 |
 | -------- | ------: | ----------: |
-| Priority |   $$3$$ |      $$11$$ |
-| Location |  $$71$$ | $$1000111$$ |
-| Status   |   $$1$$ |       $$1$$ |
-| Candy    |   $$0$$ |       $$0$$ |
+| Priority |     $3$ |        $11$ |
+| Location |    $71$ |   $1000111$ |
+| Status   |     $1$ |         $1$ |
+| Candy    |     $0$ |         $0$ |
 
 Here you might spot the problem with a simple conversion of each integer to base-2 and joining them into a string. But if you don't you're in good company because the problem is not obvious nor intuitive.
 
@@ -464,24 +464,34 @@ A bitfield is, ultimately, a number. It's not special, not magical. We make it s
 
 Why powers of 2? Because that's what computers are good at. Ultimately every bit is represented as either a 1 or 0. A bit is the smallest component of memory we can manipulate. So if we want our data to be as small as possible that means using the smallest number of bits that can represent the individual pieces of data we want to reference.
 
-Since we want to represent more data than a single bit can hold and since we want to keep all of our data together that means we have to place all of our bits into a single number. That means every single bit and its position in the number is very important. As a series of numbers 101110 might look similar to 1011100 but it is quite literally the difference between 46 and 92.
+Since we want to represent more data than a single bit can hold and since we want to keep all of our data together that means we have to place all of our bits into a single number. That means every single bit and its position in the number is very important. As a series of numbers $101110$ might look similar to $1011100$ but it is quite literally the difference between $46$ and $92$.
 
-As a quick level set on number "places" in base-10 vs base-2.
+As a quick level set on number "places" in base-10 vs base-2 let's look at what the number `1000` represents in base-2 vs base-10.
 
-```plaintext
-| Base-10 Place | 1000s | 100s | 10s | 1s |
-| Number        | 1     | 0    | 0   | 0  |
-| Base-2 Place  | 8s    | 4s   | 2s  | 1s |
-```
+|               |     1 |    0 |   0 |  0 |
+|---------------|-------|------|-----|----|
+| Base-10 Place | 1000  | 100  | 10  | 1  |
+| Base-2 Place  | 8     | 4    | 2   | 1  |
 
-| $$N$$      | $$N^{10}$$ |  $$N^{2}$$ |
-| :--------- | ---------: | ---------: |
-| 0          |          1 |          1 |
-| 1          |         10 |          2 |
-| 2          |        100 |          4 |
-| 3          |       1000 |          8 |
-| 4          |      10000 |         16 |
-| $$\ldots$$ | $$\ldots$$ | $$\ldots$$ |
+In other words, each new digit represents another power of the base.
+
+| N          |         $N^{10}$ |          $N^2$ |
+| :--------- | -------------: | -------------: |
+| 0          |              1 |              1 |
+| 1          |             10 |              2 |
+| 2          |            100 |              4 |
+| 3          |           1000 |              8 |
+| 4          |          10000 |             16 |
+| ...        |            ... |            ... |
+
+As we add data to our bitfield we'll be adding more and more powers of base-2.
+
+| bitfield length | possible values in base-10 |
+|----------------:|---------------------------:|
+|               1 |                       $0\ldots1$ |
+|               2 |                       $0\ldots3$ |
+|               3 |                       $0\ldots7$ |
+|               4 |                      $0\ldots15$ |
 
 # Constructing a bitfield by hand
 
@@ -502,46 +512,67 @@ We'll build our bitfield from smallest to largest numbers. That is we'll create 
 
 First we have candy. Since it's the first field its unit is 1. But our value (peppermint patties) is also 0 so we end up with a value of 0 going into the bitfield. It's three bits of zero, but that's not information we can encode in the zero itself.
 
-Bitfield: $$(0 * 1)$$.
+$$
+0(1) = 0
+$$
 
 Next we have status. Our value (empty) is represented as 1 in our design. BUT since candy takes three bits to hold its data our status value of 1 needs to use 8 for its units. The 1s, 2s, and 4s places are all reserved for candy data.
 
-Bitfield: $$(0 * 1) + (1 * 8)$$
+$$
+0(1) + 1(8) = 8
+$$
 
-After status is location (Room 71). Its data starts off right next to status since status only takes one bit for its data. That means all of the location data will be in units of 16.
+After status is location. Our value (Room 71) will be represented as itself `71` in the data. But instead of being the value `71` directly it will be `71` times the power of 2 where its field belongs. The location data starts off right next to status since status only takes one bit for its data. That means all of the location data will be in units of 16.
 
-Bitfield: $$(0 * 1) + (1 * 8) + (71 * 16)$$
+$$
+0(1) + 1(8) + 71(16) = 1144
+$$
 
-Finally we have priority. Since location took a whopping seven bits of data priority is pushed way up into units of 2048. Our data is "urgent" which we've represented as 3.
+Finally we have priority. Since location took a whopping seven bits of data priority is pushed way up into units of 2048. Our data is "urgent" which we've represented as the value `3`.
 
-Bitfield: $$(0 * 1) + (1 * 8) + (71 * 16) + (2048 * 3)$$
+$$
+0(1) + 1(8) + 71(16) + 3(2048) = 7288
+$$
 
-What does that give us? 7288! Is that what we wanted? Well let's see!
+So our bitfield holding our sample data is the value $7288$. Is that what we wanted? Well let's see!
 
 ```ruby
 7288.to_s(2) # => 1110001111000
 ```
 
-That's a `11` for priority, a `1000111` for location, a `1` for status, and a `000` for candy. In base-10 they're respectively 3, 71, 1, and 0. That checks out! (Don't worry we'll parse bitfields for real later on.)
+Let's break that down left to right (priority, locaiton, status, candy)
+
+- `11` for priority
+- `1000111` for location
+- `1` for status
+- `000` for candy
+
+In base-10 they're respectively the values $3$, $71$, $1$, and $0$. That checks out! (Don't worry we'll parse bitfields for real later on.)
 
 # Constructing a bitfield by adding powers of two
 
-That worked, but we need a generalized programmable solution to putting our data into a bitfield. We need an algorithm! The result of our calculation should be the integer number `7288` in whatever base we find convenient to work with: probably base-10.
+That worked, but we need a generalized programmable solution to putting our data into a bitfield. We need an algorithm! The result of our calculation should be the base-10 integer number `7288` in whatever base we find convenient to work with (probably base-10).
 
 Our algorithm will need two sets of data:
 
 - The bit lengths of each field
-- The actual values for each field
+- The actual values to place in each field
 
 Using the bit lengths of each field we'll calculate the unit power of two for each field going from smallest to largest.
 
-Candy, the first field, starts things off by having the unit $$2^{0} = 1$$.
+That is, we'll figure out what powers of two each piece of the bitfield will be expressed in.
 
-Next is the status field. Since the candy field took three bits status gets the unit $$2^{0 + 3} = 2^{3} = 8$$.
+Candy, the first field, starts things off in units of $2^0 = 1$
 
-Then the location field. Just one bit was taken for status so we have $$2^{0 + 3 + 1} = 2^{4} = 16$$
+Next is the status field. Since the candy field took three bits status will be in units of $2^{0 + 3} = 2^3 = 8$
 
-Finally the priority field coming in after the seven bits for location: $$2^{0 + 3 + 1 + 7} = 2^{11} = 2048$$.
+Then the location field. Just one bit was taken for status so we have $2^{0 + 3 + 1} = 2^4 = 16$
+
+Finally the priority field coming in after the seven bits for location will be in units of $2048$
+
+$$
+2^{0 + 3 + 1 + 7} = 2^{11} = 2048
+$$
 
 Given an ordered set of fields and their bit lengths we could arbitrarily map that data into the bit unit for each field. Great! That means we can construct that data in advance and it's a simple matter of multiplication and addition to arrive at our bitfield integer.
 
@@ -642,14 +673,14 @@ We have another option available to us when we're constructing our bitfield: **b
 
 | Bitwise left shift |   Base-2 | Base-10 |
 | :----------------- | -------: | ------: |
-| `1 << 0`           |        1 |       1 |
-| `1 << 1`           |       10 |       2 |
-| `1 << 2`           |      100 |       4 |
-| `1 << 3`           |     1000 |       8 |
-| `1 << 4`           |    10000 |      16 |
-| `1 << 5`           |   100000 |      32 |
-| `1 << 6`           |  1000000 |      64 |
-| `1 << 7`           | 10000000 |     128 |
+| $1\ll0$           |        1 |       1 |
+| $1\ll1$           |       10 |       2 |
+| $1\ll2$           |      100 |       4 |
+| $1\ll3$           |     1000 |       8 |
+| $1\ll4$           |    10000 |      16 |
+| $1\ll5$           |   100000 |      32 |
+| $1\ll6$           |  1000000 |      64 |
+| $1\ll7$           | 10000000 |     128 |
 
 That's _awesome_! We can take the number we know we want and then directly say where we want it to be in the resulting bitfield number. Let's build this bitfield up iteratively. Of course there are also many ways we could nicely wrap it up into a class. For example our earlier class keeping track of the base for each field could instead keep track of the position directly. It's a bit more intuitive to think about the position of each value vs its starting power of two.
 
