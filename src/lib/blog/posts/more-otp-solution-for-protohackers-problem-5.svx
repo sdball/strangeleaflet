@@ -1,0 +1,266 @@
+---
+layout: gitblog
+title: More OTP solution for Protohackers Problem 5 - sdball/protohackers
+date: 2023-02-10T04:07:42.000Z
+categories:
+  - Elixir
+  - Protohackers
+  - git blog
+repo: github.com/sdball/protohackers
+commit: 6688ae8307c073a11536502913dcff967741c28c
+---
+
+Thanks to @whatyouhide for his [Protohackers in Elixir: day 5](https://youtu.be/tm4Jgg7zeXk) video!
+
+His guide was a hugely great refresher for me into how to setup a
+proper supervision tree including how to use `DynamicSupervisor` which
+is new to me. The last time I did dynamic supervision the correct
+approach was the, now deprecated, `:simple_one_for_one` strategy.
+
+While my previous approach
+[Protohackers.MobInTheMiddleServer](https://github.com/sdball/protohackers/blob/ee1715a114ac845045c3ba43aa8e679c789ee8b5/lib/protohackers/mob_in_the_middle_server.ex)
+worked fine and was reasonably readable, it was overworking the Task
+module and doing too much supervision from within a non-supervisor
+process. It all worked because Elixir is awesome but it wasn't very
+idiomatic and would not have tolerated failure as well as a proper OTP
+solution.
+
+With this redesign we have an actual supervision tree watching the
+running "mob in the middle" server and connections.
+
+We have a top level supervisor which runs an acceptor and connection
+supervisor. Then the acceptor accepts a new socket connection it asks
+the connection supervisor to start a connection process. The connection
+process connects to the chat server being proxied. The connection
+process is what actually handles the TCP socket traffic from the client
+and the upstream server and does the actual work of rewriting the
+boguscoin addresses per the problem requirements.
+
+While this approach is somewhat more complex the actual implementation
+details are easier. For example we don't need to handle our own
+low-level `receive` block to handle the Elixir messages from the TCP
+socket. We can instead rely on the GenServer behavior to deliver them
+via the `handle_info` callback functions. Nice!
+
+[6688ae8307c073a11536502913dcff967741c28c on sdball/protohackers](https://github.com/sdball/protohackers/commit/6688ae8307c073a11536502913dcff967741c28c)
+
+## added files
+
+### lib/protohackers/mitm/acceptor.ex
+
+```
+defmodule Protohackers.MITM.Acceptor do
+  # temporary - do not restart task for any kind of exit
+  # transient - restart for non-successful exits
+  # permanent - always restart task on exit
+  use Task, restart: :transient
+
+  require Logger
+
+  def start_link(port) do
+    Task.start_link(__MODULE__, :run, [port])
+  end
+
+  def run(port) do
+    listen_options = [
+      # receive data as binaries (instead of lists)
+      mode: :binary,
+      # receive incoming packets as messages
+      active: :once,
+      # allow reusing the address if the listener crashes
+      reuseaddr: true,
+      # keep the peer socket open after the client closes its writes
+      exit_on_close: false,
+      # automatically split inputs by newline
+      packet: :line,
+      # increase default buffer to 10KB
+      buffer: 1024 * 10
+    ]
+
+    with {:ok, listen_socket} <- :gen_tcp.listen(port, listen_options) do
+      Logger.info("MITM Acceptor started listening port=#{port}")
+      accept_loop(listen_socket)
+    else
+      {:error, reason} ->
+        raise "MITM Acceptor failed to start listening port=#{port} reason=#{inspect(reason)}"
+    end
+  end
+
+  def accept_loop(listen_socket) do
+    with {:ok, socket} <- :gen_tcp.accept(listen_socket) do
+      Logger.info("MITM Acceptor accepted connection socket=#{inspect(socket)}")
+      Protohackers.MITM.ConnectionSupervisor.start_child(socket)
+      accept_loop(listen_socket)
+    else
+      {:error, reason} ->
+        raise "MITM Acceptor failed to accept connection reason=#{inspect(reason)}"
+    end
+  end
+end
+```
+
+### lib/protohackers/mitm/boguscoin.ex
+
+```
+defmodule Protohackers.MITM.Boguscoin do
+  @boguscoin ~r/^7[a-zA-Z0-9]{25,34}$/
+  @target_coin "7YWHMfk9JZe0LM0g1ZauHuiSxhI"
+
+  def rewrite(string) when is_binary(string) do
+    string
+    |> String.split(" ")
+    |> Enum.map(&Regex.replace(@boguscoin, &1, "7YWHMfk9JZe0LM0g1ZauHuiSxhI"))
+    |> Enum.join(" ")
+  end
+end
+```
+
+### lib/protohackers/mitm/connection.ex
+
+```
+defmodule Protohackers.MITM.Connection do
+  use GenServer, restart: :transient
+
+  require Logger
+
+  alias Protohackers.MITM.Boguscoin
+
+  def start_link(client_socket) do
+    GenServer.start_link(__MODULE__, client_socket)
+  end
+
+  defstruct [:client_socket, :upstream_socket]
+
+  @impl true
+  def init(client_socket) do
+    upstream_server = Application.get_env(:protohackers, Protohackers.MobInTheMiddleServer)
+
+    case :gen_tcp.connect(upstream_server[:host], upstream_server[:port], [:binary, active: :once]) do
+      {:ok, upstream_socket} ->
+        Logger.debug("MITM.Connection started connection client_socket=#{inspect(client_socket)}")
+        {:ok, %__MODULE__{client_socket: client_socket, upstream_socket: upstream_socket}}
+
+      {:error, reason} ->
+        Logger.error(
+          "MITM.Connect failed to connect to upstream server reason=#{inspect(reason)}"
+        )
+
+        {:stop, reason}
+    end
+  end
+
+  @impl true
+  def handle_info(message, state)
+
+  def handle_info(
+        {:tcp, client_socket, data},
+        %__MODULE__{client_socket: client_socket} = state
+      ) do
+    :ok = :inet.setopts(client_socket, active: :once)
+    Logger.debug("MITM.Connection received tcp data from client #{inspect(data)}")
+    :gen_tcp.send(state.upstream_socket, Boguscoin.rewrite(data))
+    {:noreply, state}
+  end
+
+  def handle_info(
+        {:tcp, upstream_socket, data},
+        %__MODULE__{upstream_socket: upstream_socket} = state
+      ) do
+    :ok = :inet.setopts(upstream_socket, active: :once)
+    Logger.debug("MITM.Connection received tcp data from upstream #{inspect(data)}")
+    :gen_tcp.send(state.client_socket, Boguscoin.rewrite(data))
+    {:noreply, state}
+  end
+
+  def handle_info({:tcp_error, socket, reason}, %__MODULE__{} = state)
+      when socket in [state.client_socket, state.upstream_socket] do
+    Logger.error("MITM.Connection received tcp error #{inspect(reason)}")
+    :gen_tcp.close(state.client_socket)
+    :gen_tcp.close(state.upstream_socket)
+    {:stop, :normal, state}
+  end
+
+  def handle_info({:tcp_closed, socket}, %__MODULE__{} = state)
+      when socket in [state.client_socket, state.upstream_socket] do
+    Logger.debug("MITM.Connection tcp connection closed")
+    :gen_tcp.close(state.client_socket)
+    :gen_tcp.close(state.upstream_socket)
+    {:stop, :normal, state}
+  end
+
+  def handle_info(message, state) do
+    Logger.error("MITM.Connection unexpected elixir message message=#{inspect(message)}")
+    {:noreply, state}
+  end
+end
+```
+
+### lib/protohackers/mitm/connection_supervisor.ex
+
+```
+defmodule Protohackers.MITM.ConnectionSupervisor do
+  use DynamicSupervisor
+
+  def start_link([] = _opts) do
+    DynamicSupervisor.start_link(__MODULE__, :no_args, name: __MODULE__)
+  end
+
+  def start_child(socket) do
+    child_spec = {Protohackers.MITM.Connection, socket}
+
+    with {:ok, conn} <- DynamicSupervisor.start_child(__MODULE__, child_spec),
+         :ok <- :gen_tcp.controlling_process(socket, conn) do
+      {:ok, conn}
+    end
+  end
+
+  def init(:no_args) do
+    DynamicSupervisor.init(strategy: :one_for_one, max_children: 50)
+  end
+end
+```
+
+### lib/protohackers/mitm/supervisor.ex
+
+```
+defmodule Protohackers.MITM.Supervisor do
+  use Supervisor
+
+  def start_link(port: port) do
+    Supervisor.start_link(__MODULE__, port: port)
+  end
+
+  @impl true
+  def init(port: port) do
+    children = [
+      Protohackers.MITM.ConnectionSupervisor,
+      {Protohackers.MITM.Acceptor, port}
+    ]
+
+    # :rest_for_one
+    # if a process crashes then it **and** any children defined after it will be restarted
+    Supervisor.init(children, strategy: :rest_for_one)
+  end
+end
+```
+
+## modified files
+
+### lib/protohackers/application.ex
+
+```diff
+diff --git a/lib/protohackers/application.ex b/lib/protohackers/application.ex
+index efd1d08..b4c8899 100644
+--- a/lib/protohackers/application.ex
++++ b/lib/protohackers/application.ex
+@@ -11,7 +11,8 @@ defmodule Protohackers.Application do
+       {Protohackers.AssetPriceServer, 11237},
+       {Protohackers.ChatRoomServer, 11238},
+       {Protohackers.UnusualDatabaseProtocolServer, 11239},
+-      {Protohackers.MobInTheMiddleServer, 11240},
++      # {Protohackers.MobInTheMiddleServer, 11240},
++      {Protohackers.MITM.Supervisor, port: 11240},
+       {Protohackers.SpeedLimitServer, 11241}
+     ]
+
+```

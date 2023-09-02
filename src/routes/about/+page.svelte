@@ -18,12 +18,4 @@
     mine.
   </p>
   <p>I also have a fun time comparision site: <a href="https://furtherfrom.com">Further From</a></p>
-  <p>
-    I'll write more later. For now I need to get going on migrating markdown files into this new
-    site from my previous blot.im setup.
-  </p>
-  <p>
-    Speaking of blot.im: it's fantastic! If you need a simple blog setup it's what you want. I'm
-    only switching away because I wanted a space to be able to do more arbitary fun things.
-  </p>
 </main>
