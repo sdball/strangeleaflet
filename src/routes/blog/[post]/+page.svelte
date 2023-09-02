@@ -1,12 +1,18 @@
 <script>
   export let data;
-  import { fade, fly } from "svelte/transition";
+  import { fade } from "svelte/transition";
+  import { quadInOut } from "svelte/easing";
   import Navigation from "$lib/components/Navigation.svelte";
-  const { Content } = data;
+  let Content;
+  $: {
+    Content = data.Content;
+  }
 </script>
 
 <Navigation />
 
-<div in:fly={{ duration: 300, y: 200 }} out:fly={{ duration: 300, x: 200 }}>
-  <Content />
-</div>
+{#key data.currentRoute}
+  <div in:fade={{ duration: 300, easing: quadInOut }}>
+    <Content />
+  </div>
+{/key}

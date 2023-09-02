@@ -1,9 +1,6 @@
 import { error } from "@sveltejs/kit";
 
-/**
- *
- * @param {{params: { post: string }}} param0
- */
+/** import type { PageLoad } from './$types'; */
 export const load = async ({ params }) => {
   try {
     const post = (

@@ -19,7 +19,6 @@
   export let categories;
 
   import { formatDate } from "$lib/blog/formatDateTime";
-  import Navigation from "$lib/components/Navigation.svelte";
 </script>
 
 {#if layout === "blog"}
