@@ -4,6 +4,8 @@ import { mdsvex } from "mdsvex";
 import relativeImages from "mdsvex-relative-images";
 import remarkMath from "remark-math";
 import rehypeKatexSvelte from "rehype-katex-svelte";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -18,7 +20,7 @@ const config = {
         blog: "src/routes/blog/mdsvex.svelte"
       },
       remarkPlugins: [relativeImages, remarkMath],
-      rehypePlugins: [rehypeKatexSvelte]
+      rehypePlugins: [rehypeKatexSvelte, rehypeSlug, rehypeAutolinkHeadings]
     }),
     vitePreprocess({})
   ],
