@@ -10,11 +10,15 @@
     Tooltip,
     Dropdown,
     DropdownItem,
-    DropdownDivider
+    DropdownDivider,
+    Button,
+    Input
   } from "flowbite-svelte";
-  import { ChevronDownOutline } from "flowbite-svelte-icons";
+  import { ChevronDownOutline, SearchOutline } from "flowbite-svelte-icons";
+  import { goto } from "$app/navigation";
 
-  import StrangeLeafletSvg from "./StrangeLeafletSvg.svelte";
+  import StrangeLeafletSvg from "$lib/components/StrangeLeafletSvg.svelte";
+  import Search from "$lib/components/Search.svelte";
 </script>
 
 <Navbar let:hidden let:toggle rounded color="form">
@@ -40,9 +44,12 @@
       <DropdownItem href="/blog">All</DropdownItem>
     </Dropdown>
   </NavUl>
-  <div class="flex md:order-2">
+
+  <div class="flex md:order-2 gap-x-2">
+    <Search />
     <DarkMode />
     <Tooltip>Toggle Dark Mode</Tooltip>
+
     <NavHamburger on:click={toggle} />
   </div>
 </Navbar>
