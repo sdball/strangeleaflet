@@ -17,8 +17,8 @@ const config = {
         dashes: "oldschool"
       },
       layout: {
-        blog: "src/routes/blog/mdsvex.svelte",
-        gitblog: "src/routes/blog/mdsvex.svelte",
+        blog: "src/routes/blog/posts/mdsvex.svelte",
+        gitblog: "src/routes/blog/gitblog/mdsvex.svelte",
         _: "src/routes/blog/mdsvex.svelte"
       },
       remarkPlugins: [relativeImages, remarkMath],

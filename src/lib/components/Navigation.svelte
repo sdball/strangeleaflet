@@ -1,6 +1,19 @@
 <script>
   export let showSiteName = true;
-  import { DarkMode, Navbar, NavBrand, NavLi, NavUl, NavHamburger, Tooltip } from "flowbite-svelte";
+  import {
+    DarkMode,
+    Navbar,
+    NavBrand,
+    NavLi,
+    NavUl,
+    NavHamburger,
+    Tooltip,
+    Dropdown,
+    DropdownItem,
+    DropdownDivider
+  } from "flowbite-svelte";
+  import { ChevronDownOutline } from "flowbite-svelte-icons";
+
   import StrangeLeafletSvg from "./StrangeLeafletSvg.svelte";
 </script>
 
@@ -15,8 +28,17 @@
   </NavBrand>
   <NavUl {hidden}>
     <NavLi href="/">Home</NavLi>
-    <NavLi href="/blog">Blog</NavLi>
     <NavLi href="/about">About Me</NavLi>
+    <NavLi id="blogs-menu" class="cursor-pointer">
+      Blogs<ChevronDownOutline class="w-3 h-3 ml-2 text-primary-800 dark:text-white inline" />
+    </NavLi>
+
+    <Dropdown triggeredBy="#blogs-menu" class="w-44 z-20">
+      <DropdownItem href="/blog/posts">Posts</DropdownItem>
+      <DropdownItem href="/blog/gitblog">Git Blog</DropdownItem>
+      <DropdownDivider />
+      <DropdownItem href="/blog">All</DropdownItem>
+    </Dropdown>
   </NavUl>
   <div class="flex md:order-2">
     <DarkMode />

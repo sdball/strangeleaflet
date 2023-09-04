@@ -25,6 +25,4 @@ $ git blog
 $ git blog c09efbf
 ```
 
-The posts are dropped into my [blot.im](https://blot.im) directory for Strange
-Leaflet as draft posts. I have another script `publish-blog-post` that uses
-`fzf` to prompt me for draft posts that I'm ready to publish.
+Essentially the command turns the Git commit message into markdown which I can then drop into this markdown-based blog setup.
