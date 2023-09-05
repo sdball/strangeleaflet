@@ -24,7 +24,7 @@ export const fetchGitBlogs = async () => {
   /**
    * @type Record<string, any>
    */
-  const postFiles = import.meta.glob("/src/lib/blog/gitblog/**/*.svx", { eager: true });
+  const postFiles = import.meta.glob("/src/lib/blog/gitblogs/**/*.svx", { eager: true });
   return Object.entries(postFiles)
     .map(([path, meta]) => {
       meta.metadata.date = new Date(meta.metadata.date);

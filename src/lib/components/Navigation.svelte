@@ -35,7 +35,7 @@
 
     <Dropdown triggeredBy="#blogs-menu" class="w-44 z-20">
       <DropdownItem href="/blog/posts">Posts</DropdownItem>
-      <DropdownItem href="/blog/gitblog">Git Blog</DropdownItem>
+      <DropdownItem href="/blog/gitblogs">Git Blogs</DropdownItem>
       <DropdownDivider />
       <DropdownItem href="/blog">All</DropdownItem>
     </Dropdown>

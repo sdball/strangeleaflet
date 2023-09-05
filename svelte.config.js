@@ -18,7 +18,7 @@ const config = {
       },
       layout: {
         blog: "src/routes/blog/posts/mdsvex.svelte",
-        gitblog: "src/routes/blog/gitblog/mdsvex.svelte",
+        gitblog: "src/routes/blog/gitblogs/mdsvex.svelte",
         _: "src/routes/blog/mdsvex.svelte"
       },
       remarkPlugins: [relativeImages, remarkMath],

@@ -5,8 +5,8 @@ export const load = async ({ params }) => {
   try {
     const post = (
       await Promise.all([
-        import(`../../../../lib/blog/posts/${params.post}.svx`).catch((err) => null),
-        import(`../../../../lib/blog/posts/${params.post}/index.svx`).catch((err) => null)
+        import(`../../../../lib/blog/gitblogs/${params.post}.svx`).catch((err) => null),
+        import(`../../../../lib/blog/gitblogs/${params.post}/index.svx`).catch((err) => null)
       ])
     ).find((p) => !!p);
     const { title, date } = post.metadata;
@@ -18,6 +18,7 @@ export const load = async ({ params }) => {
       Content
     };
   } catch (_err) {
+    console.error(_err);
     throw error(404, "Not Found");
   }
 };
