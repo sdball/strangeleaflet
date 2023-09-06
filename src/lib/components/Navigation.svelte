@@ -10,9 +10,7 @@
     Tooltip,
     Dropdown,
     DropdownItem,
-    DropdownDivider,
-    Button,
-    Input
+    DropdownDivider
   } from "flowbite-svelte";
   import { ChevronDownOutline, SearchOutline } from "flowbite-svelte-icons";
   import { goto } from "$app/navigation";
