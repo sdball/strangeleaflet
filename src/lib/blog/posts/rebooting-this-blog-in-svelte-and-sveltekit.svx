@@ -1,0 +1,151 @@
+---
+layout: blog
+date: 2023-09-07T12:57:59Z
+title: Rebooting this blog in Svelte and SvelteKit
+categories:
+  - svelte
+  - blog
+---
+
+<script>
+  import { Button } from "flowbite-svelte";
+  import Penguin from "$lib/components/Penguin.svelte";
+  let walk = true;
+</script>
+
+Hello Internet! After being a happy blot.im customer for years, well, I'm still very happy with Blot. It's a fantastic way to easily get a blog on the Internet with minimal fuss. But I started using Svelte for a work project and loved it so much that I started learning it more and more and picked up SvelteKit as well which has some compelling ideas for creating web pages and even web applications. Then I found some fantastic guides to creating nice blogs in SvelteKit which led me to finding the amazing project mdsvex. The idea of easily creating application experiences alongside and within markdown I just had to switch away from blot.im and use this amazing framework.
+
+Look check this out, I can drop in a component just like this right in my blog post markdown.
+
+```svelte
+<Penguin walk={true} />
+```
+
+<Penguin walk={true} />
+
+How cool is that!? Yes I shamelessly copied that cute component from mdsvex's homepage but I just had to recreate it locally to see how it works. I also tweaked a few things and learned about Svelte's `tweened` function which gives you a special Svelte store that continually updates its value over a fixed duration: i.e. an easy to use clock with which we can animate.
+
+Want to see the data about the walking penguin? Me too! I added an `insight` attribute.
+
+```svelte
+<Penguin walk={true} insight={true} />
+```
+
+<Penguin walk={true} insight={true} />
+
+Wanna see something cool? Resize your browser window and that insight view's `innerWidth` will change and the penguin walk will correct itself to the new width if needed.
+
+You can see how [mdsvex wrote their penguin component](https://github.com/SvelteLab/SvelteLab/blob/1284f4b4d11f0c5458e1287357c4964803a1bf99/src/lib/default_project_files/mdsvex/src/lib/Penguin.svelte) and here's mine. Check out how little code there is! All the `$:` declarations are reactive declarations which will execute if any of the variables they use are changed. How cool is that?
+
+```svelte
+<script>
+  import { tweened } from "svelte/motion";
+
+  export let walk = false;
+  export let insight = false;
+  export let speed = 10;
+
+  let pos = tweened(0);
+  let walking = false;
+  let contentWidth = 900;
+  let maxWidth = 390;
+
+  /** @type {boolean} */
+  let flip;
+
+  /** @type {number} */
+  let innerWidth;
+
+  /**
+   * Calculate a duration as a distance between two points multiplied by a speed
+   *
+   * @param {number} x - first point
+   * @param {number} y - second point
+   * @param {number} s - penguin walking speed (1–100)
+   * @returns {number} calculated duration
+   */
+  const calculateDuration = (x, y, s) => {
+    if (s > 100) {
+      s = 100;
+    }
+
+    if (s < 1) {
+      s = 1;
+    }
+
+    return Math.abs(x - y) * (100 / s);
+  };
+
+  function startWalking() {
+    walking = true;
+    adjustWalkWidth();
+    // pos.set(to, { duration: calculateDuration($pos, from, speed) });
+  }
+
+  function stopWalking() {
+    walking = false;
+    pos.set($pos, { duration: 0 });
+  }
+
+  function adjustWalkWidth() {
+    if (!walking) return;
+    const duration = flip
+      ? calculateDuration($pos, from, speed)
+      : calculateDuration($pos, to, speed);
+    pos.set(flip ? from : to, { duration });
+  }
+
+  $: to = innerWidth > contentWidth ? maxWidth : (innerWidth * 0.9) / 2 - 32;
+  $: from = innerWidth > contentWidth ? -maxWidth : ((innerWidth * 0.9) / 2 - 32) * -1;
+  $: innerWidth && adjustWalkWidth();
+  $: walk && !walking && startWalking();
+  $: !walk && walking && stopWalking();
+  $: $pos >= to &&
+    (flip = true) &&
+    pos.set(from, { duration: calculateDuration($pos, from, speed) });
+  $: $pos <= from &&
+    !(flip = false) &&
+    pos.set(to, { duration: calculateDuration($pos, to, speed) });
+  $: penguinGif = walk ? "penguin.gif" : "penguin_static.gif";
+</script>
+
+<svelte:window bind:innerWidth />
+
+{#if insight}
+  <pre>
+gif: {penguinGif}
+walking: {walking}
+innerWidth: {innerWidth}
+from: {from.toFixed(0)}
+to: {to.toFixed(0)}
+pos: {$pos.toFixed(0)}
+speed: {speed}
+</pre>
+{/if}
+
+<div class="penguin" style="transform: translateX({$pos}px) rotateY({flip ? 180 : 0}deg);">
+  <img alt="a cartoon penguin walking" src="/{penguinGif}" />
+</div>
+
+<style>
+  .penguin {
+    width: 64px;
+    height: 70px;
+    margin: 44px auto 24px auto;
+  }
+</style>
+```
+
+You might note in the code that we can make a zoomy bird. And we can make him stoppable with a button that updates the `walk` variable. Note in this declaration I'm using `{walk}` which Svelte nicely turns into `walk={walk}`. I have a `walk` variable declared in this markdown file that's initially set to `true`.
+
+```svelte
+<Penguin {walk} speed={100} insight={true} />
+<Button color={walk ? "red" : "green"} on:click={() => (walk = !walk)}
+  >{walk ? "Stop" : "Start"} Walking</Button
+>
+```
+
+<Penguin {walk} speed={100} insight={true} />
+<Button color={walk ? "red" : "green"} on:click={() => walk = !walk}>{walk ? "Stop" : "Start"} Walking</Button>
+
+How exciting is that? This is so fun!
