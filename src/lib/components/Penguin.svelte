@@ -9,6 +9,7 @@
   let walking = false;
   let contentWidth = 900;
   let maxWidth = 390;
+  let duration = 0;
 
   /** @type {boolean} */
   let flip;
@@ -38,7 +39,11 @@
 
   function startWalking() {
     walking = true;
-    adjustWalkWidth();
+    if (flip === undefined) {
+      pos.set($pos, { duration: 0 });
+    } else {
+      adjustWalkWidth();
+    }
   }
 
   function stopWalking() {
@@ -48,9 +53,7 @@
 
   function adjustWalkWidth() {
     if (!walking) return;
-    const duration = flip
-      ? calculateDuration($pos, from, speed)
-      : calculateDuration($pos, to, speed);
+    duration = flip ? calculateDuration($pos, from, speed) : calculateDuration($pos, to, speed);
     pos.set(flip ? from : to, { duration });
   }
 
@@ -59,12 +62,16 @@
   $: innerWidth && adjustWalkWidth();
   $: walk && !walking && startWalking();
   $: !walk && walking && stopWalking();
-  $: $pos >= to &&
-    (flip = true) &&
-    pos.set(from, { duration: calculateDuration($pos, from, speed) });
-  $: $pos <= from &&
-    !(flip = false) &&
-    pos.set(to, { duration: calculateDuration($pos, to, speed) });
+  $: if ($pos >= to) {
+    flip = true;
+    duration = calculateDuration($pos, from, speed);
+    pos.set(from, { duration });
+  }
+  $: if ($pos <= from) {
+    flip = false;
+    duration = calculateDuration($pos, to, speed);
+    pos.set(to, { duration });
+  }
   $: penguinGif = walk ? "penguin.gif" : "penguin_static.gif";
 </script>
 
@@ -73,11 +80,14 @@
 {#if insight}
   <pre>
 gif: {penguinGif}
+walk: {walk}
 walking: {walking}
 innerWidth: {innerWidth}
 from: {from.toFixed(0)}
 to: {to.toFixed(0)}
 pos: {$pos.toFixed(0)}
+duration: {duration}
+flip: {flip}
 speed: {speed}
 </pre>
 {/if}
