@@ -79,7 +79,6 @@ You can see how [mdsvex wrote their penguin component](https://github.com/Svelte
   function startWalking() {
     walking = true;
     adjustWalkWidth();
-    // pos.set(to, { duration: calculateDuration($pos, from, speed) });
   }
 
   function stopWalking() {

@@ -39,7 +39,6 @@
   function startWalking() {
     walking = true;
     adjustWalkWidth();
-    // pos.set(to, { duration: calculateDuration($pos, from, speed) });
   }
 
   function stopWalking() {
