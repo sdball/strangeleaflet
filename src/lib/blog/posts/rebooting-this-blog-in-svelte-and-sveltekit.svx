@@ -148,13 +148,13 @@ speed: {speed}
 You might note in the code that we can make a zoomy bird. And we can make him stoppable with a button that updates the `walk` variable. Note in this declaration I'm using `{walk}` which Svelte nicely turns into `walk={walk}`. I have a `walk` variable declared in this markdown file that's initially set to `true`.
 
 ```svelte
-<Penguin {walk} speed={100} insight={true} />
+<Penguin {walk} speed={80} insight={true} />
 <Button color={walk ? "red" : "green"} on:click={() => (walk = !walk)}
   >{walk ? "Stop" : "Start"} Walking</Button
 >
 ```
 
-<Penguin {walk} speed={100} insight={true} />
+<Penguin {walk} speed={80} insight={true} />
 <Button color={walk ? "red" : "green"} on:click={() => walk = !walk}>{walk ? "Stop" : "Start"} Walking</Button>
 
 How exciting is that? This is so fun!
