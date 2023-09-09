@@ -15,6 +15,8 @@ categories:
 
 Hello Internet! After being a happy blot.im customer for years, well, I'm still very happy with Blot. It's a fantastic way to easily get a blog on the Internet with minimal fuss. But I started using Svelte for a work project and loved it so much that I started learning it more and more and picked up SvelteKit as well which has some compelling ideas for creating web pages and even web applications. Then I found some fantastic guides to creating nice blogs in SvelteKit which led me to finding the amazing project mdsvex. The idea of easily creating application experiences alongside and within markdown I just had to switch away from blot.im and use this amazing framework.
 
+# Why Svelte?
+
 Look check this out, I can drop in a component just like this right in my blog post markdown.
 
 ```svelte
@@ -158,3 +160,39 @@ You might note in the code that we can make a zoomy bird. And we can make him st
 <Button color={walk ? "red" : "green"} on:click={() => walk = !walk}>{walk ? "Stop" : "Start"} Walking</Button>
 
 How exciting is that? This is so fun!
+
+In Svelte, frontend application design is just so simple and easy that it's genuinely a joy to make interactive experiences. Like being able to stop that penguin. I _could_ do that in Phoenix LiveView, but having a roundtrip to the server even over a minimal websocket connection doesn't sit right for that kind of infrequent ad-hoc operation that only ultimately changes browser state.
+
+LiveView is a perfect fit for ensuring that server-state and browser-state are in sync and reactive to each other. That concept and capability is incredibly powerful. If I had a web application with dynamic external and internal sources of information to keep updated and synchronized across all connected browsers while also allowing all browsers to be synchronized with each other: Phoenix and especially Phoenix LiveView is the only reasonable answer.
+
+But this blog isn't that. It's a collection of webpages that are essentially static to the server but dynamic to the browser. The experience is delivered and then entirely self-contained and isolated in the browser space. That kind of experience is perfect for Svelte and its supremely well designed experience for building frontend user experiences.
+
+Can you stop the penguin in your browser? Yes, easily! Can you stop the penguin in your browser and for all connected browsers? No and adding that capability without Phoenix and LiveView would be a complex nightmare to build that still wouldn't work as well as a simple Phoenix declaration.
+
+## Why SvelteKit then?
+
+To start, SvelteKit is the backend framework that pairs directly with Svelte. You are not required to use SvelteKit to use Svelte. And similarly I suppose you aren't required to use Svelte to use SvelteKit but that would be some work to avoid some convenience.
+
+So why SvelteKit and not [Phoenix + Svelte](https://medium.com/@alistairisrael/phoenix-1-7-with-svelte-12257d853ed1) or [Phoenix LiveView + Svelte](https://dev.to/debussyman/e2e-reactivity-using-svelte-with-phoenix-liveview-38mf)?
+
+### Markdown
+
+I'm writing this post in markdown. And in the SvelteKit ecosystem there's this really cool project that I copied a penguin animation from: [mdsvex](https://mdsvex.pngwn.io/docs). Which further has its own [ecosystem of plugins](https://mdsvex.pngwn.io/docs#remarkplugins--rehypeplugins). That all means that once I wire up mdsvex into SvelteKit I have an easy experience to write blog posts that can be as locally interactive as I care to make them. Each markdown file is extended with the capability to use the full unabridged set of capabilities of Svelte and SvelteKit with no ceremony.
+
+One great plugin I'm using for mdsvex allows me to use relative links for images from the location of the markdown file. That means I can put posts with images into their own directories and finally easily group posts and their images together.
+
+Another nice plugin automatically adds IDs to markdown headers. Another plugin automatically adds links to markdown headers with IDs. Yet another adds support for $\TeX$ which I've actually used in my [post on bitfields](/blog/posts/shrink-your-data-into-bitfields).
+
+There are projects to provide similar "write markdown pages in Phoenix" but none that so easily integrate markdown with the frontend experience.
+
+### Web pages vs a web application
+
+This site is very much what I'd call web pages and not a web application. And SvelteKit has some great design choices that make writing web pages fun and easy. For one, its [routing system is entirely based on the filesystem](https://kit.svelte.dev/docs/routing). That means adding a new page is simple as adding a folder and file vs updating an application router and then adding the file or files to support that new route. It seems silly but the ease of seeing my routing pages right in the file tree is pretty nice for a simple set of web pages.
+
+### Svelte!
+
+SvelteKit and Svelte are, obviously, made for each other. With this combination the dream of having the same code for the frontend and backend is fully realized. [The same code can run on both the server and browser](https://kit.svelte.dev/docs/routing#page-page-js), literally the _same_ code. You can of course also mandate that certain code only runs in the browser and other code only runs on the server.
+
+## Wrap up
+
+SvelteKit and Svelte aren't a fit for all things. But for writing a markdown file focused blog and set of web pages that want to have the capability for joyful interactive browser experiences they're amazing!
