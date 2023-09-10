@@ -6,6 +6,11 @@ categories:
   - programming
 ---
 
+<script>
+  import { Range, Label, Card } from 'flowbite-svelte';
+  let n = 5;
+</script>
+
 Some applications want to save every byte. Every last byte! Maybe they have memory constraints, maybe they're sending data over the network, maybe they just like saving bytes.
 
 One way to help save bytes is to use efficient data structures. One popular memory efficient data structure is a bitfield. A bitfield allows complex, predefined data to be stored in a compact series of bits.
@@ -283,16 +288,16 @@ The number of bits you need for a field is enough to represent the power of two 
 
 Let's say we want a bitfield to hold days of the month. There are 31 possible values from 1 to 31. Let's see how many bits we'd need to hold that data.
 
-| Number of Bits | Available Values |         Range |
-| :------------: | :--------------: | :-----------: |
-|      $1$       |        $2$       |    $0\ldots1$ |
-|      $2$       |        $4$       |    $0\ldots3$ |
-|      $3$       |        $8$       |    $0\ldots7$ |
-|      $4$       |       $16$       |   $0\ldots15$ |
-|      $5$       |       $32$       |   $0\ldots31$ |
-|      $6$       |       $64$       |   $0\ldots63$ |
-|      $7$       |      $128$       |  $0\ldots127$ |
-|      $8$       |      $256$       |  $0\ldots255$ |
+| Number of Bits | Available Values |    Range     |
+| :------------: | :--------------: | :----------: |
+|      $1$       |       $2$        |  $0\ldots1$  |
+|      $2$       |       $4$        |  $0\ldots3$  |
+|      $3$       |       $8$        |  $0\ldots7$  |
+|      $4$       |       $16$       | $0\ldots15$  |
+|      $5$       |       $32$       | $0\ldots31$  |
+|      $6$       |       $64$       | $0\ldots63$  |
+|      $7$       |      $128$       | $0\ldots127$ |
+|      $8$       |      $256$       | $0\ldots255$ |
 
 Hey there we go! Using 5 bits gives us a bucket of 32 spaces which is just a little more than we need to hold any of the 31 possible days in a month.
 
@@ -366,9 +371,9 @@ Ultimately for this specific example we want to get this binary number:
 
 Made up of these components
 
-| Priority |  Location   | Status |   Candy |
-| :------- | :---------: | :----: | ------: |
-| $11$   | $1000111$ | $1$  | $000$ |
+| Priority | Location  | Status | Candy |
+| :------- | :-------: | :----: | ----: |
+| $11$     | $1000111$ |  $1$   | $000$ |
 
 Would that save us space? Yes! Because we can represent that long string of bits as an integer of whatever base we like!
 
@@ -402,12 +407,12 @@ serialized = IntegerArray.serialize(data)
 
 Let's convert them individually to base-2
 
-| Field    | Base-10 |      Base-2 |
-| -------- | ------: | ----------: |
-| Priority |     $3$ |        $11$ |
-| Location |    $71$ |   $1000111$ |
-| Status   |     $1$ |         $1$ |
-| Candy    |     $0$ |         $0$ |
+| Field    | Base-10 |    Base-2 |
+| -------- | ------: | --------: |
+| Priority |     $3$ |      $11$ |
+| Location |    $71$ | $1000111$ |
+| Status   |     $1$ |       $1$ |
+| Candy    |     $0$ |       $0$ |
 
 Here you might spot the problem with a simple conversion of each integer to base-2 and joining them into a string. But if you don't you're in good company because the problem is not obvious nor intuitive.
 
@@ -468,30 +473,45 @@ Since we want to represent more data than a single bit can hold and since we wan
 
 As a quick level set on number "places" in base-10 vs base-2 let's look at what the number `1000` represents in base-2 vs base-10.
 
-|               |     1 |    0 |   0 |  0 |
-|---------------|-------|------|-----|----|
-| Base-10 Place | 1000  | 100  | 10  | 1  |
-| Base-2 Place  | 8     | 4    | 2   | 1  |
+|               | 1    | 0   | 0   | 0   |
+| ------------- | ---- | --- | --- | --- |
+| Base-10 Place | 1000 | 100 | 10  | 1   |
+| Base-2 Place  | 8    | 4   | 2   | 1   |
 
 In other words, each new digit represents another power of the base.
 
-| N          |         $N^{10}$ |          $N^2$ |
-| :--------- | -------------: | -------------: |
-| 0          |              1 |              1 |
-| 1          |             10 |              2 |
-| 2          |            100 |              4 |
-| 3          |           1000 |              8 |
-| 4          |          10000 |             16 |
-| ...        |            ... |            ... |
+| N   | $10^N$ | $2^N$ |
+| :-- | -----: | ----: |
+| 0   |      1 |     1 |
+| 1   |     10 |     2 |
+| 2   |    100 |     4 |
+| 3   |   1000 |     8 |
+| 4   |  10000 |    16 |
+| ... |    ... |   ... |
 
 As we add data to our bitfield we'll be adding more and more powers of base-2.
 
 | bitfield length | possible values in base-10 |
-|----------------:|---------------------------:|
-|               1 |                       $0\ldots1$ |
-|               2 |                       $0\ldots3$ |
-|               3 |                       $0\ldots7$ |
-|               4 |                      $0\ldots15$ |
+| --------------: | -------------------------: |
+|               1 |                 $0\ldots1$ |
+|               2 |                 $0\ldots3$ |
+|               3 |                 $0\ldots7$ |
+|               4 |                $0\ldots15$ |
+
+<Card>
+  <div class="mb-3">
+  <Label>Bitfield length: {n}</Label>
+  <Range id="range-n" min="1" max="31" bind:value={n} />
+  </div>
+
+  <p class="m-0">Range of base-10 values: <code>0...{(2**n) - 1}</code></p>
+
+  <p class="m-0">Number of possible values: <code>{(2**n)}</code></p>
+  <p class="m-0">Example bitfield values</p>
+  <pre>{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}
+{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}
+{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}</pre>
+</Card>
 
 # Constructing a bitfield by hand
 
@@ -673,14 +693,14 @@ We have another option available to us when we're constructing our bitfield: **b
 
 | Bitwise left shift |   Base-2 | Base-10 |
 | :----------------- | -------: | ------: |
-| $1\ll0$           |        1 |       1 |
-| $1\ll1$           |       10 |       2 |
-| $1\ll2$           |      100 |       4 |
-| $1\ll3$           |     1000 |       8 |
-| $1\ll4$           |    10000 |      16 |
-| $1\ll5$           |   100000 |      32 |
-| $1\ll6$           |  1000000 |      64 |
-| $1\ll7$           | 10000000 |     128 |
+| $1\ll0$            |        1 |       1 |
+| $1\ll1$            |       10 |       2 |
+| $1\ll2$            |      100 |       4 |
+| $1\ll3$            |     1000 |       8 |
+| $1\ll4$            |    10000 |      16 |
+| $1\ll5$            |   100000 |      32 |
+| $1\ll6$            |  1000000 |      64 |
+| $1\ll7$            | 10000000 |     128 |
 
 That's _awesome_! We can take the number we know we want and then directly say where we want it to be in the resulting bitfield number. Let's build this bitfield up iteratively. Of course there are also many ways we could nicely wrap it up into a class. For example our earlier class keeping track of the base for each field could instead keep track of the position directly. It's a bit more intuitive to think about the position of each value vs its starting power of two.
 
@@ -938,14 +958,14 @@ Let's see how this works in practice by going back to our status messages bitfie
 
 To extract individual fields from our bitfield we need four different comparison numbers. Determining each number is simple: fill in a `1` for the bits of the field and leave everything else `0`.
 
-| value             |      purpose |
-| :---------------- | -----------: |
-| `1110001111000`   | the bitfield in question |
-| ---               | ---          |
-| `1100000000000`   |     bits to extract the priority |
-| `0011111110000`   |     bits to extract the location |
-| `0000000001000`   |       bits to extract the status |
-| `0000000000111`   |        bit to extract candy |
+| value           |                      purpose |
+| :-------------- | ---------------------------: |
+| `1110001111000` |     the bitfield in question |
+| ---             |                          --- |
+| `1100000000000` | bits to extract the priority |
+| `0011111110000` | bits to extract the location |
+| `0000000001000` |   bits to extract the status |
+| `0000000000111` |         bit to extract candy |
 
 Let's look at status and see how its bitwise AND comparison value can extract the actual value of the field while ignoring anything else in the bitfield.
 
