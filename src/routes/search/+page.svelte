@@ -2,6 +2,7 @@
   export let data;
   import Navigation from "$lib/components/Navigation.svelte";
   import Item from "$lib/components/Item.svelte";
+  import Footer from "$lib/components/Footer.svelte";
 </script>
 
 <Navigation />
@@ -15,3 +16,5 @@
     <Item {item} class="mb-9" />
   {/each}
 </main>
+
+<Footer />

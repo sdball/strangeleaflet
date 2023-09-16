@@ -3,6 +3,7 @@
 
   import { formatDate } from "$lib/blog/formatDateTime.js";
   import Navigation from "$lib/components/Navigation.svelte";
+  import Footer from "$lib/components/Footer.svelte";
 </script>
 
 <Navigation />
@@ -24,3 +25,5 @@
     {/each}
   </ul>
 </main>
+
+<Footer />

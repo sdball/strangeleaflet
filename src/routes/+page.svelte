@@ -2,12 +2,13 @@
   import { Heading, P, A } from "flowbite-svelte";
   import Navigation from "$lib/components/Navigation.svelte";
   import StrangeLeafletSvg from "$lib/components/StrangeLeafletSvg.svelte";
+  import Footer from "$lib/components/Footer.svelte";
 </script>
 
 <Navigation />
 
 <main
-  class="prose dark:prose-invert mt-12 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
+  class="prose dark:prose-invert mt-12 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal lg:mb-24"
 >
   <Heading class="mt-9">Strange Leaflet</Heading>
   <P>Hi there. Uh. Not much to see on the frontpage yet.</P>
@@ -26,3 +27,5 @@
     implement the animation for switching between pages. I hope it isn't too annoying.</P
   >
 </main>
+
+<Footer />
