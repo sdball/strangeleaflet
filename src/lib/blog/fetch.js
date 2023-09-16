@@ -12,7 +12,7 @@ export const fetchPosts = async () => {
           .replace(/^\/src\/lib/, "")
           .replace(/\.svx$/, "")
           .replace(/\/index$/, ""),
-        metadata: meta.metadata
+        ...meta
       };
     })
     .sort((a, b) => {
@@ -34,7 +34,7 @@ export const fetchGitBlogs = async () => {
           .replace(/^\/src\/lib/, "")
           .replace(/\.svx$/, "")
           .replace(/\/index$/, ""),
-        metadata: meta.metadata
+        ...meta
       };
     })
     .sort((a, b) => {

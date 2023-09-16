@@ -12,8 +12,7 @@
     DropdownItem,
     DropdownDivider
   } from "flowbite-svelte";
-  import { ChevronDownOutline, SearchOutline } from "flowbite-svelte-icons";
-  import { goto } from "$app/navigation";
+  import { ChevronDownOutline } from "flowbite-svelte-icons";
 
   import StrangeLeafletSvg from "$lib/components/StrangeLeafletSvg.svelte";
   import Search from "$lib/components/Search.svelte";
@@ -40,6 +39,9 @@
       <DropdownItem href="/blog/gitblogs">Git Blogs</DropdownItem>
       <DropdownDivider />
       <DropdownItem href="/blog">All</DropdownItem>
+      <DropdownDivider />
+      <DropdownItem href="/blog/feed">Atom Feed</DropdownItem>
+      <DropdownItem href="/blog/feed.rss">RSS Feed</DropdownItem>
     </Dropdown>
   </NavUl>
 
