@@ -1,5 +1,4 @@
-import { Feed } from "feed";
-
+// this is the blog level feed and should include all types of blog posts
 import { fetchAll } from "$lib/blog/fetch";
 
 import { generateFeed } from "$lib/blog/generateFeed.js";
