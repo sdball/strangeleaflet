@@ -30,18 +30,28 @@
   <NavUl {hidden}>
     <NavLi href="/">Home</NavLi>
     <NavLi href="/about">About Me</NavLi>
+
     <NavLi id="blogs-menu" class="cursor-pointer">
       Blogs<ChevronDownOutline class="w-3 h-3 ml-2 text-primary-800 dark:text-white inline" />
     </NavLi>
-
     <Dropdown triggeredBy="#blogs-menu" class="w-44 z-20">
       <DropdownItem href="/blog/posts">Posts</DropdownItem>
       <DropdownItem href="/blog/gitblogs">Git Blogs</DropdownItem>
       <DropdownDivider />
       <DropdownItem href="/blog">All</DropdownItem>
+    </Dropdown>
+
+    <NavLi id="feeds-menu" class="cursor-pointer">
+      Feeds<ChevronDownOutline class="w-3 h-3 ml-2 text-primary-800 dark:text-white inline" />
+    </NavLi>
+    <Dropdown triggeredBy="#feeds-menu" class="w-44 z-20">
+      <DropdownItem href="/blog/feed.atom">Blog only - atom</DropdownItem>
+      <DropdownItem href="/blog/feed.json">Blog only - json</DropdownItem>
+      <DropdownItem href="/blog/feed.json">Blog only - rss</DropdownItem>
       <DropdownDivider />
-      <DropdownItem href="/blog/feed">Atom Feed</DropdownItem>
-      <DropdownItem href="/blog/feed.rss">RSS Feed</DropdownItem>
+      <DropdownItem href="/feed.atom">All - atom</DropdownItem>
+      <DropdownItem href="/feed.json">All - json</DropdownItem>
+      <DropdownItem href="/feed.json">All - rss</DropdownItem>
     </Dropdown>
   </NavUl>
 

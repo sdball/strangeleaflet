@@ -17,6 +17,6 @@ export async function GET({ setHeaders, params }) {
 
   const { format } = params;
   const items = await fetchAll();
-  const feed = generateFeed(items, format);
+  const feed = generateFeed(items, format, "/blog");
   return new Response(feed);
 }

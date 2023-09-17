@@ -63,16 +63,30 @@ const gitBlogDescription = (metadata) => {
 };
 
 /**
+ *
+ * @param {string|undefined} format
+ * @param {string|undefined} path
+ * @returns {string}
+ */
+const feedTitle = (format, path) => {
+  format ||= ".atom";
+  format = format?.slice(1);
+  path ||= "all";
+  return `Strange Leaflet - ${path || ""} (${format})`;
+};
+
+/**
  * Generates an RSS/Atom feed based on the provided items and format.
  *
  * @param {Array<Item>} items - An array of items to include in the feed.
  * @param {string|undefined} format - The format of the feed, e.g., ".rss" or ".atom".
+ * @param {string} path - The url path of the feed e.g. "/blog"
  * @returns {string} The generated feed in the specified format.
  */
-export const generateFeed = (items, format) => {
+export const generateFeed = (items, format, path) => {
   const feed = new Feed({
     id: "strangeleaflet.com",
-    title: "Strange Leaflet",
+    title: feedTitle(format, path),
     copyright: `© ${new Date().getFullYear()} Stephen Ball`,
     description: "Stephen Ball's writings on programming, tech, and other things",
     link: "https://www.strangeleaflet.com",
