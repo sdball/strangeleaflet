@@ -2,6 +2,7 @@
 layout: blog
 date: 2023-09-07T12:57:59Z
 title: Rebooting this blog in Svelte and SvelteKit
+description: "In which I explain a bit of why and how I'm writing my personal blog in SvelteKit instead of a backend like Phoenix."
 categories:
   - svelte
   - blog
