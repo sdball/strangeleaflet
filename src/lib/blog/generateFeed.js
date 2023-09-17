@@ -8,10 +8,11 @@ import { Feed } from "feed";
 
 /**
  * @typedef {Object} ItemMetadata
- * @property {string} link - The link to the item.
- * @property {string} title - The title of the item.
- * @property {Date} date - The date of the item.
- * @property {Array<string>} categories - The categories associated with the item.
+ * @property {string} link
+ * @property {string} title
+ * @property {string} description
+ * @property {Date} date
+ * @property {Array<string>} categories
  */
 
 /**
@@ -29,8 +30,10 @@ export const generateFeed = (items, format) => {
     description: "Stephen Ball's writings on programming, tech, and other things",
     link: "https://www.strangeleaflet.com",
     language: "en",
+    favicon: "https://www.strangeleaflet.com/favicon.svg",
     feedLinks: {
-      atom: "https://www.strangeleaflet.com/feed.atom"
+      atom: "https://www.strangeleaflet.com/feed.atom",
+      rss: "https://www.strangeleaflet.com/feed.rss"
     },
     author: {
       name: "Stephen Ball",
@@ -40,18 +43,27 @@ export const generateFeed = (items, format) => {
 
   items.forEach((item) => {
     feed.addItem({
+      id: item.path,
       link: item.path,
       title: item.metadata.title,
       date: item.metadata.date,
+      description:
+        item.metadata.description ||
+        "No description on this feed item. Either I forgot to add one or this is an older post that I haven't updated yet.",
       category: item.metadata.categories.map((category) => {
         return { name: category };
       })
     });
   });
 
-  if (format && format == ".rss") {
-    return feed.rss2();
-  } else {
-    return feed.atom1();
+  switch (format) {
+    case ".rss":
+      return feed.rss2();
+    case ".atom":
+      return feed.atom1();
+    case ".json":
+      return feed.json1();
+    default:
+      return feed.atom1();
   }
 };

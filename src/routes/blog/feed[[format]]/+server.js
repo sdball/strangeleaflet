@@ -4,6 +4,10 @@ import { fetchAll } from "$lib/blog/fetch";
 
 import { generateFeed } from "$lib/blog/generateFeed.js";
 
+export const entries = () => {
+  return [{ format: ".rss" }, { format: ".atom" }, { format: ".json" }, { format: undefined }];
+};
+
 export const prerender = true;
 
 export async function GET({ setHeaders, params }) {
