@@ -136,7 +136,7 @@ speed: {speed}
 {/if}
 
 <div class="penguin" style="transform: translateX({$pos}px) rotateY({flip ? 180 : 0}deg);">
-  <img alt="a cartoon penguin walking" src="/{penguinGif}" />
+  <img alt="a cartoon penguin walking" src="/images/{penguinGif}" />
 </div>
 
 <style>
