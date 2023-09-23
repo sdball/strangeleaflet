@@ -2,6 +2,7 @@
 layout: blog
 title: Shrink your data into bitfields (and out again)
 date: 2020-04-29 16:15Z
+featured: true
 categories:
   - programming
 ---
