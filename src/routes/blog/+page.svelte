@@ -4,6 +4,7 @@
   import { formatDate } from "$lib/blog/formatDateTime.js";
   import Navigation from "$lib/components/Navigation.svelte";
   import Footer from "$lib/components/Footer.svelte";
+  import BlogListItem from "$lib/components/BlogListItem.svelte";
 </script>
 
 <Navigation />
@@ -15,12 +16,7 @@
   <ul>
     {#each data.posts as post}
       <li>
-        <h2>
-          <a href={post.path}>
-            {post.metadata.title}
-          </a>
-        </h2>
-        Published {formatDate(post.metadata.date)}
+        <BlogListItem item={post} />
       </li>
     {/each}
   </ul>

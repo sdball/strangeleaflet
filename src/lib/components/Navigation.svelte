@@ -38,6 +38,8 @@
       <DropdownItem href="/blog/posts">Posts</DropdownItem>
       <DropdownItem href="/blog/gitblogs">Git Blogs</DropdownItem>
       <DropdownDivider />
+      <DropdownItem href="/blog/featured">Featured</DropdownItem>
+      <DropdownDivider />
       <DropdownItem href="/blog">All</DropdownItem>
     </Dropdown>
 

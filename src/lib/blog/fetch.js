@@ -43,3 +43,13 @@ export const fetchAll = async () => {
     return b.metadata.date - a.metadata.date;
   });
 };
+
+/**
+ * Filters an array of items to return only those with a `featured` property in their `metadata`.
+ *
+ * @param {Array<{ metadata: { featured: boolean } }>} items - An array of items with metadata containing a `featured` property.
+ * @returns {Array<{ metadata: { featured: boolean } }>} An array containing only the featured items.
+ */
+export const featured = (items) => {
+  return items.filter((item) => item.metadata.featured);
+};
