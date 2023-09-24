@@ -6,8 +6,8 @@
   import { Button, Search, Modal } from "flowbite-svelte";
   import { SearchOutline } from "flowbite-svelte-icons";
 
-  import Item from "./Item.svelte";
   import { searchAll } from "$lib/blog/search";
+  import BlogListItem from "./BlogListItem.svelte";
 
   let searchOpen = false;
   let searchTerm = "";
@@ -50,12 +50,16 @@
   {/if}
   {#key searchTerm}
     <div
-      class="prose dark:prose-invert prose-p:mt-0 prose-p:mb-0 mt-12 pb-20 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal"
+      class="prose dark:prose-invert prose-p:mt-0 prose-p:mb-0 mt-12 pb-20 mx-auto max-w-[90ch] relative break-normal"
       in:fly={{ delay: 200, duration: 200, x: 200 }}
     >
-      {#each searchResults as result}
-        <Item item={result} class="mb-3" />
-      {/each}
+      <ul class="list-none">
+        {#each searchResults as result}
+          <li class="py-0 my-0">
+            <BlogListItem item={result} />
+          </li>
+        {/each}
+      </ul>
     </div>
   {/key}
 </Modal>

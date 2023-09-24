@@ -1,27 +1,11 @@
 <script>
-  /**
-   * @type string
-   */
   export let title;
-  /**
-   * @type string
-   */
   export let date;
-
-  /**
-   * @type string
-   */
   export let layout;
-
-  /**
-   * @type [string]
-   */
   export let categories;
-
-  /**
-   * @type string
-   */
   export let repo;
+
+  import Categories from "$lib/components/Categories.svelte";
 
   import { formatDate } from "$lib/blog/formatDateTime";
 </script>
@@ -32,7 +16,7 @@
   >
     <h1>{title}</h1>
     <p>Published: {formatDate(date)}</p>
-    <p>Categories: {categories}</p>
+    <p><Categories {categories} /></p>
     <hr />
     <slot />
   </article>
@@ -42,7 +26,7 @@
   >
     <h1>{title}</h1>
     <p>Published: {formatDate(date)}</p>
-    <p>Categories: {categories}</p>
+    <p><Categories {categories} /></p>
     <p>Repo: {repo}</p>
     <hr />
     <slot />
@@ -53,7 +37,7 @@
   >
     <h1>{title}</h1>
     <p>Published: {formatDate(date)}</p>
-    <p>Categories: {categories}</p>
+    <p><Categories {categories} /></p>
     <hr />
     <slot />
   </article>

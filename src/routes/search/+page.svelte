@@ -1,7 +1,7 @@
 <script>
   export let data;
   import Navigation from "$lib/components/Navigation.svelte";
-  import Item from "$lib/components/Item.svelte";
+  import BlogListItem from "$lib/components/BlogListItem.svelte";
   import Footer from "$lib/components/Footer.svelte";
 </script>
 
@@ -13,7 +13,7 @@
   <h1>Search results for {data.term}</h1>
   <h2>Most recent</h2>
   {#each data.items as item}
-    <Item {item} class="mb-9" />
+    <BlogListItem {item} class="mb-9" />
   {/each}
 </main>
 

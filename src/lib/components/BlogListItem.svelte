@@ -3,6 +3,8 @@
 
   import { Badge } from "flowbite-svelte";
 
+  import Categories from "./Categories.svelte";
+
   import { formatDate } from "$lib/blog/formatDateTime";
 </script>
 
@@ -17,14 +19,7 @@
 <ul>
   <li>Published: {formatDate(item.metadata.date)}</li>
   <li>
-    Categories:
-    <div class="inline-flex gap-x-3 pl-1">
-      {#each item.metadata.categories as category}
-        <span>
-          <Badge color="blue">{category}</Badge>
-        </span>
-      {/each}
-    </div>
+    <Categories categories={item.metadata.categories} />
   </li>
   {#if item.metadata.layout === "gitblog"}
     <li>
