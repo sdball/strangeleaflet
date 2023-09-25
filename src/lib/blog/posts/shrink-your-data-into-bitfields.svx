@@ -30,8 +30,10 @@ We'll take some data from this:
 To this! The same data!
 
 ```json
-7288
+1110001111000
 ```
+
+(That base-2 number is `7288` in base-10).
 
 We'll do that in a series of steps and using less data with each one.
 

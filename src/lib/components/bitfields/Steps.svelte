@@ -13,7 +13,7 @@
 
   let data3 = [3, 71, 1, 0];
 
-  let data4 = 7288;
+  let data4 = 1110001111000;
 
   let n = 1;
 
