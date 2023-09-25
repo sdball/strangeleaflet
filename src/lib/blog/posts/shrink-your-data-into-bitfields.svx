@@ -8,15 +8,38 @@ categories:
 ---
 
 <script>
-  import { Range, Label, Card } from 'flowbite-svelte';
-  let n = 5;
+  import Steps from "$lib/components/bitfields/Steps.svelte"
+  import BitfieldLength from "$lib/components/bitfields/BitfieldLength.svelte"
 </script>
 
 Some applications want to save every byte. Every last byte! Maybe they have memory constraints, maybe they're sending data over the network, maybe they just like saving bytes.
 
 One way to help save bytes is to use efficient data structures. One popular memory efficient data structure is a bitfield. A bitfield allows complex, predefined data to be stored in a compact series of bits.
 
-In this post I'm going to cheat a bit and use size when serialized to JSON as a proxy for the actual savings. High level programming languages do really neat things behind the scenes to store data efficiently. We're going to sidestep all of that: JSON is JSON.
+We'll take some data from this:
+
+```json
+{
+  "priority": "urgent",
+  "location": "Room 71",
+  "status": "empty",
+  "candy": "peppermint patties"
+}
+```
+
+To this! The same data!
+
+```json
+7288
+```
+
+We'll do that in a series of steps and using less data with each one.
+
+<Steps />
+
+How? Incrementally!
+
+# Starting with the data
 
 Let's say we have some data
 
@@ -499,20 +522,9 @@ As we add data to our bitfield we'll be adding more and more powers of base-2.
 |               3 |                 $0\ldots7$ |
 |               4 |                $0\ldots15$ |
 
-<Card>
-  <div class="mb-3">
-  <Label>Bitfield length: {n}</Label>
-  <Range id="range-n" min="1" max="31" bind:value={n} />
-  </div>
-
-  <p class="m-0">Range of base-10 values: <code>0...{(2**n) - 1}</code></p>
-
-  <p class="m-0">Number of possible values: <code>{(2**n)}</code></p>
-  <p class="m-0">Example bitfield values</p>
-  <pre>{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}
-{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}
-{Array.from({length: n}, () => Math.floor(Math.random() * 2)).join("")}</pre>
-</Card>
+<div class="mb-9">
+  <BitfieldLength />
+</div>
 
 # Constructing a bitfield by hand
 
