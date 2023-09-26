@@ -63,10 +63,10 @@ data = {
 }
 ```
 
-That's some nice data! But if we serialize it to JSON we have 99 bytes!
+That's some nice data! But if we serialize it to JSON we have 88 bytes!
 
 ```ruby
-data.to_json.size # => 99
+data.to_json.size # => 88
 ```
 
 What can we do to use less bytes?
@@ -85,7 +85,7 @@ smaller_data = [
 smaller_data.to_json.size # => 49
 ```
 
-Wooo, 49 bytes! We've already gotten it down to 49.4% of the original size. We gave up some flexibility because we now we have a fixed set of keys in a fixed order but we saved a lot of space!
+Wooo, 49 bytes! We've already gotten it down to 55% of the original size. We gave up some flexibility because we now we have a fixed set of keys in a fixed order but we saved a lot of space!
 
 We can go even further if we're willing to give up still more flexibility.
 
@@ -126,7 +126,7 @@ even_smaller_data = [
 even_smaller_data.to_json.size # => 30
 ```
 
-Now we're down to 30.3% of the original size with that optimization alone!
+Now we're down to 34% of the original size with that optimization alone!
 
 Let's squish down the other data by limiting their options.
 
@@ -153,9 +153,9 @@ even_smaller_still_data = [3, 71, 1, 0]
 even_smaller_still_data.to_json.size # => 10
 ```
 
-10 bytes! We're down to around 10.1% of the size of the original data!
+10 bytes! We're down to around 11% of the size of the original data!
 
-At this point we need code to serialize the data down and parse it back out.
+At this point we need code that has explicit knowledge of the data structure to serialize the data down and parse it back out.
 
 ```ruby
 module IntegerArray
@@ -411,7 +411,7 @@ Would that save us space? Yes! Because we can represent that long string of bits
 0b1110001111000.to_s(16) # => "1c78"
 ```
 
-Sticking with base-10 for simplicity and all of our original data would be represented as 7288. That's just 4 bytes as JSON! 4.04% of the original 99 bytes!
+Sticking with base-10 for simplicity and all of our original data would be represented as 7288. That's just 4 bytes as JSON! 4.5% of the original 88 bytes!
 
 # Constructing a bitfield
 
