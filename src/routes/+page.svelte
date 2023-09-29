@@ -12,15 +12,20 @@
 >
   <Heading class="mt-9">Strange Leaflet</Heading>
   <P>Hi there. Uh. Not much to see on the frontpage yet.</P>
-  <P>You should probably head to <A href="/blog">the blog</A>.</P>
   <P
-    >But since you're here, wanna see the SVG I made from scratch to be the favicon and logo? It's
-    supposed to be some dotmatrix paper with "SL" in ASCII banner text.</P
+    >You should probably head to <A href="/blog">the blog</A>. Or perhaps focus in on the <A
+      href="/blog/featured">featured blog posts</A
+    >.</P
+  >
+  <P
+    >Since you're already here, wanna see the SVG I made from scratch to be the favicon and logo?
+    It's supposed to be some dotmatrix paper with "SL" in ASCII banner text.</P
   >
   <StrangeLeafletSvg />
   <P
     >Cool right? I hope so because did I mention I made it from scratch? Also check out how it
-    changes when you switch light/dark modes.</P
+    changes when you switch light/dark modes. And by from scratch I mean I started with a blank SVG
+    file in pixelmator. I even hand placed each of those `#` characters.</P
   >
   <P
     >Oh also since this whole site is running on Svelte/SvelteKit it was, like, almost no code to
