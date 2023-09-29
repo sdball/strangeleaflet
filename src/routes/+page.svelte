@@ -11,15 +11,15 @@
   class="prose dark:prose-invert mt-12 mx-auto max-w-[90ch] px-4 relative sm:px-6 lg:px-8 break-normal lg:mb-24"
 >
   <Heading class="mt-9">Strange Leaflet</Heading>
-  <P>Hi there. Uh. Not much to see on the frontpage yet.</P>
+  <P>Hello!</P>
   <P
     >You should probably head to <A href="/blog">the blog</A>. Or perhaps focus in on the <A
       href="/blog/featured">featured blog posts</A
     >.</P
   >
   <P
-    >Since you're already here, wanna see the SVG I made from scratch to be the favicon and logo?
-    It's supposed to be some dotmatrix paper with "SL" in ASCII banner text.</P
+    >Since here, would you like to see the SVG I made from scratch to be the favicon and logo? It's
+    supposed to be some dotmatrix paper with "SL" in ASCII banner text.</P
   >
   <StrangeLeafletSvg />
   <P

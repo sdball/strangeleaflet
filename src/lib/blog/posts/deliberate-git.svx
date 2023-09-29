@@ -2,6 +2,7 @@
 layout: blog
 title: Deliberate Git
 date: 2013-06-19T16:00:00.000Z
+featured: true
 categories:
   - git
 ---
