@@ -3,6 +3,7 @@ layout: blog
 title: Shrink your data into bitfields (and out again)
 date: 2020-04-29 16:15Z
 featured: true
+description: "Some applications want to save every byte. Every last byte! Maybe they have memory constraints, maybe they're sending data over the network, maybe they just like saving bytes. This post goes into how bitfields allow us to shink complex data down into very small representations starting from arbitrary JSON and gradually transforming it down into a bitfield."
 categories:
   - programming
 ---

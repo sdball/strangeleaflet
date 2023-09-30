@@ -1,9 +1,10 @@
 <script>
   export let title;
   export let date;
-  export let layout;
   export let categories;
   export let repo;
+  export let commit;
+  export let description;
 
   import Categories from "$lib/components/Categories.svelte";
 
@@ -15,17 +16,20 @@
 <svelte:head>
   <title>{SITE.title} - {title}</title>
   <meta property="og:title" content={title} />
+  {#if description}
+    <meta name="description" property="og:description" content={description} />
+  {:else}
+    <meta name="description" property="og:description" content="Git commit {commit} in {repo}" />
+  {/if}
 </svelte:head>
 
-{#if layout === "gitblog"}
-  <article
-    class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
-  >
-    <h1>{title}</h1>
-    <p>Published: {formatDate(date)}</p>
-    <p><Categories {categories} /></p>
-    <p>Repo: {repo}</p>
-    <hr />
-    <slot />
-  </article>
-{/if}
+<article
+  class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
+>
+  <h1>{title}</h1>
+  <p class="mb-0 pb-0">Published: {formatDate(date)}</p>
+  <p class="my-0 py-0"><Categories {categories} /></p>
+  <p class="my-0 py-0">Repo: {repo}</p>
+  <hr />
+  <slot />
+</article>

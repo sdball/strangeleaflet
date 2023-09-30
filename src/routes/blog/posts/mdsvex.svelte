@@ -1,9 +1,11 @@
 <script>
   export let title;
   export let date;
-  export let layout;
   export let categories;
-  export let repo;
+  export let description;
+  export let featured;
+
+  import { Badge } from "flowbite-svelte";
 
   import Categories from "$lib/components/Categories.svelte";
 
@@ -15,37 +17,20 @@
 <svelte:head>
   <title>{SITE.title} - {title}</title>
   <meta property="og:title" content={title} />
+  {#if description}
+    <meta name="description" property="og:description" content={description} />
+  {/if}
 </svelte:head>
 
-{#if layout === "blog"}
-  <article
-    class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
-  >
-    <h1>{title}</h1>
-    <p>Published: {formatDate(date)}</p>
-    <p><Categories {categories} /></p>
-    <hr />
-    <slot />
-  </article>
-{:else if layout === "gitblog"}
-  <article
-    class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
-  >
-    <h1>{title}</h1>
-    <p>Published: {formatDate(date)}</p>
-    <p><Categories {categories} /></p>
-    <p>Repo: {repo}</p>
-    <hr />
-    <slot />
-  </article>
-{:else}
-  <article
-    class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
-  >
-    <h1>{title}</h1>
-    <p>Published: {formatDate(date)}</p>
-    <p><Categories {categories} /></p>
-    <hr />
-    <slot />
-  </article>
-{/if}
+<article
+  class="prose dark:prose-invert mx-auto max-w-[90ch] mt-12 px-4 pb-20 relative sm:px-6 lg:px-8 break-normal"
+>
+  <h1>{title}</h1>
+  <p class="mb-0 pb-0">Published: {formatDate(date)}</p>
+  <p class="my-0 py-0"><Categories {categories} /></p>
+  {#if featured}
+    <Badge>featured</Badge>
+  {/if}
+  <hr />
+  <slot />
+</article>
