@@ -8,7 +8,14 @@
   import Categories from "$lib/components/Categories.svelte";
 
   import { formatDate } from "$lib/blog/formatDateTime";
+
+  import { SITE } from "$lib/constants";
 </script>
+
+<svelte:head>
+  <title>{SITE.title} - {title}</title>
+  <meta property="og:title" content={title} />
+</svelte:head>
 
 {#if layout === "blog"}
   <article

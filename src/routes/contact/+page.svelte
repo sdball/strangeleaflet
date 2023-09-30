@@ -3,7 +3,14 @@
   import Navigation from "$lib/components/Navigation.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import { LinkedinSolid, BullhornSolid, GithubSolid, EnvelopeSolid } from "flowbite-svelte-icons";
+  import { SITE } from "$lib/constants";
+  let title = "Contact";
 </script>
+
+<svelte:head>
+  <title>{SITE.title} - {title}</title>
+  <meta property="og:title" content={title} />
+</svelte:head>
 
 <Navigation />
 

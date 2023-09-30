@@ -1,30 +1,18 @@
 <script>
-  /**
-   * @type string
-   */
   export let title;
-  /**
-   * @type string
-   */
   export let date;
-
-  /**
-   * @type string
-   */
   export let layout;
-
-  /**
-   * @type [string]
-   */
   export let categories;
-
-  /**
-   * @type string
-   */
   export let repo;
 
   import { formatDate } from "$lib/blog/formatDateTime";
+  import { SITE } from "$lib/constants";
 </script>
+
+<svelte:head>
+  <title>{SITE.title} - {title}</title>
+  <meta property="og:title" content={title} />
+</svelte:head>
 
 {#if layout === "blog"}
   <article

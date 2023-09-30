@@ -3,7 +3,14 @@
   import Navigation from "$lib/components/Navigation.svelte";
   import StrangeLeafletSvg from "$lib/components/StrangeLeafletSvg.svelte";
   import Footer from "$lib/components/Footer.svelte";
+  import { SITE } from "$lib/constants";
+  let title = "Home";
 </script>
+
+<svelte:head>
+  <title>{SITE.title} - {title}</title>
+  <meta name="title" property="og:title" content={title} />
+</svelte:head>
 
 <Navigation />
 

@@ -1,11 +1,18 @@
 <script>
   export let data;
 
-  import { formatDate } from "$lib/blog/formatDateTime.js";
   import Navigation from "$lib/components/Navigation.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import BlogListItem from "$lib/components/BlogListItem.svelte";
+
+  import { SITE } from "$lib/constants.js";
+  let title = "All Blogs";
 </script>
+
+<svelte:head>
+  <title>{SITE.title} - {title}</title>
+  <meta property="og:title" content={title} />
+</svelte:head>
 
 <Navigation />
 
