@@ -10,6 +10,7 @@ categories:
 <script>
   import Steps from "$lib/components/bitfields/Steps.svelte"
   import BitfieldLength from "$lib/components/bitfields/BitfieldLength.svelte"
+  import BitfieldExplorer from "$lib/components/bitfields/BitfieldExplorer.svelte"
 </script>
 
 Some applications want to save every byte. Every last byte! Maybe they have memory constraints, maybe they're sending data over the network, maybe they just like saving bytes.
@@ -497,7 +498,18 @@ Why powers of 2? Because that's what computers are good at. Ultimately every bit
 
 Since we want to represent more data than a single bit can hold and since we want to keep all of our data together that means we have to place all of our bits into a single number. That means every single bit and its position in the number is very important. As a series of numbers $101110$ might look similar to $1011100$ but it is quite literally the difference between $46$ and $92$.
 
-As a quick level set on number "places" in base-10 vs base-2 let's look at what the number `1000` represents in base-2 vs base-10.
+The key is that the "pieces" (digits) of our bitfield number in binary are the data we want to store. What the pieces represent and their size is entirely arbitrary. The same bitfield `1100` might be one field, two fields, three fields, or four fields.
+
+```
+1100     = 1 field with 16 possible values
+11 00    = 2 fields with 4 possible values each
+1 100    = 2 fields: one with 2 possible values and one with 8 possible values
+1 1 00   = 3 fields: two with 2 possible values and one with 4 possible values
+```
+
+<BitfieldExplorer />
+
+As a quick level set on number "places" in base-10 vs base-2 let's look at what the number $1000$ represents in base-2 vs base-10.
 
 |               | 1    | 0   | 0   | 0   |
 | ------------- | ---- | --- | --- | --- |
