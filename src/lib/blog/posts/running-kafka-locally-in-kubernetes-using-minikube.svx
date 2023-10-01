@@ -1,0 +1,170 @@
+---
+layout: blog
+date: 2023-10-01T17:35:40Z
+title: Running Kafka locally in Kubernetes using Minikube
+description: "Let's run Kafka in Kubernetes using Minikube and then connect to a topic using kcat running on our host machine."
+categories:
+  - kafka
+---
+
+# Running Kafka locally with Kubernetes
+
+Hey Kafka right? Let's run it from my MacBook Air to the point where we can interact with it and actually produce/consume data.
+
+Minikube is a great easy button to run local Kubernetes.
+
+```shell
+$ minikube start
+```
+
+```shell
+$ kubectl cluster-info
+Kubernetes control plane is running at https://127.0.0.1:59946
+KubeDNS is running at https://127.0.0.1:59946/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+```
+
+And helm is a great way to easily run sets of pods.
+
+```shell
+$ helm repo add bitnami https://charts.bitnami.com/bitnami
+```
+
+```shell
+$ helm install my-kafka bitnami/kafka --version 25.2.0
+```
+
+```shell
+$ kubectl get pods
+NAME                    READY   STATUS    RESTARTS   AGE
+my-kafka-controller-0   1/1     Running   0          89s
+my-kafka-controller-1   1/1     Running   0          89s
+my-kafka-controller-2   1/1     Running   0          88s
+```
+
+Woo Kafka! That was easy.
+
+Now that we have Kafka running we need to setup `client.properties` file we can use for our producer/consumer clients.
+
+```bash
+$ cat > client.properties <<EOF
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=SCRAM-SHA-256
+sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+    username="user1" \
+    password="$(kubectl get secret my-kafka-user-passwords --namespace default -o jsonpath='{.data.client-passwords}' | base64 -d | cut -d , -f 1)";
+EOF
+```
+
+Next we'll bring up a pod in the cluster that will allow us to run the Kafka producer/consumer scripts.
+
+```shell
+$ kubectl run my-kafka-client --restart='Never' --image docker.io/bitnami/kafka:3.5.1-debian-11-r61 --namespace default --command -- sleep infinity
+```
+
+Copy the `client.properties` file into the client pod.
+
+```shell
+$ kubectl cp --namespace default client.properties my-kafka-client:/tmp/client.properties
+```
+
+Then we'll run `bash` on the pod so we can run the producer script.
+
+```shell
+$ kubectl exec --tty -i my-kafka-client --namespace default -- bash
+```
+
+On the client pod cd into the `kafka/bin` directory
+
+```shell
+# my-kafka-client
+$ cd /opt/bitnami/kafka/bin
+```
+
+And start the producer script. Once it's going whatever we type into this window will be produced as messages to the `test` topic.
+
+```shell
+my-kafka-client# kafka-console-producer.sh \
+            --producer.config /tmp/client.properties \
+            --broker-list my-kafka-controller-0.my-kafka-controller-headless.default.svc.cluster.local:9092,my-kafka-controller-1.my-kafka-controller-headless.default.svc.cluster.local:9092,my-kafka-controller-2.my-kafka-controller-headless.default.svc.cluster.local:9092 \
+            --topic test
+```
+
+```
+>hi
+>hi
+>I am producing a message 1234
+```
+
+In another shell on our host we'll again connect to the client pod. This time to run the consumer script.
+
+```shell
+$ kubectl exec --tty -i my-kafka-client --namespace default -- bash
+```
+
+```shell
+# my-kafka-client
+$ cd /opt/bitnami/kafka/bin
+```
+
+```shell
+my-kafka-client# kafka-console-consumer.sh \
+            --consumer.config /tmp/client.properties \
+            --bootstrap-server my-kafka.default.svc.cluster.local:9092 \
+            --topic test \
+            --from-beginning
+```
+
+If all goes well then we should see all of the messages that have been typed into the `test` topic so far.
+
+```
+hi
+hi
+I am producing a message 1234
+```
+
+Amazing! The power of Kafka in the palm of my hand.
+
+## Consuming with kcat
+
+Now let's use `kcat` on my Mac to consume all the messages in the `test` topic. That will require some interesting hacks. Let's do them!
+
+First we need to ensure that we're forwarding the 9092 port from one of the Kafka brokers. We could use `k9s` to do this more easily but we can also run a `kubectl` port forward in the background.
+
+```shell
+$ kubectl port-forward my-kafka-controller-0 9092:9092 &
+```
+
+Next we need to add an entry into our `/etc/hosts` file to ensure `kcat` can resolve the internal DNS name of the Kafka broker.
+
+```shell
+127.0.0.1 my-kafka-controller-0.my-kafka-controller-headless.default.svc.cluster.local
+```
+
+Then we need that password for authentication:
+
+```shell
+$ export CLIENT_PASSWORD=$(kubectl get secret my-kafka-user-passwords --namespace default -o jsonpath='{.data.client-passwords}' | base64 -d | cut -d , -f 1)
+```
+
+Then with password in hand, DNS hack in place, and port forwarding applied we can finally have `kcat` consume from a topic in the cluster!
+
+```shell
+$ kcat -b localhost:9092 -t test -C -o beginning -X security.protocol=SASL_PLAINTEXT -X sasl.mechanisms=SCRAM-SHA-256 -X sasl.username=user1 -X sasl.password=$CLIENT_PASSWORD
+```
+
+```
+hi
+hi
+I am producing a message 1234
+% Reached end of topic test [0] at offset 3
+```
+
+That's it! We've brought up Kafka in Kubernetes running locally, setup a test topic using the producer script, and consumed that test topic using both the consumer script in a pod and `kcat` running on the host machine.
+
+## Cleanup
+
+```shell
+$ minikube delete
+```
+
+Done! Minikube is great for Kubernetes experiments. Bring something up, figure it out, shut it down.
