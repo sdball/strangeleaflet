@@ -1,5 +1,5 @@
 <script>
-  import { Avatar } from "flowbite-svelte";
+  import { Avatar, Badge } from "flowbite-svelte";
   import Navigation from "$lib/components/Navigation.svelte";
   import Footer from "$lib/components/Footer.svelte";
   import Contact from "$lib/components/Contact.svelte";
@@ -36,11 +36,14 @@
     </p>
 
     <p>
-      Power Up Your Prompt! &mdash; Abstractions, 2016<br />
-      (unfortunately technical issues prevented recording)
+      Power Up Your Prompt! &mdash; Abstractions, 2016
+      <Badge class="ml-3" color="yellow">Unrecorded</Badge>
     </p>
 
-    <p>Follow Your Feedback &mdash; Abstractions II, 2019</p>
+    <p>
+      Follow Your Feedback &mdash; Abstractions II, 2019
+      <Badge class="ml-3" color="yellow">Unrecorded</Badge>
+    </p>
     <blockquote>
       What do programming tests, command line tools, and technical interviews all have in common?
       They're all feedback systems! We'll dive through these three systems and explore how they are
