@@ -7,8 +7,6 @@ categories:
   - kafka
 ---
 
-# Running Kafka locally with Kubernetes
-
 Hey Kafka right? Let's run it from my MacBook Air to the point where we can interact with it and actually produce/consume data.
 
 Minikube is a great easy button to run local Kubernetes.
