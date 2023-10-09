@@ -1,27 +1,5 @@
 import { Feed } from "feed";
 
-/**
- * @typedef {Object} Item
- * @property {string} path - The URL path to the item.
- * @property {ItemMetadata} metadata
- */
-
-/**
- * @typedef {Object} ItemMetadata
- * @property {string} layout
- * @property {string} link
- * @property {string} title
- * @property {string} description
- * @property {Date} date
- * @property {Array<string>} categories
- * @property {string|undefined} commit
- * @property {string|undefined} repo
- */
-
-/**
- * @param {Feed} feed
- * @param {Item} item
- */
 const blog = (feed, item) => {
   feed.addItem({
     id: item.path,
@@ -37,10 +15,6 @@ const blog = (feed, item) => {
   });
 };
 
-/**
- * @param {Feed} feed
- * @param {Item} item
- */
 const gitBlog = (feed, item) => {
   feed.addItem({
     id: item.path,
@@ -54,20 +28,24 @@ const gitBlog = (feed, item) => {
   });
 };
 
-/**
- * @param {ItemMetadata} metadata
- */
 const gitBlogDescription = (metadata) => {
   if (metadata.description) return metadata.description;
   return `No description on this git-blog post. But I can say this post is from commit ${metadata.commit} for the repo ${metadata.repo}`;
 };
 
-/**
- *
- * @param {string|undefined} format
- * @param {string|undefined} path
- * @returns {string}
- */
+const micro = (feed, item) => {
+  feed.addItem({
+    id: item.path,
+    link: item.path,
+    title: item.metadata.title,
+    date: item.metadata.date,
+    description: item.metadata.content,
+    category: item.metadata.categories.map((category) => {
+      return { name: category };
+    })
+  });
+};
+
 const feedTitle = (format, path) => {
   format ||= ".atom";
   format = format?.slice(1);
@@ -75,14 +53,6 @@ const feedTitle = (format, path) => {
   return `Strange Leaflet - ${path || ""} (${format})`;
 };
 
-/**
- * Generates an RSS/Atom feed based on the provided items and format.
- *
- * @param {Array<Item>} items - An array of items to include in the feed.
- * @param {string|undefined} format - The format of the feed, e.g., ".rss" or ".atom".
- * @param {string} path - The url path of the feed e.g. "/blog"
- * @returns {string} The generated feed in the specified format.
- */
 export const generateFeed = (items, format, path) => {
   const feed = new Feed({
     id: "strangeleaflet.com",
@@ -110,6 +80,9 @@ export const generateFeed = (items, format, path) => {
           break;
         case "gitblog":
           gitBlog(feed, item);
+          break;
+        case "micro":
+          micro(feed, item);
           break;
         default:
           console.warn({ layout: item.metadata.layout }, "feed.unknownLayout");

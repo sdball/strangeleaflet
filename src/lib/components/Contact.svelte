@@ -1,10 +1,11 @@
 <script>
-  import { Card, Avatar } from "flowbite-svelte";
+  import { Card } from "flowbite-svelte";
   import { LinkedinSolid, BullhornSolid, GithubSolid, EnvelopeSolid } from "flowbite-svelte-icons";
+  import MyAvatar from "./MyAvatar.svelte";
 </script>
 
 <Card border={false} size="xl">
-  <Avatar size="xl" src="/images/avatar.webp" />
+  <MyAvatar />
   <h2 class="mb-1 text-xl font-medium text-gray-900 dark:text-white">Stephen Ball</h2>
   <div class="grid grid-cols-1 lg:flex lg:gap-x-9">
     <span class="text-sm text-gray-500 dark:text-gray-400">Programmer</span>

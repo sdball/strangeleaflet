@@ -21,25 +21,25 @@ const blogItems = (globbed) => {
 };
 
 export const fetchPosts = async () => {
-  /**
-   * @type Record<string, any>
-   */
   const postFiles = import.meta.glob("/src/lib/blog/posts/**/*.svx", { eager: true });
   return blogItems(postFiles);
 };
 
 export const fetchGitBlogs = async () => {
-  /**
-   * @type Record<string, any>
-   */
   const postFiles = import.meta.glob("/src/lib/blog/gitblogs/**/*.svx", { eager: true });
+  return blogItems(postFiles);
+};
+
+export const fetchMicro = async () => {
+  const postFiles = import.meta.glob("/src/lib/blog/micro/**/*.svx", { eager: true });
   return blogItems(postFiles);
 };
 
 export const fetchAll = async () => {
   const posts = await fetchPosts();
   const gitblogs = await fetchGitBlogs();
-  return [...posts, ...gitblogs].sort((a, b) => {
+  const micro = await fetchMicro();
+  return [...posts, ...gitblogs, ...micro].sort((a, b) => {
     return b.metadata.date - a.metadata.date;
   });
 };
