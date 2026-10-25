@@ -12,6 +12,7 @@ templates/layout.html    the page around every post and page
 static/theme.css         the theme (light and dark), copied to public/
 scripts/build            builds public/ (sets up .venv the first time)
 scripts/serve            builds, then serves public/ at http://localhost:8000/
+scripts/check-links      checks every internal link and image in public/
 ```
 
 ## Run it locally
@@ -20,6 +21,7 @@ scripts/serve            builds, then serves public/ at http://localhost:8000/
 scripts/serve        # http://localhost:8000/
 scripts/serve 9000   # or pick a port
 scripts/build        # rebuild while serve keeps running, then refresh
+scripts/check-links  # after a build: any links or images that go nowhere?
 ```
 
 It needs Python 3 and installs `mistune` and `Pygments` from

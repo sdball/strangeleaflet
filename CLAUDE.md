@@ -11,12 +11,14 @@ isn't obvious from it.
 ```sh
 scripts/serve            # build, then serve public/ at http://localhost:8000/
 scripts/build            # rebuild while serve keeps running
+scripts/check-links      # after a build
 git config core.hooksPath .githooks   # once per clone
 ```
 
-There's no test suite. After changing the build, the template, or a post's
-markup, rebuild and look at the pages it affects in a browser, in both light and
-dark, and at phone width.
+There's no test suite. `scripts/check-links` (also run by the deploy) fails on
+internal links, images, or #anchors that go nowhere; links to other sites aren't
+fetched. After changing the build, the template, or a post's markup, also look
+at the pages it affects in a browser, in both light and dark, and at phone width.
 
 ## Rules
 

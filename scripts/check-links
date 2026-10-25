@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Check that every internal link and image in public/ points at something.
+
+Run it after scripts/build. Links to other sites aren't fetched; links to
+strangeleaflet.com itself are checked like relative ones. A link with a
+#fragment must also land on an element with that id.
+"""
+
+import sys
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+ROOT = Path(__file__).resolve().parent.parent
+PUBLIC = ROOT / "public"
+SITE = "https://strangeleaflet.com"
+LINKING = {"href", "src", "poster"}
+
+
+class Page(HTMLParser):
+    def __init__(self, text):
+        super().__init__()
+        self.links = []
+        self.ids = set()
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        for name, value in attrs:
+            if name in ("id", "name") and value:
+                self.ids.add(value)
+            elif name in LINKING and value and tag != "link":
+                self.links.append(value)
+            elif tag == "link" and name == "href" and ("rel", "stylesheet") in attrs:
+                self.links.append(value)
+
+    handle_startendtag = handle_starttag
+
+
+def target_file(path):
+    """The file GitHub Pages would serve for a URL path, or None."""
+    target = PUBLIC / path.lstrip("/")
+    for candidate in (target, target / "index.html", target / "index.xml"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def main():
+    if not PUBLIC.exists():
+        sys.exit("No public/ yet. Run scripts/build first.")
+
+    pages = {}
+    for html in sorted(PUBLIC.rglob("*.html")):
+        pages[html] = Page(html.read_text())
+
+    broken = []
+    for html, page in pages.items():
+        base = "/" + str(html.parent.relative_to(PUBLIC)).replace(".", "").strip("/") + "/"
+        base = base.replace("//", "/")
+        for link in page.links:
+            url = (link[len(SITE):] or "/") if link.startswith(SITE) else link
+            parts = urlsplit(url)
+            if parts.scheme or url.startswith("//"):
+                continue  # another site
+            path = unquote(parts.path)
+            if not path:
+                target = html  # a #fragment on this page
+            else:
+                if not path.startswith("/"):
+                    path = base + path
+                target = target_file(path)
+                if target is None:
+                    broken.append((html, link, "nothing there"))
+                    continue
+            fragment = unquote(parts.fragment)
+            if fragment and target.suffix == ".html":
+                ids = pages[target].ids if target in pages else Page(target.read_text()).ids
+                if fragment not in ids:
+                    broken.append((html, link, f"no #{fragment} there"))
+
+    for html, link, why in broken:
+        print(f"{html.relative_to(PUBLIC)}: {link} ({why})")
+    if broken:
+        sys.exit(f"{len(broken)} broken link{'s' if len(broken) != 1 else ''}")
+    print(f"Checked {sum(len(p.links) for p in pages.values())} links on {len(pages)} pages")
+
+
+if __name__ == "__main__":
+    main()

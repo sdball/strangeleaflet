@@ -28,6 +28,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python scripts/build.py
+      - run: python scripts/check-links
       - name: Check every page has GoatCounter
         run: |
           missing=$(grep -rL --include='*.html' 'data-goatcounter="https://sdball.goatcounter.com/count"' public | xargs -r grep -L 'http-equiv="refresh"' || true)
