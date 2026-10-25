@@ -33,7 +33,7 @@ SITE_URL = "https://strangeleaflet.com"
 SITE_DESCRIPTION = "A nerdy blog by Stephen Ball focusing on Elixir, Go, TypeScript, shell scripts, and other cool weird stuff."
 AUTHOR = "Stephen Ball"
 FEED_SIZE = 10
-LEAFLETS_INTRO = "Pieces told over several pages, each with a cover and its pages in order."
+LEAFLETS_INTRO = "Opening the small mailbox reveals some leaflets. Each has a cover and pages to turn, one after another."
 
 LAYOUT = Template((ROOT / "templates" / "layout.html").read_text())
 
