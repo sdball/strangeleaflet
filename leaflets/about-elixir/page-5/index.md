@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 5
-slug: strange-leaflet-about-elixir-page-5
+alias: strange-leaflet-about-elixir-page-5
 published_date: 2022-06-21T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-meta_description: Immutable data and why it's awesome.
+meta_description: Immutable data and why it's awesome
 ---
-
-« [back to page 4](/strange-leaflet-about-elixir-page-4) || [turn to page 6](/strange-leaflet-about-elixir-page-6) »
 
 If you like there's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage5.livemd) where you can actually run code and follow along. This was written to be a Livebook first, but works well enough as a post too.
 
@@ -221,5 +218,3 @@ iex> Agent.stop(agent)
 ```
 
 I hope you've enjoyed this small sojourn into the world of immutable data. How about next time we dive back into Agents and GenServer itself? The state abstraction so nice it's survived for decades now and what enables everything from telephone calls to WhatsApp.
-
-« [back to page 4](/strange-leaflet-about-elixir-page-4) || [turn to page 6](/strange-leaflet-about-elixir-page-6) »

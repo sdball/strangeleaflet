@@ -258,6 +258,9 @@ video {
   margin: 1.5rem auto;
   border-radius: var(--radius);
 }
+iframe { /* embedded videos are a fixed 560px */
+  max-width: 100%;
+}
 p > img:only-child {
   margin: 0 auto;
 }
@@ -527,6 +530,208 @@ span.linenos.special { color: var(--code-ink); background-color: var(--code-mark
   border-color: var(--brass);
 }
 
+/* Leaflets: a running head on each page (the leaflet's name, then its pages as eyelets) */
+.leaflet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .25rem 1rem;
+  margin: 0 0 1.25rem;
+}
+.leaflet-head > a {
+  font-family: var(--type);
+  font-size: .95rem;
+  color: var(--brass);
+  text-decoration: none;
+}
+.leaflet-head > a:hover {
+  text-decoration: underline;
+}
+.leaflet-head + h1 {
+  margin: 0 0 .35rem;
+  font-size: clamp(1.9rem, 6vw, 2.4rem);
+  line-height: 1.12;
+}
+.dek {
+  margin: 0 0 .4rem;
+  font-size: 1.1em;
+  font-style: italic;
+  color: var(--muted);
+  text-wrap: balance;
+}
+
+/* Pages as numbered eyelets on a thread, like the blog list turned sideways.
+   Each eyelet draws the thread back to the one before it, so a long leaflet can wrap. */
+.eyelets {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -2px;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+.eyelets li,
+.eyelets li + li {
+  position: relative;
+  margin: 0;
+}
+.eyelets li + li::before { /* thread */
+  content: "";
+  position: absolute;
+  top: calc(50% - .75px);
+  right: 50%;
+  width: 100%;
+  height: 1.5px;
+  background: var(--line);
+}
+.eyelets a {
+  position: relative;
+  z-index: 1; /* over the thread to the next eyelet */
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  font-family: var(--type);
+  font-size: .8rem;
+  color: var(--muted);
+  text-decoration: none;
+}
+.eyelets a::before { /* eyelet */
+  content: "";
+  position: absolute;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2.5px solid var(--brass);
+  border-radius: 50%;
+  background: var(--bg);
+}
+.eyelets a span {
+  position: relative;
+}
+.eyelets a:hover::before {
+  background: var(--tint);
+}
+.eyelets a[aria-current="page"] {
+  font-weight: 700;
+  color: var(--bg);
+}
+.eyelets a[aria-current="page"]::before {
+  background: var(--brass);
+}
+@media (max-width: 480px) { /* eight pages fit on one line down to a 360px phone */
+  .eyelets a {
+    width: 40px;
+  }
+}
+
+/* The page turn at the foot of each leaflet page */
+.page-turn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 3rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1.5px solid var(--line);
+}
+.page-turn a {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  min-height: 44px;
+  padding: .35rem 0;
+  text-decoration: none;
+}
+.page-turn .next {
+  grid-column: 2;
+  text-align: right;
+}
+.page-turn .dir {
+  font-family: var(--type);
+  font-size: .95rem;
+  color: var(--link);
+}
+.page-turn .what {
+  font-size: .95rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.page-turn a:hover .dir {
+  text-decoration: underline;
+}
+
+/* A leaflet's cover */
+.leaflet-meta {
+  margin-bottom: 2rem;
+  font-family: var(--type);
+  font-size: .9rem;
+  color: var(--muted);
+}
+.leaflet-pages li > span {
+  flex-basis: 4.5rem;
+  font-family: var(--type);
+  font-size: .85rem;
+  color: var(--muted);
+}
+.open-leaflet {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .4rem 1.1rem;
+  font-family: var(--type);
+  color: var(--ink);
+  text-decoration: none;
+  border: 1.5px solid var(--brass);
+  border-radius: 999px;
+}
+.open-leaflet:hover {
+  color: var(--bg);
+  background: var(--brass);
+}
+
+/* /leaflets/ */
+.leaflet-entry {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  margin: 2rem 0;
+}
+.leaflet-entry > div:only-child { /* a cover without a picture */
+  grid-column: 1 / -1;
+}
+.leaflet-entry img {
+  margin: .3rem 0 0;
+  border: 1.5px solid var(--line);
+}
+.leaflet-entry h2 {
+  margin: 0 0 .2rem;
+  font-size: 1.4rem;
+}
+.leaflet-entry h2 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.leaflet-entry h2 a:hover {
+  color: var(--link);
+  text-decoration: underline;
+}
+.leaflet-entry .leaflet-meta {
+  margin: 0 0 .5rem;
+}
+.leaflet-entry p:last-child {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .leaflet-entry {
+    grid-template-columns: 1fr;
+    gap: .5rem;
+  }
+  .leaflet-entry img {
+    max-width: 12rem;
+  }
+}
+
 /* Footer */
 footer {
   margin-top: 3.5rem;
@@ -560,7 +765,8 @@ select {
   }
   nav,
   footer,
-  .tags {
+  .tags,
+  .eyelets {
     display: none !important;
   }
   .highlight {

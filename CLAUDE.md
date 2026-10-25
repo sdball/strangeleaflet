@@ -22,11 +22,14 @@ at the pages it affects in a browser, in both light and dark, and at phone width
 
 ## Rules
 
-- **URLs never change.** A post's URL is `/<slug>/`, and the feed's entry ids are
-  those URLs. Renaming a slug needs an `alias:` for the old path, or readers and
-  feed subscribers break.
-- **Don't write `published_date` on a new post.** The pre-commit hook stamps it
-  in the commit that publishes the post (`publish: true` or no `publish` line).
+- **URLs never change.** A post's URL is `/<slug>/`, a leaflet page's is
+  `/leaflets/<name>/page-N/` from its folders, and the feed's entry ids are
+  those URLs. Renaming a slug or moving a page needs an `alias:` for the old
+  path, or readers and feed subscribers break; a page that was already in the
+  feed also needs `feed_id:` with its old path.
+- **Don't write `published_date` on a new post or leaflet page.** The pre-commit
+  hook stamps it in the commit that publishes it (`publish: true` or no
+  `publish` line). Leaflet covers have no date; theirs is their pages' range.
   Drafts are `publish: false` and are committed publicly; that's fine.
 - **The page markup mirrors Bear's** (`header > a.title > h1`, `nav p`, `main`,
   `ul.blog-posts` with `time`, `p.tags`, Pygments' `div.highlight`) because

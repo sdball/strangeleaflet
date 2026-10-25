@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 4
-slug: strange-leaflet-about-elixir-page-4
+alias: strange-leaflet-about-elixir-page-4
 published_date: 2022-06-20T04:00:00+00:00
 tags: elixir, livebook
 publish: true
 meta_description: Using Elixir processes to handle asynchronous work
 ---
-
-« [back to page 3](/strange-leaflet-about-elixir-page-3) || [turn to page 5](/strange-leaflet-about-elixir-page-5) »
 
 If you like there's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage4.livemd) where you can actually run code and follow along. This was written to be a Livebook first, but works well enough as a post too.
 
@@ -194,5 +191,3 @@ Well
 6. Print out a success or failure
 
 This is the slightest dip into the world of Elixir processes. But it's a start!
-
-« [back to page 3](/strange-leaflet-about-elixir-page-3) || [turn to page 5](/strange-leaflet-about-elixir-page-5) »

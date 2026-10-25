@@ -33,6 +33,7 @@ SITE_URL = "https://strangeleaflet.com"
 SITE_DESCRIPTION = "A nerdy blog by Stephen Ball focusing on Elixir, Go, TypeScript, shell scripts, and other cool weird stuff."
 AUTHOR = "Stephen Ball"
 FEED_SIZE = 10
+LEAFLETS_INTRO = "Pieces told over several pages, each with a cover and its pages in order."
 
 LAYOUT = Template((ROOT / "templates" / "layout.html").read_text())
 
@@ -77,10 +78,15 @@ markdown = mistune.create_markdown(
 
 # Sources
 
+def index_source(folder):
+    return next((folder / name for name in ("index.md", "index.html") if (folder / name).exists()), None)
+
+
 def find_sources(folder):
     for path in sorted(folder.iterdir()):
         if path.is_dir():
-            yield from (path / name for name in ("index.md", "index.html") if (path / name).exists())
+            if index_source(path):
+                yield index_source(path)
         elif path.suffix in (".md", ".html"):
             yield path
 
@@ -95,7 +101,8 @@ def frontmatter_value(raw):
     return raw
 
 
-def load(path, folder, is_page):
+def load(path, folder, kind, url=None):
+    """Kind is post, page, cover, or leaflet page. Leaflets pass a url; the rest come from slug."""
     text = path.read_text()
     if not text.startswith("---\n"):
         sys.exit(f"{path.relative_to(ROOT)}: missing frontmatter")
@@ -106,23 +113,59 @@ def load(path, folder, is_page):
             key, _, value = line.partition(":")
             meta[key.strip()] = frontmatter_value(value)
 
-    slug = meta.get("slug", "").strip("/")
+    if url is None:
+        slug = meta.get("slug", "").strip("/")
+        url = f"/{slug}/" if slug else "/"
     published = meta.get("published_date")
     return {
         "source": path,
         "assets": path.parent if path.parent != folder else None,
-        "is_page": is_page,
+        "kind": kind,
         "title": meta.get("title", ""),
-        "slug": slug,
-        "url": f"/{slug}/" if slug else "/",
+        "url": url,
         "date": datetime.fromisoformat(published) if published else None,
         "tags": [t.strip() for t in meta.get("tags", "").split(",") if t.strip()],
         "aliases": [a.strip().strip("/") for a in meta.get("alias", "").split(",") if a.strip()],
         "publish": meta.get("publish", "true") != "false",
         "description": meta.get("meta_description", ""),
+        "feed_id": meta.get("feed_id", "").strip(),
         "body": body,
         "is_html": path.suffix == ".html",
     }
+
+
+LEAFLET_PAGE = re.compile(r"^page-(\d+)(\.md|\.html)?$")
+
+
+def load_leaflets(folder):
+    """Each leaflets/<name>/ has a cover (index.md) and pages (page-N/index.md or page-N.md).
+
+    A cover gets "pages", its published pages in order, and each page gets
+    "leaflet" (its cover) and "number". A leaflet with no published pages is
+    left out.
+    """
+    leaflets = []
+    for home in sorted(p for p in folder.iterdir() if p.is_dir()):
+        url = f"/leaflets/{home.name}/"
+        if not index_source(home):
+            sys.exit(f"{home.relative_to(ROOT)}: a leaflet needs a cover, index.md")
+        cover = load(index_source(home), folder, "cover", url)
+        pages = []
+        for path in home.iterdir():
+            match = LEAFLET_PAGE.match(path.name)
+            source = index_source(path) if path.is_dir() else path
+            if not match or not source:
+                continue
+            n = int(match.group(1))
+            page = load(source, home, "leaflet page", f"{url}page-{n}/")
+            page.update(leaflet=cover, number=n, title=f"{cover['title']}, page {n}")
+            pages.append(page)
+        cover["pages"] = sorted((p for p in pages if p["publish"]), key=lambda p: p["number"])
+        if cover["publish"] and cover["pages"]:
+            leaflets.append(cover)
+        elif cover["publish"]:
+            print(f"{cover['source'].relative_to(ROOT)}: no published pages yet, leaving it out")
+    return leaflets
 
 
 # Pieces of markup shared by the pages
@@ -150,6 +193,11 @@ def post_list(posts, embedded=False):
     return f'<ul class="{css}">\n{items}\n</ul>'
 
 
+def tag_links(tags):
+    links = "\n".join(f'<a rel="nofollow" href="{esc(tag_href(t))}">#{esc(t)}</a>' for t in tags)
+    return f'\n<p class="tags">\n{links}\n</p>' if tags else ""
+
+
 def tag_cloud(posts):
     tags = sorted({t for p in posts for t in p["tags"]})
     links = "\n".join(f'<a rel="nofollow" href="{esc(tag_href(t))}">#{esc(t)}</a>' for t in tags)
@@ -172,6 +220,107 @@ TAG_FILTER = """<style>.blog-posts li[hidden] { display: none; }</style>
     note.hidden = false;
   })();
 </script>"""
+
+
+# Leaflets: a cover with a contents list, and pages strung on eyelets with a page turn at the foot
+
+def page_count(cover):
+    n = len(cover["pages"])
+    return f"{n} page" if n == 1 else f"{n} pages"
+
+
+def leaflet_dates(cover):
+    first, last = cover["pages"][0]["date"], cover["pages"][-1]["date"]
+    if f"{first:%Y%m%d}" == f"{last:%Y%m%d}":
+        return time_tag(first)
+    return f"{time_tag(first)} – {time_tag(last)}"
+
+
+def leaflet_months(cover):
+    """June–July 2022, or September 2025–March 2026."""
+    first, last = cover["pages"][0]["date"], cover["pages"][-1]["date"]
+    if (first.year, first.month) == (last.year, last.month):
+        return f"{first:%B %Y}"
+    if first.year == last.year:
+        return f"{first:%B}–{last:%B %Y}"
+    return f"{first:%B %Y}–{last:%B %Y}"
+
+
+def cover_main(cover, content):
+    first = cover["pages"][0]
+    items = "\n".join(
+        f'<li><span>page {p["number"]}</span><a href="{p["url"]}">{esc(p["description"] or p["title"])}</a></li>'
+        for p in cover["pages"]
+    )
+    return (
+        f'<h1>{esc(cover["title"])}</h1>\n'
+        f'<p class="leaflet-meta">{leaflet_dates(cover)} · {page_count(cover)}</p>\n'
+        f'{content}'
+        f'<h2 id="contents">Contents</h2>\n'
+        f'<ul class="blog-posts leaflet-pages">\n{items}\n</ul>\n'
+        f'<p><a class="open-leaflet" href="{first["url"]}">turn to page {first["number"]} »</a></p>'
+        f'{tag_links(cover["tags"])}'
+    )
+
+
+def leaflet_page_main(page, content):
+    cover = page["leaflet"]
+    pages = cover["pages"]
+    eyelets = []
+    for p in pages:
+        current = ' aria-current="page"' if p is page else ""
+        eyelets.append(f'    <li><a href="{p["url"]}"{current} title="{esc(p["description"])}"><span>{p["number"]}</span></a></li>')
+    eyelets = "\n".join(eyelets)
+    head = (
+        f'<div class="leaflet-head">\n'
+        f'  <a href="{cover["url"]}">{esc(cover["title"])}</a>\n'
+        f'  <ol class="eyelets" aria-label="Pages">\n{eyelets}\n  </ol>\n'
+        f'</div>'
+    )
+
+    # Page 1 turns back to the cover, and the last page closes the leaflet
+    i = pages.index(page)
+    if i > 0:
+        back = (pages[i - 1]["url"], f'« back to page {pages[i - 1]["number"]}', pages[i - 1]["description"])
+    else:
+        back = (cover["url"], "« back to the cover", cover["title"])
+    if i < len(pages) - 1:
+        ahead = (pages[i + 1]["url"], f'turn to page {pages[i + 1]["number"]} »', pages[i + 1]["description"])
+    else:
+        ahead = (cover["url"], "close the leaflet »", "Back to the cover")
+    turn = "\n".join(
+        f'  <a class="{css}" href="{href}"><span class="dir">{esc(direction)}</span><span class="what">{esc(what)}</span></a>'
+        for css, (href, direction, what) in (("prev", back), ("next", ahead))
+    )
+
+    dek = f'<p class="dek">{esc(page["description"])}</p>\n' if page["description"] else ""
+    return (
+        f'{head}\n<h1>Page {page["number"]}</h1>\n{dek}<p><i>{time_tag(page["date"])}</i></p>\n{content}'
+        f'<nav class="page-turn" aria-label="Turn the page">\n{turn}\n</nav>'
+    )
+
+
+def leaflets_main(leaflets, contents):
+    articles = []
+    for cover in leaflets:
+        picture = ""
+        img = re.search(r'<img [^>]*src="([^"]+)"', contents[cover["url"]])
+        if img:
+            src = img.group(1)
+            if not re.match(r"^([a-z][a-z0-9+.-]*:|/)", src, re.I):
+                src = cover["url"] + src
+            # The title beside it is the same link, so this one stays out of the tab order
+            picture = f'  <a href="{cover["url"]}" tabindex="-1" aria-hidden="true"><img src="{esc(src)}" alt=""></a>\n'
+        about = f'\n    <p>{esc(cover["description"])}</p>' if cover["description"] else ""
+        articles.append(
+            f'<article class="leaflet-entry">\n{picture}'
+            f'  <div>\n'
+            f'    <h2><a href="{cover["url"]}">{esc(cover["title"])}</a></h2>\n'
+            f'    <p class="leaflet-meta">{page_count(cover)} · {leaflet_months(cover)}</p>{about}\n'
+            f'  </div>\n'
+            f'</article>'
+        )
+    return f'<h1>Leaflets</h1>\n<p>{esc(LEAFLETS_INTRO)}</p>\n' + "\n".join(articles)
 
 
 def expand_embeds(body, posts):
@@ -204,7 +353,7 @@ def absolute_urls(content, base):
 def render_content(entry, posts):
     if entry["is_html"]:
         return entry["body"]
-    body = expand_embeds(entry["body"], posts) if entry["is_page"] else entry["body"]
+    body = expand_embeds(entry["body"], posts) if entry["kind"] == "page" else entry["body"]
     renderer.heading_ids = set()
     return markdown(body)
 
@@ -237,14 +386,20 @@ def atom_date(date):
 
 
 def write_feed(posts, contents):
+    """Posts and leaflet pages, newest first."""
     entries = []
     for p in posts[:FEED_SIZE]:
         url = SITE_URL + p["url"]
+        # A page that moved keeps the id it was first in the feed with, so readers don't see it twice
+        entry_id = SITE_URL + p["feed_id"] if p["feed_id"] else url
+        title = p["title"]
+        if p["kind"] == "leaflet page" and p["description"]:
+            title += ": " + p["description"]
         content = absolute_urls(contents[p["url"]], p["url"])
         categories = "".join(f'\n    <category term="{esc(t)}"/>' for t in p["tags"])
         entries.append(f"""  <entry>
-    <id>{url}</id>
-    <title>{esc(p["title"])}</title>
+    <id>{entry_id}</id>
+    <title>{esc(title)}</title>
     <link href="{url}"/>
     <published>{atom_date(p["date"])}</published>
     <updated>{atom_date(p["date"])}</updated>{categories}
@@ -272,8 +427,8 @@ def write_feed(posts, contents):
     (PUBLIC / "feed.xml").write_text(feed)
 
 
-def write_sitemap(entries):
-    urls = "\n".join(f"  <url><loc>{SITE_URL}{e['url']}</loc></url>" for e in entries)
+def write_sitemap(urls):
+    urls = "\n".join(f"  <url><loc>{SITE_URL}{url}</loc></url>" for url in urls)
     (PUBLIC / "sitemap.xml").write_text(
         f'<?xml version="1.0" encoding="utf-8"?>\n'
         f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{urls}\n</urlset>\n'
@@ -298,17 +453,20 @@ def write_alias(alias, target):
 
 def main():
     entries = []
-    for name, is_page in (("posts", False), ("pages", True)):
+    for name, kind in (("posts", "post"), ("pages", "page")):
         folder = ROOT / name
-        entries += [load(p, folder, is_page) for p in find_sources(folder)]
+        entries += [load(p, folder, kind) for p in find_sources(folder)]
     entries = [e for e in entries if e["publish"]]
+    leaflets = load_leaflets(ROOT / "leaflets")
+    for cover in leaflets:
+        entries += [cover] + cover["pages"]
 
-    seen = {}
+    seen = {"/leaflets/": ROOT / "leaflets"}
     for e in entries:
-        if not e["is_page"] and not e["date"]:
-            # .githooks/pre-commit adds the date in the commit that publishes a post
+        if e["kind"] in ("post", "leaflet page") and not e["date"]:
+            # .githooks/pre-commit adds the date in the commit that publishes a post or leaflet page
             if os.environ.get("CI"):
-                sys.exit(f"{e['source'].relative_to(ROOT)}: posts need a published_date")
+                sys.exit(f"{e['source'].relative_to(ROOT)}: posts and leaflet pages need a published_date")
             e["date"] = datetime.now(timezone.utc)
             print(f"{e['source'].relative_to(ROOT)}: no published_date yet, previewing it as now")
         for url in [e["url"]] + [f"/{a}/" for a in e["aliases"]]:
@@ -316,11 +474,12 @@ def main():
                 sys.exit(f"{e['source'].relative_to(ROOT)}: {url} is also used by {seen[url].relative_to(ROOT)}")
             seen[url] = e["source"]
 
-    posts = sorted(
-        (e for e in entries if not e["is_page"]),
-        key=lambda p: p["date"],
-        reverse=True,
-    )
+    def newest_first(kinds):
+        return sorted((e for e in entries if e["kind"] in kinds), key=lambda e: e["date"], reverse=True)
+
+    # Leaflet pages stay out of the blog list, but the feed has them
+    posts = newest_first({"post"})
+    leaflets.sort(key=lambda cover: cover["pages"][-1]["date"], reverse=True)
 
     # Empty public/ rather than replacing it, so a running scripts/serve keeps serving it
     PUBLIC.mkdir(exist_ok=True)
@@ -332,35 +491,50 @@ def main():
     for e in entries:
         content = render_content(e, posts)
         contents[e["url"]] = content
-        out = Path(e["slug"]) / "index.html"
+        path = e["url"].strip("/")
 
         if e["assets"]:
-            shutil.copytree(e["assets"], PUBLIC / e["slug"], dirs_exist_ok=True,
-                            ignore=shutil.ignore_patterns("index.md", "index.html", ".*"))
+            def ignore(folder, names):
+                skip = {n for n in names if n in ("index.md", "index.html") or n.startswith(".")}
+                if e["kind"] == "cover" and Path(folder) == e["assets"]:
+                    skip |= {n for n in names if LEAFLET_PAGE.match(n)}  # the pages copy their own
+                return skip
+            shutil.copytree(e["assets"], PUBLIC / path, dirs_exist_ok=True, ignore=ignore)
 
-        if e["is_page"]:
-            body_class = "home" if e["url"] == "/" else e["slug"]
+        if e["kind"] == "page":
+            body_class = "home" if e["url"] == "/" else path
             main_html = content
+        elif e["kind"] == "cover":
+            body_class = "leaflet-cover"
+            main_html = cover_main(e, content)
+        elif e["kind"] == "leaflet page":
+            body_class = "leaflet-page"
+            main_html = leaflet_page_main(e, content)
         else:
             body_class = "post"
-            tags = ""
-            if e["tags"]:
-                links = "\n".join(f'<a rel="nofollow" href="{esc(tag_href(t))}">#{esc(t)}</a>' for t in e["tags"])
-                tags = f'\n<p class="tags">\n{links}\n</p>'
-            main_html = f'<h1>{esc(e["title"])}</h1>\n<p><i>{time_tag(e["date"])}</i></p>\n{content}{tags}'
+            main_html = f'<h1>{esc(e["title"])}</h1>\n<p><i>{time_tag(e["date"])}</i></p>\n{content}{tag_links(e["tags"])}'
 
         page(
-            out,
+            Path(path) / "index.html",
             title=SITE_TITLE if e["url"] == "/" else f"{e['title']} – {SITE_TITLE}",
             description=description_for(e, content),
             canonical=SITE_URL + e["url"],
             body_class=body_class,
             main=main_html,
-            og_type="website" if e["is_page"] else "article",
+            og_type="article" if e["kind"] in ("post", "leaflet page") else "website",
         )
 
         for alias in e["aliases"]:
             write_alias(alias, e["url"])
+
+    page(
+        "leaflets/index.html",
+        title=f"Leaflets – {SITE_TITLE}",
+        description=LEAFLETS_INTRO,
+        canonical=SITE_URL + "/leaflets/",
+        body_class="leaflets",
+        main=leaflets_main(leaflets, contents),
+    )
 
     page(
         "404.html",
@@ -371,9 +545,11 @@ def main():
         main='<h1>Not found</h1>\n<p>There\'s no page here. The <a href="/blog/">blog</a> lists every post.</p>',
     )
 
-    write_feed(posts, contents)
-    write_sitemap(entries)
-    print(f"Built {len(posts)} posts and {len(entries) - len(posts)} other pages into public/")
+    write_feed(newest_first({"post", "leaflet page"}), contents)
+    write_sitemap([e["url"] for e in entries] + ["/leaflets/"])
+    leaflet_pages = sum(len(cover["pages"]) for cover in leaflets)
+    others = len(entries) - len(posts) - len(leaflets) - leaflet_pages
+    print(f"Built {len(posts)} posts, {len(leaflets)} leaflets ({leaflet_pages} pages), and {others} other pages into public/")
 
 
 if __name__ == "__main__":

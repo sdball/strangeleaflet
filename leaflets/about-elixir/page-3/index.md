@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 3
-slug: strange-leaflet-about-elixir-page-3
+alias: strange-leaflet-about-elixir-page-3
 published_date: 2022-06-19T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-meta_description: What Elixir processes are, what's inside one, and how to send one a message.
+meta_description: What Elixir processes are, what's inside one, and how to send one a message
 ---
-
-« [back to page 2](/strange-leaflet-about-elixir-page-2) || [turn to page 4](/strange-leaflet-about-elixir-page-4) »
 
 If you like there's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage3.livemd) where you can actually run code and follow along. This was written to be a Livebook first, but works well enough as a post too.
 
@@ -184,5 +181,3 @@ You can evaluate that receive block of code a few times (one for as many message
 That `after` block of code ensures that our `receive` block doesn't do its default behavior of waiting forever to receive a new message.
 
 And there we have it. A quick introduction into **WHAT IS EVEN AN ELIXIR PROCESS?**
-
-« [back to page 2](/strange-leaflet-about-elixir-page-2) || [turn to page 4](/strange-leaflet-about-elixir-page-4) »

@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 1
-slug: strange-leaflet-about-elixir-page-1
+alias: strange-leaflet-about-elixir-page-1
 published_date: 2022-06-12T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-meta_description: Learn how Elixir is a language of independently running processes.
+meta_description: Learn how Elixir is a language of independently running processes
 ---
-
-[turn to page 2](/strange-leaflet-about-elixir-page-2) »
 
 If you like there's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage1.livemd) where you can actually run code and follow along. This was written to be a Livebook first, but works well enough as a post too.
 
@@ -128,5 +125,3 @@ end)
 ```
 
 You see, Elixir is a language where your processes are never alone. Your code is never running by itself with no friends and no allies. Your code has access to a universal force. An energy field that surrounds, penetrates, and binds our code together. It has the BEAM.
-
-If you choose to keep reading the leaflet [turn to page 2](/strange-leaflet-about-elixir-page-2) »

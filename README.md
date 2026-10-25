@@ -7,6 +7,7 @@ Python script turns them into a static site in `public/`, and pushing to
 ```
 posts/<slug>.md          a post
 posts/<slug>/index.md    a post with its own files (images, scripts) beside it
+leaflets/<name>/         a leaflet: a cover (index.md) and its pages (page-N/index.md)
 pages/                   index.md (home), blog.md, about-me.md
 templates/layout.html    the page around every post and page
 static/theme.css         the theme (light and dark), copied to public/
@@ -101,6 +102,35 @@ feed readers and visitors without JavaScript see, and the element replaces it:
 `<slug>.html`) with the same frontmatter, and its body is used as-is inside the
 layout.
 
+## Leaflets
+
+A leaflet is a piece told over several pages, with a cover. Leaflets live at
+`/leaflets/`, which the build generates and the nav links to.
+
+```
+leaflets/<name>/index.md          the cover, at /leaflets/<name>/
+leaflets/<name>/page-1/index.md   page 1, at /leaflets/<name>/page-1/, with its files beside it
+leaflets/<name>/page-2.md         or a page with no files of its own
+```
+
+The cover has a `title`, a `meta_description` (shown on `/leaflets/`), `tags`,
+and any `alias`, and no `published_date`. Its body is the introduction; the
+build adds the dates, the page count, and a contents list. The first image on
+a cover is its picture on `/leaflets/`. A cover can reference its pages' files
+(`page-1/picture.webp`).
+
+A page needs no `title` or `slug`: its number comes from its folder, and its
+`meta_description` is the line under "Page N", its entry in the contents, and
+the end of its feed title ("Programming Videos, page 2: …"). It gets a
+`published_date` the same way a post does. The build adds the running head
+(the leaflet's name and its pages) and the page turn at the foot, so don't
+write those by hand.
+
+Leaflet pages aren't in the `/blog/` list or its tag filter, but they are in
+the feed, by date, so a new page reaches subscribers. A page that moved after
+it was already in the feed keeps its old entry id with `feed_id: /old-path/`,
+so readers don't see it twice.
+
 ## Pages
 
 `pages/` holds pages that aren't posts. They can use Bear's embeds, each on a
@@ -113,7 +143,8 @@ line of its own:
 ## What the build makes
 
 - a page for every post and page, at `/<slug>/`
-- `/feed/` (`feed/index.xml`) and `/feed.xml`: an Atom feed of the latest 10 posts, with the same entry ids Bear used
+- `/leaflets/`, and each leaflet's cover and pages under it
+- `/feed/` (`feed/index.xml`) and `/feed.xml`: an Atom feed of the latest 10 posts and leaflet pages, with the same entry ids Bear used
 - `/sitemap.xml` and `/robots.txt`
 - `/404.html`
 - a redirect page at each alias

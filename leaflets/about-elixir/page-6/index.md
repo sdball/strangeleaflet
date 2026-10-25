@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 6
-slug: strange-leaflet-about-elixir-page-6
+alias: strange-leaflet-about-elixir-page-6
 published_date: 2022-06-27T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-meta_description: How an Elixir GenServer process manages state.
+meta_description: How an Elixir GenServer process manages state
 ---
-
-« [back to page 5](/strange-leaflet-about-elixir-page-5) || [turn to page 7](/strange-leaflet-about-elixir-page-7) »
 
 There's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage6.livemd) where you can actually run code and follow along directly.
 
@@ -249,5 +246,3 @@ This approach forces you as the developer to explicitly handle your state. It ca
 We have no state but what we make.
 
 ![The phrase "No State" carved into a wooden table](no-state.webp)
-
-« [back to page 5](/strange-leaflet-about-elixir-page-5) || [turn to page 7](/strange-leaflet-about-elixir-page-7) »

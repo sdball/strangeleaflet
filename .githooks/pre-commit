@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stamp published_date on posts that this commit publishes.
+"""Stamp published_date on posts and leaflet pages that this commit publishes.
 
 Drafts (publish: false) leave published_date out. When a commit includes a
 post that will be published and still has no published_date, this sets it to
@@ -11,7 +11,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-POST = re.compile(r"^posts/([^/]+\.(md|html)|[^/]+/index\.(md|html))$")
+# Posts and leaflet pages, which go in the feed. Leaflet covers have no date.
+POST = re.compile(r"^(posts/([^/]+\.(md|html)|[^/]+/index\.(md|html))"
+                  r"|leaflets/[^/]+/page-\d+(\.(md|html)|/index\.(md|html)))$")
 
 
 def git(*args, check=True):

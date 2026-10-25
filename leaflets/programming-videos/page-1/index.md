@@ -1,15 +1,10 @@
 ---
-title: Programming Videos
-slug: programming-videos
-alias: leaflets/programming-videos
 published_date: 2025-09-14T13:09:00+00:00
 tags: curated, programming, videos
 publish: true
+meta_description: The Soul of Erlang and Elixir
+feed_id: /programming-videos/
 ---
-
-Kicking off a blog post series of curated programming videos.
-
-## The Soul of Erlang and Elixir
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/JvBT4XBdoUE?si=cy2cFvmYHJ6D9Qko" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 

@@ -229,7 +229,7 @@ The active games only persist as long as the server is running. And because I'm 
 
 ## Summary
 
-Phoenix LiveView makes creating interactive user experiences robust and easy. Phoenix pubsub makes coordinating a shared experience robust and easy. Phoenix and Elixir make creating code that's fun to write. If you haven't tried out Elixir yet maybe start with my [introductory Livebook](https://github.com/sdball/livebooks/blob/main/books/strange-leaflet-about-elixir/page1.livemd) or [corresponding blog series](/strange-leaflet-about-elixir-page-1/)?
+Phoenix LiveView makes creating interactive user experiences robust and easy. Phoenix pubsub makes coordinating a shared experience robust and easy. Phoenix and Elixir make creating code that's fun to write. If you haven't tried out Elixir yet maybe start with my [introductory Livebook](https://github.com/sdball/livebooks/blob/main/books/strange-leaflet-about-elixir/page1.livemd) or [corresponding blog series](/leaflets/about-elixir/page-1/)?
 
 ---
 

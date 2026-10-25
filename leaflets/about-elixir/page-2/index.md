@@ -1,13 +1,10 @@
 ---
-title: Strange Leaflet about Elixir - Page 2
-slug: strange-leaflet-about-elixir-page-2
+alias: strange-leaflet-about-elixir-page-2
 published_date: 2022-06-13T04:00:00+00:00
 tags: elixir, livebook
 publish: true
 meta_description: What is the BEAM and why is it so awesome?
 ---
-
-« [back to page 1](/strange-leaflet-about-elixir-page-1/) || [turn to page 3](/strange-leaflet-about-elixir-page-3/) »
 
 If you like there's a [Livebook version of this post](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fsdball%2Flivebooks%2Fblob%2Fmain%2Fbooks%2Fstrange-leaflet-about-elixir%2Fpage2.livemd) where you can actually run code and follow along. This was written to be a Livebook first, but works well enough as a post too.
 
@@ -104,5 +101,3 @@ What is Elixir? Elixir is `beam` running a **thread** per CPU running a **schedu
 Everything in Elixir is running in a process.
 
 Elixir applications run thousands or millions of processes. Think of them as cheap as instantiating an object in an object oriented language.
-
-« [back to page 1](/strange-leaflet-about-elixir-page-1/) || [turn to page 3](/strange-leaflet-about-elixir-page-3/) »
