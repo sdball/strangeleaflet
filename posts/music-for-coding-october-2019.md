@@ -4,7 +4,6 @@ slug: music-for-coding-october-2019
 published_date: 2019-10-29T04:00:00+00:00
 tags: music, programming
 publish: true
-is_page: false
 meta_description: Some music albums and playlists that I find great to listen to while programming.
 ---
 

@@ -4,7 +4,6 @@ slug: elixir-phoenix-and-role-postgres-does-not-exist
 published_date: 2021-08-30T04:00:00+00:00
 tags: elixir, phoenix
 publish: true
-is_page: false
 ---
 
 If you're trying to follow along the [Elixir Phoenix Up and Running guide](https://hexdocs.pm/phoenix/up_and_running.html) you may run straight into this error if you're using homebrew's Postgres install when you run `mix ecto.create`

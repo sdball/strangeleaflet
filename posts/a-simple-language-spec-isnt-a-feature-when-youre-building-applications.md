@@ -4,7 +4,6 @@ slug: a-simple-language-spec-isnt-a-feature-when-youre-building-applications
 published_date: 2020-10-11T04:00:00+00:00
 tags: go, programming
 publish: true
-is_page: false
 meta_description: Go famously has a small, simple language spec. That isn't always a good thing.
 ---
 

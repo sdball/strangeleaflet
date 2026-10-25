@@ -4,7 +4,6 @@ slug: rewriting-my-protohackers-repo-as-an-umbrella-app
 published_date: 2023-02-15T11:50:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-is_page: false
 ---
 
 My existing setup for my [protohackers problems repo](https://github.com/sdball/protohackers) with one big application running a bunch of smaller

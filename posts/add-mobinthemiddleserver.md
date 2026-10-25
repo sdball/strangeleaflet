@@ -4,7 +4,6 @@ slug: add-mobinthemiddleserver
 published_date: 2023-01-14T05:15:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-is_page: false
 ---
 
 Protohackers problem 5: https://protohackers.com/problem/5

@@ -4,7 +4,6 @@ slug: better-go-test-output
 published_date: 2022-03-16T04:00:00+00:00
 tags: go
 publish: true
-is_page: false
 ---
 
 The `go test` command is alright and props to Go for being a real modern language with built-in support for testing. But its output is decidedly unfriendly.

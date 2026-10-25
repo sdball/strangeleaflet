@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-5
 published_date: 2022-06-21T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-is_page: false
 meta_description: Immutable data and why it's awesome.
 ---
 

@@ -4,7 +4,6 @@ slug: conways-game-of-life-a-functional-approach
 published_date: 2024-08-23T04:00:00+00:00
 tags: clojure, elixir, programming
 publish: true
-is_page: false
 meta_description: How to implement Conway's Game of Life using functional programming.
 ---
 

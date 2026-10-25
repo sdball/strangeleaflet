@@ -3,7 +3,6 @@ title: Switched to Bear
 slug: switched-to-bear
 published_date: 2025-09-14T13:56:00+00:00
 publish: true
-is_page: false
 ---
 
 I was browsing around the [Kagi small web](https://kagi.com/smallweb) and found that I was on a blog powered by Bear. A couple things caught my eye.

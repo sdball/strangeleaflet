@@ -4,7 +4,6 @@ slug: lets-write-an-elixir-livebook-smart-cell
 published_date: 2022-05-22T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-is_page: false
 meta_description: The basics of how to write an Elixir Livebook smart cell.
 ---
 

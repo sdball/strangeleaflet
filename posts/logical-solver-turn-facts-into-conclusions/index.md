@@ -4,7 +4,6 @@ slug: logical-solver-turn-facts-into-conclusions
 published_date: 2019-11-08T05:00:00+00:00
 tags: puzles
 publish: true
-is_page: false
 meta_description: Learn about logical grid puzzles and how applying the right tools can make complex problems trivial.
 ---
 

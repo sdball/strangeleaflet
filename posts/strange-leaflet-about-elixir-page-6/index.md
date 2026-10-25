@@ -3,7 +3,6 @@ title: Strange Leaflet about Elixir - Page 6
 slug: strange-leaflet-about-elixir-page-6
 published_date: 2022-06-27T04:00:00+00:00
 publish: true
-is_page: false
 meta_description: How an Elixir GenServer process manages state.
 ---
 

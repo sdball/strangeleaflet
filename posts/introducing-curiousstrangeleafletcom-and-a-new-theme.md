@@ -3,7 +3,6 @@ title: Introducing curious.strangeleaflet.com and a new theme
 slug: introducing-curiousstrangeleafletcom-and-a-new-theme
 published_date: 2026-10-13T23:47:00+00:00
 publish: true
-is_page: false
 ---
 
 Hello! I've been having a ton of fun vibing up self-contained HTML pages to explore random interests and I finally assembled a hosting setup. You can find them all at [https://curious.strangeleaflet.com](https://curious.strangeleaflet.com) and they are literally straight up from the public folder of [curious-strangeleaflet](https://github.com/sdball/strangeleaflet-curious). Very intentionally there's no cohesive theming, no build step, no script at all required. There _is_ a script to serve them all up locally but that's just for convenience the pages work equally well when opened directly as HTML.

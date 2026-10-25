@@ -3,7 +3,6 @@ title: Writing an Elixir/Phoenix based multiplayer Minesweeper game
 slug: writing-an-elixirphoenix-based-multiplayer-minesweeper-game
 published_date: 2024-08-18T04:00:00+00:00
 publish: true
-is_page: false
 ---
 
 ## Context?

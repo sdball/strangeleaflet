@@ -4,7 +4,6 @@ slug: command-line-tools-jq
 published_date: 2019-11-06T05:00:00+00:00
 tags: shell
 publish: true
-is_page: false
 meta_description: jq is awesome
 ---
 

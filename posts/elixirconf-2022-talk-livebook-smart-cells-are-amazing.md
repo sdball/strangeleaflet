@@ -4,7 +4,6 @@ slug: elixirconf-2022-talk-livebook-smart-cells-are-amazing
 published_date: 2022-11-01T04:00:00+00:00
 tags: elixir, livebook, talk
 publish: true
-is_page: false
 ---
 
 Hello Internet! My talk from ElixirConf 2022 is now uploaded and ready to stream! If you are curious about the inner workings of Elixir Livebook or smart cells then you will probably find something interesting. At the very least you'll get context for the [GIFs](/gifs-from-my-2022-elixirconf-talk-livebook-smart-cells-are-amazing).

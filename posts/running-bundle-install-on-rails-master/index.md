@@ -4,7 +4,6 @@ slug: running-bundle-install-on-rails-master
 published_date: 2019-12-01T05:00:00+00:00
 tags: rails, ruby
 publish: true
-is_page: false
 meta_description: How I handled bundle install errors for the Rails 6 repo
 ---
 

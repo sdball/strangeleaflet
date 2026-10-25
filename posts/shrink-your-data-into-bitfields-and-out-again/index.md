@@ -5,7 +5,6 @@ alias: blog/shrink-your-data-into-bitfields
 published_date: 2020-04-29T04:00:00+00:00
 tags: data, elixir, programming
 publish: true
-is_page: false
 meta_description: Some applications want to save every byte. Every last byte! Learn how bitfields allow us to shink complex data down into a bitfield.
 ---
 

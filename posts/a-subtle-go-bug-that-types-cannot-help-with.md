@@ -4,7 +4,6 @@ slug: a-subtle-go-bug-that-types-cannot-help-with
 published_date: 2022-04-04T04:00:00+00:00
 tags: go
 publish: true
-is_page: false
 meta_description: Types are not a solution for all programming bugs.
 ---
 

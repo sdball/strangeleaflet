@@ -4,7 +4,6 @@ slug: parsing-dates-and-times-from-strings-using-strptime
 published_date: 2012-02-10T05:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 meta_description: Datetime strings are complex. Let's turn them into structured data.
 ---
 

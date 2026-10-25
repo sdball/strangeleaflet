@@ -4,7 +4,6 @@ slug: gifs-from-my-2022-elixirconf-talk-livebook-smart-cells-are-amazing
 published_date: 2022-08-31T04:00:00+00:00
 tags: elixir, gifs
 publish: true
-is_page: false
 ---
 
 I made these animated GIFs for my ElixirConf talk. You can probably assume the context correctly but my talk will also be available to stream soon.

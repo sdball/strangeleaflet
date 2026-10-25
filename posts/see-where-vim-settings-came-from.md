@@ -4,7 +4,6 @@ slug: see-where-vim-settings-came-from
 published_date: 2022-03-15T04:00:00+00:00
 tags: vim
 publish: true
-is_page: false
 ---
 
 Ever wonder which plugin or config in vim is responsible for setting something like tabs to represent as four spaces? (e.g. `ts=4`)

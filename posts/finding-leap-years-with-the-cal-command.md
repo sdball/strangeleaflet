@@ -5,7 +5,6 @@ alias: blog/finding-leap-years-with-the-cal-command
 published_date: 2021-07-11T04:00:00+00:00
 tags: shell
 publish: true
-is_page: false
 meta_description: Use cal and some command line tricks to find leap years.
 ---
 

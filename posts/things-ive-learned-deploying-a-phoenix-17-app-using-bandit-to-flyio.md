@@ -4,7 +4,6 @@ slug: things-ive-learned-deploying-a-phoenix-17-app-using-bandit-to-flyio
 published_date: 2022-12-28T05:00:00+00:00
 tags: elixir, fly.io, phoenix
 publish: true
-is_page: false
 alias: things-ive-learned-deploying-a-phoenix-17-app-using-bandit-to-flyio-new
 meta_description: Some issues I ran into deploying a Phoenix app using Bandit to fly.io and what I learned from them.
 ---

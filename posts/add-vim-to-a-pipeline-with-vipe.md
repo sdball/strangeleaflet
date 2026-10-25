@@ -4,7 +4,6 @@ slug: add-vim-to-a-pipeline-with-vipe
 published_date: 2019-01-18T05:00:00+00:00
 tags: shell, vim
 publish: true
-is_page: false
 meta_description: How to inject vim into a shell pipeline
 ---
 

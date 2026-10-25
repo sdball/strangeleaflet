@@ -4,7 +4,6 @@ slug: solving-protohackers-problem-6
 published_date: 2023-01-16T21:03:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-is_page: false
 ---
 
 This commit solves

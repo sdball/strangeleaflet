@@ -4,7 +4,6 @@ slug: anonymous-blocks-as-function-arguments-in-ruby
 published_date: 2012-02-09T05:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 meta_description: How you can write your own code to handle blocks passed to Ruby functions
 ---
 

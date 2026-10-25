@@ -3,7 +3,6 @@ title: I’d use Spinel for Ruby projects
 slug: id-use-spinel-for-ruby-projects
 published_date: 2025-09-23T23:52:34.502231+00:00
 publish: true
-is_page: false
 ---
 
 From [Shopify, pulling strings at Ruby Central, forces Bundler and RubyGems takeover](https://joel.drapper.me/p/rubygems-takeover/) my takeaway is that on any of my Ruby projects I’d absolutely use Spinel and stay far away from rubygems.org.

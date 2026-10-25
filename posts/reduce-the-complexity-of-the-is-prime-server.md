@@ -4,7 +4,6 @@ slug: reduce-the-complexity-of-the-is-prime-server
 published_date: 2023-01-05T04:05:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-is_page: false
 ---
 
 I'm happier with this version but I'm not entirely sold on my use of

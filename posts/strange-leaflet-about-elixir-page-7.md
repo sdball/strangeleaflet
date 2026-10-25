@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-7
 published_date: 2022-06-28T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-is_page: false
 meta_description: Elixir pattern matching is awesome.
 ---
 

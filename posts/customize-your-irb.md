@@ -4,7 +4,6 @@ slug: customize-your-irb
 published_date: 2013-03-19T04:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 meta_description: How to customize your local Ruby REPL to be a more effective tool.
 ---
 

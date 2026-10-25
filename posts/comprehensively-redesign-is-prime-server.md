@@ -4,7 +4,6 @@ slug: comprehensively-redesign-is-prime-server
 published_date: 2023-01-04T20:51:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-is_page: false
 ---
 
 The first major issue was that the Protohackers challenges threw a

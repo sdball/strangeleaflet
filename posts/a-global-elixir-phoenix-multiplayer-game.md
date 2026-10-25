@@ -3,7 +3,6 @@ title: A Global Elixir Phoenix Multiplayer Game
 slug: a-global-elixir-phoenix-multiplayer-game
 published_date: 2025-01-11T05:00:00+00:00
 publish: true
-is_page: false
 ---
 
 This is a followup to my previous post [explaining how I initially wrote Mowing](/writing-an-elixirphoenix-based-multiplayer-minesweeper-game/) — a multiplayer "Minesweeper" clone with a gardening theme.

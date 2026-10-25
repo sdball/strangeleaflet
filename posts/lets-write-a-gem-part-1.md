@@ -4,7 +4,6 @@ slug: lets-write-a-gem-part-1
 published_date: 2012-02-21T05:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 meta_description: Ever wanted to write a Ruby gem? Let's do that!
 ---
 

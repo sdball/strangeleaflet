@@ -3,7 +3,6 @@ title: A History Degree Is A Programming Superpower in the Age of AI
 slug: a-history-degree-is-a-programming-superpower-in-the-age-of-ai
 published_date: 2026-05-06T16:21:00+00:00
 publish: true
-is_page: false
 ---
 
 A history degree was always a cheat code for being a high level software engineer, but large language models have turned it into even more of a superpower.

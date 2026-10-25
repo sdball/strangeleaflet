@@ -4,7 +4,6 @@ slug: lets-write-a-gem-part-2
 published_date: 2012-02-23T05:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 meta_description: In which we wrap up writing a gem and in particular delve into ensure our gem is well tested.
 ---
 

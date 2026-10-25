@@ -4,7 +4,6 @@ slug: every-if-statement-is-an-object-waiting-to-be-extracted
 published_date: 2020-02-19T05:00:00+00:00
 tags: programming, ruby
 publish: true
-is_page: false
 meta_description: Turning control flows into objects is not only possible it is sometimes more expressive and useful.
 ---
 

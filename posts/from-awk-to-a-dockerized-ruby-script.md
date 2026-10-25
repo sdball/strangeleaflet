@@ -4,7 +4,6 @@ slug: from-awk-to-a-dockerized-ruby-script
 published_date: 2021-08-08T04:00:00+00:00
 tags: awk, docker, ruby, shell
 publish: true
-is_page: false
 meta_description: Taking a script and wrapping it up into a Docker image that can easily run anywhere!
 ---
 

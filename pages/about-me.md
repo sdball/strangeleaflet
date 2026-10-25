@@ -3,7 +3,6 @@ title: About Me
 slug: about-me
 published_date: 2025-09-15T00:36:00+00:00
 publish: true
-is_page: true
 ---
 
 My name is Stephen Ball. I'm a lifelong computer nerd, videogame enthusiast, music composer, fan of surround sound, father of three, and I want everyone to be able to live a life of comfort and dignity.

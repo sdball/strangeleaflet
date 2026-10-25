@@ -4,7 +4,6 @@ slug: program-like-a-videogamer
 published_date: 2013-02-06T05:00:00+00:00
 tags: programming
 publish: true
-is_page: false
 meta_description: Feedback loops are the foundation of learning videogames and learning to program
 ---
 

@@ -4,7 +4,6 @@ slug: fun-with-rock-paper-scissors
 published_date: 2012-02-28T05:00:00+00:00
 tags: ruby
 publish: true
-is_page: false
 ---
 
 [James Edward Gray II's Ruby Quiz #16](http://www.rubyquiz.com/quiz16.html) was to implement Rock, Paper, Scissors playing classes to compete on a playing field managed by a given Game class. Today we revisit this quiz for a bit of coding fun. We'll implement some simple players and move on to some basic metaprogramming techniques and write players that manipulate each other or the game itself.

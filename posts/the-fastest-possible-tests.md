@@ -4,7 +4,6 @@ slug: the-fastest-possible-tests
 published_date: 2020-10-03T04:00:00+00:00
 tags: programming
 publish: true
-is_page: false
 meta_description: How fast could programming tests actually be?
 ---
 

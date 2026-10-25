@@ -4,7 +4,6 @@ slug: things-most-interviewees-fail-to-discover
 published_date: 2012-08-17T04:00:00+00:00
 tags: career
 publish: true
-is_page: false
 meta_description: Interviews aren't only for potential future companies and teams to find out about you, you should also use them as an opportunity to find out about them. Here are some things to try and learn.
 ---
 

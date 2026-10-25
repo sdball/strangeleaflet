@@ -5,7 +5,6 @@ alias: blog/deliberate-git
 published_date: 2013-06-19T04:00:00+00:00
 tags: git
 publish: true
-is_page: false
 meta_description: Git commits are messages to the future. This is how to deliberately make them useful.
 ---
 

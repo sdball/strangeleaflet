@@ -4,7 +4,6 @@ slug: getting-alpinejs-to-work-with-phoenix-17
 published_date: 2022-11-24T05:00:00+00:00
 tags: alpinejs, elixir, phoenix
 publish: true
-is_page: false
 ---
 
 I wanted to follow along with the very excellent blog post [Autocomplete Search Component with Phoenix LiveView and AlpineJS](https://medium.com/mindvalley-technology/autocomplete-search-component-with-phoenix-liveview-and-alpinejs-4a98b7287b9f) but translate it to Phoenix 1.7.

@@ -4,7 +4,6 @@ slug: the-problem-of-state
 published_date: 2021-05-01T04:00:00+00:00
 tags: programming
 publish: true
-is_page: false
 meta_description: State is a hard problem to deal with. I say functional languages make it easier to handle because they force you to deal with it deliberately rather than have it happen accidentally.
 ---
 

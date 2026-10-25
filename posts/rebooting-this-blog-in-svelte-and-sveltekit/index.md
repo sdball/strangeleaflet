@@ -4,7 +4,6 @@ slug: rebooting-this-blog-in-svelte-and-sveltekit
 published_date: 2023-09-07T16:57:00+00:00
 tags: blog, svelte
 publish: true
-is_page: false
 meta_description: "Why and how I'm writing my personal blog in SvelteKit instead of a backend like Phoenix."
 ---
 

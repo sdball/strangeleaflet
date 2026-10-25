@@ -4,7 +4,6 @@ slug: clojure-functions-in-four-ways
 published_date: 2021-01-31T05:00:00+00:00
 tags: clojure
 publish: true
-is_page: false
 meta_description: Four different and differently useful ways you can create functions in Clojure.
 ---
 

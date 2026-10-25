@@ -4,7 +4,6 @@ slug: links-you-might-find-interesting-4
 published_date: 2019-12-02T05:00:00+00:00
 tags: links
 publish: true
-is_page: false
 meta_description: Annotate literally anything, calculus explained with GIFs, the climate tipping point, a history of OS/2, and more!
 ---
 
