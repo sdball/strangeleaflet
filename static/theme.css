@@ -23,7 +23,7 @@
 }
 
 /* Colors: leaflet paper and navy ink by day, the curios' night cabinet by night.
-   Follows the OS unless the visitor picks a theme (theme-toggle.html sets data-theme). */
+   Follows the OS unless the visitor picks a theme (templates/layout.html sets data-theme). */
 :root {
   color-scheme: light dark;
   --bg: light-dark(#F7F4EC, #14222B);
@@ -151,7 +151,7 @@ nav a:hover {
   text-decoration-color: var(--brass);
   text-decoration-thickness: 2px;
 }
-.theme-toggle { /* added to the nav by theme-toggle.html */
+.theme-toggle { /* added to the nav by templates/layout.html */
   align-self: center;
   margin: -.5rem -.5rem -.5rem auto;
   padding: .5rem;
@@ -306,8 +306,7 @@ samp {
 }
 
 /* Code blocks */
-.highlight,
-.code {
+.highlight {
   margin: 1.75rem 0;
   padding: 0;
   color: var(--code-ink);
@@ -316,7 +315,6 @@ samp {
   background: var(--code-bg);
 }
 .highlight pre,
-.code pre,
 pre {
   margin: 0;
   padding: 1rem 1.25rem;
@@ -332,29 +330,25 @@ pre code {
 }
 @media (min-width: 600px) {
   .highlight pre,
-  .code pre,
   pre {
     font-size: .875rem;
   }
 }
 @media (max-width: 599px) { /* give code the full phone width */
-  .highlight,
-  .code {
+  .highlight {
     margin-left: calc(-1 * var(--gutter));
     margin-right: calc(-1 * var(--gutter));
     border-left: 0;
     border-right: 0;
     border-radius: 0;
   }
-  .highlight pre,
-  .code pre {
+  .highlight pre {
     padding-left: var(--gutter);
     padding-right: var(--gutter);
   }
 }
 
-/* Syntax highlighting: replaces Bear's built-in Pygments colors. Bear sets
-   bold and borders on some tokens, so each rule restates weight and style. */
+/* Syntax highlighting for the token classes Pygments emits */
 .highlight .hll { background-color: var(--code-mark) }
 td.linenos .normal,
 span.linenos { color: var(--code-comment); background-color: transparent; padding: 0 .75em 0 0 }
@@ -533,40 +527,6 @@ span.linenos.special { color: var(--code-ink); background-color: var(--code-mark
   border-color: var(--brass);
 }
 
-/* Upvote ("toast") button */
-#upvote-form small {
-  font-size: inherit;
-}
-.upvote-button {
-  flex-direction: row !important;
-  gap: .35rem;
-  min-height: 40px;
-  padding: .35rem .9rem !important;
-  font-family: var(--type);
-  font-size: .9rem;
-  color: var(--muted) !important;
-  border: 1.5px solid var(--line) !important;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.upvote-button svg {
-  width: 18px;
-  height: 18px;
-}
-.upvote-button:hover {
-  color: var(--ink) !important;
-  border-color: var(--brass) !important;
-}
-.upvote-button.upvoted,
-.upvote-button[disabled] {
-  color: var(--brass) !important;
-  border-color: var(--brass) !important;
-  cursor: default;
-}
-.upvote-count {
-  margin: 0 !important;
-}
-
 /* Footer */
 footer {
   margin-top: 3.5rem;
@@ -580,31 +540,12 @@ footer a {
   color: inherit;
 }
 
-/* Forms (subscribe page) */
+/* Form controls, for widgets */
 input,
 button,
 textarea,
 select {
   font: inherit;
-}
-input[type=email],
-input[type=text],
-textarea {
-  padding: .45rem .65rem;
-  color: var(--ink);
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--bg);
-}
-input[type=submit],
-button[type=submit] {
-  padding: .45rem 1rem;
-  font-family: var(--type);
-  color: var(--bg);
-  border: 0;
-  border-radius: var(--radius);
-  background: var(--ink);
-  cursor: pointer;
 }
 
 /* Print */
@@ -619,12 +560,10 @@ button[type=submit] {
   }
   nav,
   footer,
-  .tags,
-  #upvote-form {
+  .tags {
     display: none !important;
   }
-  .highlight,
-  .code {
+  .highlight {
     border-color: #ccc;
     background: #fff;
   }

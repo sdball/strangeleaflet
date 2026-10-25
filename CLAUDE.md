@@ -29,7 +29,8 @@ dark, and at phone width.
 - **The page markup mirrors Bear's** (`header > a.title > h1`, `nav p`, `main`,
   `ul.blog-posts` with `time`, `p.tags`, Pygments' `div.highlight`) because
   `static/theme.css` was written against it. Change the markup and the theme
-  together. The theme's source is `../strangeleaflet-theme`.
+  together. `static/theme.css` is the only copy of the theme; the old
+  `strangeleaflet-theme` repo was for pasting it into Bear and is retired.
 - **LF line endings** (`.gitattributes` enforces it). Bear's export was CRLF.
 
 ## Markdown gotchas (mistune)

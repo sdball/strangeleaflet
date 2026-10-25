@@ -9,7 +9,7 @@ posts/<slug>.md          a post
 posts/<slug>/index.md    a post with its own files (images, scripts) beside it
 pages/                   index.md (home), blog.md, about-me.md
 templates/layout.html    the page around every post and page
-static/theme.css         the theme, from github.com/sdball/strangeleaflet-theme
+static/theme.css         the theme (light and dark), copied to public/
 scripts/build            builds public/ (sets up .venv the first time)
 scripts/serve            builds, then serves public/ at http://localhost:8000/
 ```
