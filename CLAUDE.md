@@ -74,8 +74,8 @@ choice. `/feed.xml` is the same file.
 ## Related repos and links
 
 - `../strangeleaflet-curious`: curious.strangeleaflet.com, standalone curios.
-  The Conway post links to `/conway-life/` there ahead of that curio existing;
-  that link 404s on purpose until it does.
+  The Conway post describes its `/conway-life/` curio, so a change to the
+  curio's stations may need the post's wording updated too.
 - `../strange_leaflet`: the old Phoenix version, still running at
   strangeleaflet.fly.dev. A few posts link to its `/widgets` and games.
 - The repo's git history before the Bear export holds the SvelteKit version,

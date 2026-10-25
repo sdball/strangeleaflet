@@ -28,7 +28,7 @@ The game is seeded with an initial pattern and from that point the pattern plays
 
 It might seem trivial but the simple system and rules give rise to surprisingly complex living ecosystems. It's even possible to build patterns of such complexity that they can store data and perform calculations.
 
-You can try out my own [LiveView based Game of Life](https://curious.strangeleaflet.com/conway-life/). You can try filling out a seed pattern yourself by clicking on the dead cells and then either "step" to see the next interation or "play" to play out the board. If you want a fun way to get started you can click "random" and then "play" to see how a random pattern generates interestingly lifelike behavior.
+You can try out my own [Game of Life curio](https://curious.strangeleaflet.com/conway-life/). It starts with a 9×9 Go board for learning the rules: it can show each point's count of living neighbors, mark what dies and what's born next, and light up the rule a tapped point follows. At the end there's a big board to play with gliders, guns, and long-lived seeds, including "Spacefaring" from my old LiveView version.
 
 ## Functional programming?
 
@@ -314,7 +314,32 @@ def step(cells) do
 end
 ```
 
-But ah well. That code doesn't look very idiomatic in Elixir anyway. The Elixir approach is to build data pipelines that are readable top to bottom starting from an initial data structure and ending with the result. Let's do that!
+But ah well.
+
+### Succeeding with a for loop after all
+
+[Claude](https://www.anthropic.com/claude) found a `for` loop approach that more closely matches the original Clojure. A `when` guard on a generator is limited to guard expressions, but a comprehension can also take **filters**: extra clauses after the generators. Filters can be any expression at all, including `MapSet.member?/2`.
+
+That's exactly what `neighbors` is already doing with `{dx, dy} !== {0, 0}`! Move the membership check out of the guard and into a filter and the Clojure version ports straight across.
+
+```elixir
+def neighbors({x, y}) do
+  for dx <- -1..1, dy <- -1..1, {dx, dy} != {0, 0}, do: {x + dx, y + dy}
+end
+
+def step(cells) do
+  for {cell, n} <- Enum.frequencies(Enum.flat_map(cells, &neighbors/1)),
+      n == 3 or (n == 2 and MapSet.member?(cells, cell)),
+      into: MapSet.new(),
+      do: cell
+end
+```
+
+`into: MapSet.new()` collects the results into a `MapSet` just like Clojure's `set`. Nine lines instead of seventeen, and running the [R-pentomino](https://conwaylife.com/wiki/R-pentomino) through its 1103 generations it's just as fast as the pipeline version below: about 410 ms either way.
+
+One catch: `cell in cells` works in a filter too, but outside a guard `in` goes through the `Enumerable` protocol, and that came out about 15% slower than calling `MapSet.member?/2` directly.
+
+The pipeline version is still worth a look though. The Elixir approach is to build data pipelines that are readable top to bottom starting from an initial data structure and ending with the result. Let's do that!
 
 ### Winning with a pipeline
 
@@ -467,7 +492,7 @@ With that we have functionally implemented the Game of Life from a simple data s
 
 If you'd like to play with a Game of Life implementation then you're in luck because it's a very popular thing to implement in impressive ways.
 
-- [My own implementation](https://curious.strangeleaflet.com/conway-life/) is running the code from this very blog post
+- [My own implementation](https://curious.strangeleaflet.com/conway-life/) runs the same algorithm in JavaScript and shows that code next to the Clojure and Elixir from this very blog post
 - [https://oimo.io/works/life/](https://oimo.io/works/life/) is one of my favorite things on the Internet: an infinitely zoomable Game of Life implementing itself.
 - [https://playgameoflife.com/](https://playgameoflife.com/) has an extensive lexicon of patterns you can load
 
