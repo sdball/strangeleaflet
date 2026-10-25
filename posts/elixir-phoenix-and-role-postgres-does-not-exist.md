@@ -1,0 +1,77 @@
+---
+title: Elixir Phoenix and "role postgres does not exist"
+slug: elixir-phoenix-and-role-postgres-does-not-exist
+published_date: 2021-08-30T04:00:00+00:00
+tags: elixir, phoenix
+publish: true
+discoverable: true
+is_page: false
+---
+
+If you're trying to follow along the [Elixir Phoenix Up and Running guide](https://hexdocs.pm/phoenix/up_and_running.html) you may run straight into this error if you're using homebrew's Postgres install when you run `mix ecto.create`
+
+```bash
+$ mix ecto.create
+18:54:52.762 [error] GenServer #PID<0.292.0> terminating
+** (Postgrex.Error) FATAL 28000 (invalid_authorization_specification) role "postgres" does not exist
+    (db_connection 2.4.0) lib/db_connection/connection.ex:100: DBConnection.Connection.connect/2
+    (connection 1.1.0) lib/connection.ex:622: Connection.enter_connect/5
+    (stdlib 3.15.2) proc_lib.erl:226: :proc_lib.init_p_do_apply/3
+Last message: nil
+State: Postgrex.Protocol
+
+18:54:52.773 [error] GenServer #PID<0.299.0> terminating
+** (Postgrex.Error) FATAL 28000 (invalid_authorization_specification) role "postgres" does not exist
+    (db_connection 2.4.0) lib/db_connection/connection.ex:100: DBConnection.Connection.connect/2
+    (connection 1.1.0) lib/connection.ex:622: Connection.enter_connect/5
+    (stdlib 3.15.2) proc_lib.erl:226: :proc_lib.init_p_do_apply/3
+Last message: nil
+State: Postgrex.Protocol
+** (Mix) The database for Hello.Repo couldn't be created: killed
+```
+
+That's not ideal! The core issue in that stack trace error is `role "postgres" does not exist`
+
+There's a couple of ways to fix the problem.
+
+## One: Fix the Phoenix config to match up with homebrew
+
+Open `config/dev.exs` and change the config to have your username and a blank password.
+
+By default Phoenix assumes "postgres" for the username and password.
+
+```elixir
+config :hello, Hello.Repo,
+  username: "sdball",
+  password: "",
+  database: "hello_dev",
+  hostname: "localhost",
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+```
+
+## Two: Fix the postgres config to match up with Phoenix
+
+1. Connect to postgres
+
+```bash
+$ psql -d postgres
+```
+
+2. Create the "postgres" user
+
+```postgres
+CREATE ROLE postgres LOGIN CREATEDB;
+```
+
+3. (ctrl-d) to close the connection to postgres
+
+# Things should be working!
+
+After either fix you should be able to create the postgres database!
+
+```bash
+$ mix ecto.create
+
+The database for Hello.Repo has been created
+```

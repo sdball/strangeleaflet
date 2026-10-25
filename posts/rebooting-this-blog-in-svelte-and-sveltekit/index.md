@@ -1,0 +1,202 @@
+---
+title: Rebooting this blog in Svelte and SvelteKit
+slug: rebooting-this-blog-in-svelte-and-sveltekit
+published_date: 2023-09-07T16:57:00+00:00
+tags: blog, svelte
+publish: true
+discoverable: true
+is_page: false
+meta_description: "Why and how I'm writing my personal blog in SvelteKit instead of a backend like Phoenix."
+---
+
+<div style="border: thin dashed lightsalmon;
+padding: 1em;
+font-size: 0.8em;
+margin: 3px 0 3em 0;
+border-style: dashed;">
+  <h1><span style="font-size: 0.7em">Side note</span></h1>
+  <p>I've migrated this post away from Svelte so its previously embedded JavaScript widgets have been replaced with screenshots.</p>
+</div>
+
+Hello Internet! After being a happy blot.im customer for years, well, I'm still very happy with Blot. It's a fantastic way to easily get a blog on the Internet with minimal fuss. But I started using Svelte for a work project and loved it so much that I started learning it more and more and picked up SvelteKit as well which has some compelling ideas for creating web pages and even web applications. Then I found some fantastic guides to creating nice blogs in SvelteKit which led me to finding the amazing project mdsvex. The idea of easily creating application experiences alongside and within markdown I just had to switch away from blot.im and use this amazing framework.
+
+# Why Svelte?
+
+Look check this out, I can drop in a component just like this right in my blog post markdown.
+
+```svelte
+<Penguin walk={true} />
+```
+
+![screenshot of an animated cartoon walking penguin](19am.webp)
+
+How cool is that!? Yes I shamelessly copied that cute component from mdsvex's homepage but I just had to recreate it locally to see how it works. I also tweaked a few things and learned about Svelte's `tweened` function which gives you a special Svelte store that continually updates its value over a fixed duration: i.e. an easy to use clock with which we can animate.
+
+Want to see the data about the walking penguin? Me too! I added an `insight` attribute.
+
+```svelte
+<Penguin walk={true} insight={true} />
+```
+
+![screenshot of the animated walking cartoon penguin with a text box of details about its speed, position, direction, and more](penguin-walk-with-details.webp)
+
+Wanna see something cool? Resize your browser window and that insight view's `innerWidth` will change and the penguin walk will correct itself to the new width if needed.
+
+You can see how [mdsvex wrote their penguin component](https://github.com/SvelteLab/SvelteLab/blob/1284f4b4d11f0c5458e1287357c4964803a1bf99/src/lib/default_project_files/mdsvex/src/lib/Penguin.svelte) and here's mine. Check out how little code there is! All the `$:` declarations are reactive declarations which will execute if any of the variables they use are changed. How cool is that?
+
+```svelte
+<script>
+  import { tweened } from "svelte/motion";
+
+  export let walk = false;
+  export let insight = false;
+  export let speed = 10;
+
+  let pos = tweened(0);
+  let walking = false;
+  let contentWidth = 900;
+  let maxWidth = 390;
+  let duration = 0;
+
+  /** @type {boolean} */
+  let flip;
+
+  /** @type {number} */
+  let innerWidth;
+
+  /**
+   * Calculate a duration as a distance between two points multiplied by a speed
+   *
+   * @param {number} x - first point
+   * @param {number} y - second point
+   * @param {number} s - penguin walking speed (1–100)
+   * @returns {number} calculated duration
+   */
+  const calculateDuration = (x, y, s) => {
+    if (s > 100) {
+      s = 100;
+    }
+
+    if (s < 1) {
+      s = 1;
+    }
+
+    return Math.abs(x - y) * (100 / s);
+  };
+
+  function startWalking() {
+    walking = true;
+    if (flip === undefined) {
+      pos.set($pos, { duration: 0 });
+    } else {
+      adjustWalkWidth();
+    }
+  }
+
+  function stopWalking() {
+    walking = false;
+    pos.set($pos, { duration: 0 });
+  }
+
+  function adjustWalkWidth() {
+    if (!walking) return;
+    duration = flip ? calculateDuration($pos, from, speed) : calculateDuration($pos, to, speed);
+    pos.set(flip ? from : to, { duration });
+  }
+
+  $: to = innerWidth > contentWidth ? maxWidth : (innerWidth * 0.9) / 2 - 32;
+  $: from = innerWidth > contentWidth ? -maxWidth : ((innerWidth * 0.9) / 2 - 32) * -1;
+  $: innerWidth && adjustWalkWidth();
+  $: walk && !walking && startWalking();
+  $: !walk && walking && stopWalking();
+  $: if ($pos >= to) {
+    flip = true;
+    duration = calculateDuration($pos, from, speed);
+    pos.set(from, { duration });
+  }
+  $: if ($pos <= from) {
+    flip = false;
+    duration = calculateDuration($pos, to, speed);
+    pos.set(to, { duration });
+  }
+  $: penguinGif = walk ? "penguin.gif" : "penguin_static.gif";
+</script>
+
+<svelte:window bind:innerWidth />
+
+{#if insight}
+  <pre>
+gif: {penguinGif}
+walk: {walk}
+walking: {walking}
+innerWidth: {innerWidth}
+from: {from.toFixed(0)}
+to: {to.toFixed(0)}
+pos: {$pos.toFixed(0)}
+duration: {duration}
+flip: {flip}
+speed: {speed}
+</pre>
+{/if}
+
+<div class="penguin" style="transform: translateX({$pos}px) rotateY({flip ? 180 : 0}deg);">
+  <img alt="a cartoon penguin walking" src="/images/{penguinGif}" />
+</div>
+
+<style>
+  .penguin {
+    width: 64px;
+    height: 70px;
+    margin: 44px auto 24px auto;
+  }
+</style>
+```
+
+You might note in the code that we can make a zoomy bird. And we can make him stoppable with a button that updates the `walk` variable. Note in this declaration I'm using `{walk}` which Svelte nicely turns into `walk={walk}`. I have a `walk` variable declared in this markdown file that's initially set to `true`.
+
+```svelte
+<Penguin {walk} speed={80} insight={true} />
+<Button color={walk ? "red" : "green"} on:click={() => (walk = !walk)}
+  >{walk ? "Stop" : "Start"} Walking</Button
+>
+```
+
+![Screenshot of the animated walking cartoon penguin with details and a large button labeled "stop walking"](43am.webp)
+
+How exciting is that? This is so fun!
+
+In Svelte, frontend application design is just so simple and easy that it's genuinely a joy to make interactive experiences. Like being able to stop that penguin. I _could_ do that in Phoenix LiveView, but having a roundtrip to the server even over a minimal websocket connection doesn't sit right for that kind of infrequent ad-hoc operation that only ultimately changes browser state.
+
+LiveView is a perfect fit for ensuring that server-state and browser-state are in sync and reactive to each other. That concept and capability is incredibly powerful. If I had a web application with dynamic external and internal sources of information to keep updated and synchronized across all connected browsers while also allowing all browsers to be synchronized with each other: Phoenix and especially Phoenix LiveView is the only reasonable answer.
+
+But this blog isn't that. It's a collection of webpages that are essentially static to the server but dynamic to the browser. The experience is delivered and then entirely self-contained and isolated in the browser space. That kind of experience is perfect for Svelte and its supremely well designed experience for building frontend user experiences.
+
+Can you stop the penguin in your browser? Yes, easily! Can you stop the penguin in your browser and for all connected browsers? No and adding that capability without Phoenix and LiveView would be a complex nightmare to build that still wouldn't work as well as a simple Phoenix declaration.
+
+## Why SvelteKit then?
+
+To start, SvelteKit is the backend framework that pairs directly with Svelte. You are not required to use SvelteKit to use Svelte. And similarly I suppose you aren't required to use Svelte to use SvelteKit but that would be some work to avoid some convenience.
+
+So why SvelteKit and not [Phoenix + Svelte](https://medium.com/@alistairisrael/phoenix-1-7-with-svelte-12257d853ed1) or [Phoenix LiveView + Svelte](https://dev.to/debussyman/e2e-reactivity-using-svelte-with-phoenix-liveview-38mf)?
+
+### Markdown
+
+I'm writing this post in markdown. And in the SvelteKit ecosystem there's this really cool project that I copied a penguin animation from: [mdsvex](https://mdsvex.pngwn.io/docs). Which further has its own [ecosystem of plugins](https://mdsvex.pngwn.io/docs#remarkplugins--rehypeplugins). That all means that once I wire up mdsvex into SvelteKit I have an easy experience to write blog posts that can be as locally interactive as I care to make them. Each markdown file is extended with the capability to use the full unabridged set of capabilities of Svelte and SvelteKit with no ceremony.
+
+One great plugin I'm using for mdsvex allows me to use relative links for images from the location of the markdown file. That means I can put posts with images into their own directories and finally easily group posts and their images together.
+
+Another nice plugin automatically adds IDs to markdown headers. Another plugin automatically adds links to markdown headers with IDs. Yet another adds support for <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi>T</mi><mspace width="-.14em" /><mpadded height="-.5ex" depth="+.5ex" voffset="-.5ex"><mrow><mi>E</mi></mrow></mpadded><mspace width="-.115em" /><mi>X</mi></mrow></mrow></math> which I've actually used in my [post on bitfields](/blog/posts/shrink-your-data-into-bitfields).
+
+There are projects to provide similar "write markdown pages in Phoenix" but none that so easily integrate markdown with the frontend experience.
+
+### Web pages vs a web application
+
+This site is very much what I'd call web pages and not a web application. And SvelteKit has some great design choices that make writing web pages fun and easy. For one, its [routing system is entirely based on the filesystem](https://kit.svelte.dev/docs/routing). That means adding a new page is simple as adding a folder and file vs updating an application router and then adding the file or files to support that new route. It seems silly but the ease of seeing my routing pages right in the file tree is pretty nice for a simple set of web pages.
+
+### Svelte!
+
+SvelteKit and Svelte are, obviously, made for each other. With this combination the dream of having the same code for the frontend and backend is fully realized. [The same code can run on both the server and browser](https://kit.svelte.dev/docs/routing#page-page-js), literally the _same_ code. You can of course also mandate that certain code only runs in the browser and other code only runs on the server.
+
+## Wrap up
+
+SvelteKit and Svelte aren't a fit for all things. But for writing a markdown file focused blog and set of web pages that want to have the capability for joyful interactive browser experiences they're amazing!

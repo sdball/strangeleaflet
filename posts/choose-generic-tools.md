@@ -1,0 +1,93 @@
+---
+title: Choose Generic Tools
+slug: choose-generic-tools
+published_date: 2020-01-03T05:00:00+00:00
+tags: programming
+publish: true
+discoverable: true
+is_page: false
+meta_description: Don't create all of your tools from scratch.
+---
+
+> **Upstream your tooling instead of rolling your own.** The more you push upstream to gems or Rails, the less logic you need in your application. Save your application code for what truly makes your company special (i.e. Pull Requests), instead of tools to make your application run smoothly (i.e. concurrent testing libraries)
+>
+> — Eileen Uchitelle : [Upgrading GitHub from Rails 3.2 to 5.2](https://github.blog/2018-09-28-upgrading-github-from-rails-3-2-to-5-2/)
+
+Ok so you're you: programmer person at company place.
+
+You need to do a thing. A small, simple thing. It's so small and simple that you don't even look around the tech landscape to see if anyone else has already figured out a way to do the thing. Even if you did you know in your heart that anything you write would be better and faster and absolutely custom fit for your problem domain. Naturally you write the TOOL! It works! Life is great!
+
+But it doesn't stop there.
+
+You need to do a variation of the thing. Well hey edge cases right? You make the change to let TOOL handle both variants. It works! Life is great! TOOL is no longer quite so simple but that's the price of progress right?
+
+But it doesn't stop there.
+
+Someone else at company place needs to do the thing. This is great! TOOL will be so useful for them!
+
+TOOL doesn't work on their system.
+
+Whoops! Your mistake. You wrote TOOL for your system and its quirks. The quirks are awesome everyone should use them but whatever. You can make TOOL work on more pedestrian systems. You make that change. It works! Life is great!
+
+TOOL gets noticed. More people need to do the thing.
+
+TOOL needs further changes to account for different systems and different use cases. It's far from the simple thing that it was. But still overall? Right on. Your work is helping everyone that needs to do the thing at company place. How valuable is that? This is definitely a chip you can use when you talk about your next compensation increase. TOOL is now a fundamental part of company place.
+
+TOOL breaks.
+
+Well no, of course TOOL didn't break. TOOL is awesome. Someone broke it because they didn't understand it. Who has time to document things? Especially such a simple and straightforward thing as TOOL?
+
+TOOL breaks.
+
+Ok this time TOOL still didn't break. TOOL is awesome. But one of its dependencies had to be version locked to the (now) previous version to keep it working as TOOL expects. TOOL is still great. Life is great!
+
+You move on. TOOL doesn't.
+
+You leveraged your TOOL experience and the go-getter reputation it into a better gig at company place. TOOL is now supported by the company developer community at large. That's good progress!
+
+The nature of the thing to do changes.
+
+Progress indeed. Now company place has different engineering requirements. The thing to do is still essentially the same, but different enough that TOOL needs to be heavily rewritten as its foundational assumptions no longer apply.
+
+It doesn't work.
+
+The new people working on TOOL can't get it to twist to fit the new shape without completely rewriting it. But we can't abandon TOOL! It's a critical part of the company engineering stack. But it can be rewritten. Here comes TOOL2!
+
+Months pass.
+
+Now there are two stacks. Teams using the original TOOL and teams using the newness of TOOL2. Everyone knows that TOOL2 is the future, but switching from TOOL isn't free and there's real work to be done.
+
+New developers continue to join company place.
+
+Not having been slowly boiled in the story of TOOL they are agast at the mess of TOOL vs TOOL2 and the entire situation. Many companies need to do the thing and they've all solved it in various ways. Some intrepid teams have even produced generic solutions as either a revenue stream for paid solutions or as a marketing strategy for free solutions.
+
+New developers question the TOOL ecosystem.
+
+Some few developers survey the technical landscape to find generic tools that could fit the need that TOOL provides. A brave few publically propose replacing TOOL with a generic piece of software. They are quickly shot down by the collective understanding that TOOL has essential company domain knowledge that cannot be replaced by anything generic. Anyone proposing any generic tools is looked at askew. Are they really good company place programmers if they don't see the value that only TOOL can bring?
+
+New developers learn not to question the TOOL ecosystem.
+
+Thats bad for innovation. Bad for team building. Bad for everyone.
+
+There's a problem with in-house tooling. Yes it fits the problem domain _perfectly_ but on the downside it fits the problem domain perfectly. If anything about the problem domain changes then the tool needs to be abandoned or changed.
+
+**Choose generic tools**. When you choose generic tools you get several benefits right away:
+
+- **New developers can come in with experience** using those tools already. Instead of being a distraction from the in-house tooling their experience becomes a valuable asset to enrich the entire experience.
+- **The tools are searchable**. This is a huge benefit! In house tools are unsearchable technology which are only fully documented in critical people's minds. But generic tools have examples and documentation all over the Internet.
+- **The tools are alive**. As the world changes the tools change as well. Instead of devoting more and more time to working on the tools themselves developers can focus on the actual domain problems.
+- **The tools have a community**. Company developers will be able to answer questions about the tools and build the company's engineering reputation. If the tools are open source then company developers will be able to contribute back to the generic tools and build the company's engineering reputation.
+
+There's a timeline of cost for in-house tools vs generic tools.
+
+## In-house
+
+1. Write a specific, simple tool for a specific, simple thing: cheap! If it's really a simple and specific thing then it's a one-time cost of some dev time.
+2. Generalize that simple tool to meet new or additional needs: expensive! When you generalize the simple in-house tool you will now unwittingly make all the mistakes that version 0.x of a generic tool made. You also commit all developers to one or both of maintaining and learning the in-house tool.
+3. Ongoing costs: high! Developer time needs to be devoted to the tool itself vs the actual company domain problems. Any problems with the tools must involve other company developers because there's no one else in the world that can know anything about the in-house tool.
+
+## Generic
+
+1. Pick a generic tool: cheap! Even paying for a tool is cheap when we're talking about developer time.
+2. Apply the generic tool to the specific problem: cheap! Developers will need to learn the tool and how to apply it. But you avoid the distraction and expense of writing and maintaining the tool.
+3. Ongoing costs: low! Developer time is maximized to work on the actual company domain problems. Any problems with the tools can start with Internet searches and may not even need other company developers.

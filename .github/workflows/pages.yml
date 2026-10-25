@@ -1,0 +1,54 @@
+# Build the site, then deploy public/ to GitHub Pages
+name: Deploy to Pages
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, but don't cancel one in progress
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python scripts/build.py
+      - name: Check every page has GoatCounter
+        run: |
+          missing=$(grep -rL --include='*.html' 'data-goatcounter="https://sdball.goatcounter.com/count"' public | xargs -r grep -L 'http-equiv="refresh"' || true)
+          if [ -n "$missing" ]; then
+            echo "::error::These pages are missing the GoatCounter snippet:"
+            echo "$missing"
+            exit 1
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: './public'
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/configure-pages@v5
+      - id: deployment
+        uses: actions/deploy-pages@v5

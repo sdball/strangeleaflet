@@ -1,0 +1,108 @@
+---
+title: A subtle Go bug that types cannot help with
+slug: a-subtle-go-bug-that-types-cannot-help-with
+published_date: 2022-04-04T04:00:00+00:00
+tags: go
+publish: true
+discoverable: true
+is_page: false
+meta_description: Types are not a solution for all programming bugs.
+---
+
+I ran into this bug while going through the highly excellent ["Powerful Command-Line Applications in Go" by Ricardo Gerardi](https://pragprog.com/titles/rggo/powerful-command-line-applications-in-go/)
+
+The following `startInterval` function contains a nested `periodic` function that will be called during a pomodoro timer. Great!
+
+The problem is that while the app is running nothing updates the application interface. It's as though the timer isn't running, but if I pause and start the timer the application UI updates once and then remains frozen. What's up?
+
+Debugging (why yes I am a PRINTS debugger) shows that the `periodic` function is indeed being called as designed by a ticker channel getting a value every second. What's the problem? Can you see it?
+
+```go
+startInterval := func() {
+  i, err := pomodoro.GetInterval(config)
+  errorCh <- err
+
+  start := func(i pomodoro.Interval) {
+    message := "Take a break"
+    if i.Category == pomodoro.CategoryPomodoro {
+      message = "Focus on your task"
+    }
+
+    w.update([]int{}, i.Category, message, "", redrawCh)
+  }
+
+  end := func(pomodoro.Interval) {
+    w.update([]int{}, "", "Nothing running...", "", redrawCh)
+  }
+
+  periodic := func(pomodoro.Interval) {
+    w.update(
+      []int{int(i.ActualDuration), int(i.PlannedDuration)},
+      "", "",
+      fmt.Sprint(i.PlannedDuration-i.ActualDuration),
+      redrawCh,
+    )
+  }
+
+  errorCh <- i.Start(ctx, config, start, periodic, end)
+}
+```
+
+The problem is that the `periodic` function accepts a `pomodoro.Interval` but does not assign it to a variable. The type matches (hooray small type victories) but nothing ensures or requires that the type be assigned.
+
+Within the `periodic` function the `i` value then silently refers to the `i` created in the outer function scope.
+
+```go
+i, err := pomodoro.GetInterval(config) // <-- this i
+```
+
+That means the function works, and is indeed called on the appropriate ticker intervals. But the application UI never actually sees changes because the values within `i` all remain how they were when the interval started.
+
+The fix? A ONE character change to assign that `pomodoro.Interval` to `i`
+
+```go
+periodic := func(i pomodoro.Interval) {
+  w.update(
+    []int{int(i.ActualDuration), int(i.PlannedDuration)},
+    "", "",
+    fmt.Sprint(i.PlannedDuration-i.ActualDuration),
+    redrawCh,
+  )
+}
+```
+
+With that change the book's code example works as intended.
+
+## A better approach: don't shadow the variable name
+
+For me a better approach would be to not [shadow](https://en.wikipedia.org/wiki/Variable_shadowing) the outer `i` value at all and instead give the `periodic` function its own variable name for the interval it expects.
+
+```go
+periodic := func(pomodoro.Interval) {
+  w.update(
+    []int{int(activeInterval.ActualDuration), int(activeInterval.PlannedDuration)},
+    "", "",
+    fmt.Sprint(activeInterval.PlannedDuration-activeInterval.ActualDuration),
+    redrawCh,
+  )
+}
+```
+
+With that change then the Go compiler immediately yells about the problem: nothing has set `activeInterval`! Easy fix.
+
+```go
+periodic := func(activeInterval pomodoro.Interval) {
+  w.update(
+    []int{int(activeInterval.ActualDuration), int(activeInterval.PlannedDuration)},
+    "", "",
+    fmt.Sprint(activeInterval.PlannedDuration-activeInterval.ActualDuration),
+    redrawCh,
+  )
+}
+```
+
+## Alternatives
+
+Go could warn about unassigned function arguments. It could even require that function arguments be assigned. In that case if you wanted to only match the signature and really for sure don't care to actually use the function argument itself then you could assign it to `_` which is explicitly an "ignore this variable" declaration in Go.
+
+Even nicer would be to take that to Elixir levels which allows giving ignored variables a name to indicate what's being ignored e.g. `_interval`

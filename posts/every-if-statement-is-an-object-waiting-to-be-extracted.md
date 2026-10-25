@@ -1,0 +1,336 @@
+---
+title: Every if statement is an object waiting to be extracted
+slug: every-if-statement-is-an-object-waiting-to-be-extracted
+published_date: 2020-02-19T05:00:00+00:00
+tags: programming, ruby
+publish: true
+discoverable: true
+is_page: false
+meta_description: Turning control flows into objects is not only possible it is sometimes more expressive and useful.
+---
+
+# The problem
+
+Consider the following Ruby code.
+
+```ruby
+class Beverage
+  attr_reader :kind
+
+  def initialize(kind)
+    @kind = kind
+  end
+
+  def typical_ounces
+    if :coffee
+      6
+    else
+      8
+    end
+  end
+
+  def calories_per_ounce
+    if :coffee
+      0
+    else
+      :unknown
+    end
+  end
+end
+```
+
+So we're modeling beverages. Great! Our class can accept a kind of beverage and then respond to some messages about it.
+
+```ruby
+coffee = Beverage.new(:coffee)
+coffee.container # => "mug"
+coffee.typical_ounces # => 6
+coffee.calories_per_ounce # => 0
+
+oj = Beverage.new(:orange_juice)
+oj.container # => "glass"
+oj.typical_ounces # => 8
+oj.calories_per_ounce # => :unknown
+```
+
+Wonderful. But those `if` blocks aren't great right? If we drop more kinds of beverage in that model then they're going to get annoying pretty quickly. But no problem we can use some `case` statements to make a nice pattern!
+
+```ruby
+class Beverage
+  attr_reader :kind
+
+  def initialize(kind)
+    @kind = kind
+  end
+
+  def typical_ounces
+    case kind
+    when :coffee
+      4
+    when :orange_juice
+      8
+    else
+      8
+    end
+  end
+
+  def calories_per_ounce
+    case kind
+    when :coffee
+      0
+    when :orange_juice
+      14
+    else
+      :unknown
+    end
+  end
+end
+```
+
+Lovely. But there's a problem here. As we add beverage after beverage the repetition of the conditionals becomes arduous.
+
+```ruby
+class Beverage
+  attr_reader :kind
+
+  def initialize(kind)
+    @kind = kind
+  end
+
+  def typical_ounces
+    case kind
+    when :coffee
+      4
+    when :orange_juice
+      8
+    when :rum
+      1.5
+    when :whole_milk
+      8
+    when :skim_milk
+      8
+    else
+      8
+    end
+  end
+
+  def calories_per_ounce
+    case kind
+    when :coffee
+      0
+    when :orange_juice
+      14
+    when :rum
+      64
+    when :whole_milk
+      19
+    when :skim_milk
+      12
+    else
+      :unknown
+    end
+  end
+end
+```
+
+Sure we could allow a lot of the `typical_ounces` fall through to the default case but then our data structures don't line up with the `calories_per_ounce` and future devs won't know if they really are the default or if we forgot to declare the correct data.
+
+The tests are similarly convoluted and each new beverage is a data slog to sort through and easy to get wrong.
+
+This isn't fun! Let's make it fun!
+
+What we have here is a failure to utilize the full power of object oriented design.
+
+> “As an OO practitioner, when you see a conditional, the hairs on your neck should stand up. Its very presence ought to offend your sensibilities. You should feel entitled to send messages to objects, and look for a way to write code that allows you to do so.”
+>
+> Excerpt From: Sandi Metz, Katrina Owen. “99 Bottles of OOP.” Apple Books.
+
+Sandi and Katrina go on to explain that of course not every conditional is bad. The problem is having conditionals controlling the individual pieces of behavior in our class. A better object oriented design would pull together all the like behaviors into their own classes. Then have singular top level conditional that decides which behavior to use.
+
+It's like having a car repair manual peppered with conditionals. "If you have an Outback then do X, but if you have a Forester then do Y." Not a great experience! A much nicer alternative is only making a decision about which car model you have once and then using its dedicated manual.
+
+# Replacing low level conditionals with objects
+
+We can make our beverage class nicer to work with by not requiring it to be the only class we have. We can make a class for each individual beverage that all answer the same messages that we want to send them.
+
+```ruby
+class Coffee
+  def typical_ounces
+    6
+  end
+
+  def calories_per_ounce
+    0
+  end
+end
+
+class OrangeJuice
+  def typical_ounces
+    8
+  end
+
+  def calories_per_ounce
+    14
+  end
+end
+
+class Rum
+  def typical_ounces
+    1.5
+  end
+
+  def calories_per_ounce
+    64
+  end
+end
+
+class WholeMilk
+  def typical_ounces
+    8
+  end
+
+  def calories_per_ounce
+    19
+  end
+end
+
+class SkimMilk
+  def typical_ounces
+    8
+  end
+
+  def calories_per_ounce
+    12
+  end
+end
+```
+
+Check that out! Those classes are completely focused and minimal. Testing them becomes a simple exercise that they respond to the right messages.
+
+But what happened to `Beverage` and where are the default values? Let's take those in reverse order.
+
+## The default case
+
+Before the default values fell out of our huge case statements in the final `else` path where we give up and say "8" for typical ounces and `:unknown` for calories per ounce. Unknown is not an actual beverage that we directly modeled before, but it's absolutely behavior that we can extract into a name.
+
+```ruby
+class UnknownBeverage
+  def typical_ounces
+    8
+  end
+
+  def calories_per_ounce
+    :unknown
+  end
+end
+```
+
+## Choosing the right behavior
+
+The `Beverage` concept is still useful. Before we'd initialize it with a `kind` and then expect the resulting instance to have the correct behavior.
+
+```ruby
+oj = Beverage.new(:orange_juice)
+oj.calories_per_ounce # => 14
+```
+
+Here we can either adjust our API or add a little complexity to the `Beverage` class.
+
+### Adjusting the Beverage API
+
+First, let's see how adjusting our API would look.
+
+In Ruby it's idiomatic to add a class method called `for` to choose between different object behaviors e.g. `Beverage.for(:coffee)`. We can call the decision method anything we like. Its job will be to pick the right beverage class so we can use whatever makes sense.
+
+```ruby
+oj = Beverage.for(:orange_juice)
+oj = Beverage.given(:orange_juice)
+oj = Beverage.from(:orange_juice)
+oj = Beverage.build(:orange_juice)
+```
+
+In our example let's stick with `for`. Here's what that top level decision behavior could look like.
+
+```ruby
+class Beverage
+  def self.for(kind)
+    case kind
+    when :coffee
+      Coffee.new
+    when :orange_juice
+      OrangeJuice.new
+    when :rum
+      Rum.new
+    when :whole_milk
+      WholeMilk.new
+    when :skim_milk
+      SkimMilk.new
+    else
+      UnknownBeverage.new
+    end
+  end
+end
+```
+
+### Keeping the original Beverage behavior
+
+Second, let's see how we could keep the original `Beverage.new` behavior by making Beverage a little more complex. It can hold the specific beverage class chosen from `kind` and delegate the calls to the appropriate data class.
+
+```ruby
+class Beverage
+  def initialize(kind)
+    @dataObject = case kind
+                  when :coffee
+                    Coffee.new
+                  when :orange_juice
+                    OrangeJuice.new
+                  when :rum
+                    Rum.new
+                  when :whole_milk
+                    WholeMilk.new
+                  when :skim_milk
+                    SkimMilk.new
+                  else
+                    UnknownBeverage.new
+                  end
+  end
+
+  def typical_ounces
+    @dataObject.typical_ounces
+  end
+
+  def calories_per_ounce
+    @dataObject.calories_per_ounce
+  end
+end
+```
+
+Even better! Ruby has a stdlib for that: SimpleDelegator! With SimpleDelegator we give it the class we want our object to delegate methods calls to. Nice!
+
+```ruby
+require "delegate"
+
+class Beverage < SimpleDelegator
+  def initialize(kind)
+    dataObject = case kind
+                 when :coffee
+                   Coffee.new
+                 when :orange_juice
+                   OrangeJuice.new
+                 when :rum
+                   Rum.new
+                 when :whole_milk
+                   WholeMilk.new
+                 when :skim_milk
+                   SkimMilk.new
+                 else
+                   UnknownBeverage.new
+                 end
+    super(dataObject)
+  end
+end
+```
+
+# Conditionals? Managed
+
+Yes in all of these cases there's still a conditional. But the key difference is that now we have a single top level conditional choosing a behavior rather than multiple low level conditionals choosing raw data. We have little to no chance of introducing a bug in the data due to a mismatch of logic. Before we could have easily introduced bug while trying to keep those large, parallel case statements consistent.

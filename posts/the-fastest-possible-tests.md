@@ -1,0 +1,88 @@
+---
+title: The Fastest Possible Tests
+slug: the-fastest-possible-tests
+published_date: 2020-10-03T04:00:00+00:00
+tags: programming
+publish: true
+discoverable: true
+is_page: false
+meta_description: How fast could programming tests actually be?
+---
+
+I love tests as a fast programming feedback loop! In the last twenty or so years I've seen them go from an occasional critical verification to a foundational component of modern systems design.
+
+# Why care about fast tests?
+
+When I'm writing code, especially when doing test driven development, I want the fastest feedback possible. That means fast tests.
+
+I find 100ms is my upper limit for considering any individual test to be fast enough. That is still painfully slow but only just.
+
+Any slower than 100ms and I find the delay between calling for the test and noting its result is just enough of a stuttering friction that I — even unconsciously — start to shy away from running the tests. I'll spend more time writing the code I _think_ is right vs simply allowing the tests to give me that sweet green confirmation. I'll go longer between writing new tests and start to spike off code without any guardrails or guidance.
+
+If I'm in a codebase whose unit test suite take seconds or (gasp) minutes to complete I soon advocate for deleting such painfully useless tests.
+
+To be clear I am talking about unit tests and not integration tests. Integration tests can require an actual database to actually take the data and actually store it by actually writing it to some structure either in memory, on disk, or (worse of all) on a remote machine. Those kind of tests have real limits on their speed depending on how much you are willing to isolate them and still consider them useful.
+
+But unit tests: no network, no services. Only the purity of potentially production code and testing code calling the production code and making assertions about the results.
+
+How fast can they go?
+
+# How fast should they go?
+
+Ideally unit tests should take less than 10ms to run and at most 100ms.
+
+If your language or testing framework does not allow running individual unit tests then the entire unit test suite should run in less than 1000ms (1 second).
+
+If you're using any widespread general programming language this is entirely possible even for test suites with thousands of tests. Computers are FAST!
+
+## How is that possible?
+
+That's a topic for a future blog post! But start with [A Set of Unit Testing Rules](https://www.artima.com/weblogs/viewpost.jsp?thread=126923) by Michael Feathers.
+
+> A test is not a unit test if:
+>
+> - It talks to the database
+> - It communicates across the network
+> - It touches the file system
+> - It can't run at the same time as any of your other unit tests
+> - You have to do special things to your environment (such as editing config files) to run it.
+
+# How fast is the fastest possible test? Theoretically?
+
+There is an absolutely fastest possible testing speed. If we free ourselves from all the bounds of hardware and software there is a fundamental speed limit on how fast our fastest tests can possibly be.
+
+That speed limit is — of course — the speed of light.
+
+No information can travel faster than the speed of light. No matter how much we optimize, improve, tweak, and streamline we cannot break free of the limitation that we have a roundtrip of information from human to machine and back. Information fundamentally has a speed limit.
+
+1. We need to tell our system to run a test
+2. Our system needs to transmit the results of that test
+
+How fast is that allowed to be by the speed of light? Obviously VERY fast unless our computer is very far away.
+
+Let's assume our computer is about two feet away. How fast could our test feedback be?
+
+Two feet of distance means our signal and response needs to travel four feet. (Of course light has to travel within the machine and our own heads but let's set those distances aside.)
+
+To WolframAlpha! [Lightspeed over four feet](https://www.wolframalpha.com/input/?i=lightspeed+over+4+feet)
+
+```plaintext
+lightspeed / 4 feet = 4.067ns (nanoseconds)
+```
+
+It's a fun mathematical quirk that it takes light just about one nanosecond to travel one foot which makes gauging the speed of light to travel human scale distances using antiquated imperial units relatively easy.
+
+How fast is 4ns? Let's dive down the units of time!
+
+```plaintext
+1 second             = 1 second      (1 s)
+1 second      / 1000 = 1 millisecond (1 ms)
+1 millisecond / 1000 = 1 microsecond (1 µs)
+1 microsecond / 1000 = 1 nanosecond  (1 ns)
+```
+
+Only a few orders of magnitude, no problem!
+
+Compared to our reasonable case of 10ms for one unit test? In the time it would take to serially run a thousand of our 10ms unit tests we'd be able to run 2.5 _million_ of our fastest possible 4ns tests!
+
+It's fair to say we'll never reach that speed and have any meaningful computation for an individual test. But it's good to have goals.

@@ -1,8 +1,0 @@
----
-layout: micro
-title: Hello micro!
-date: 2023-10-09T19:16:39Z
-categories:
-  - blogging
-content: Well I've gone ahead and added a micro blog to this site. Should I be doing posts like this in a fediverse instance instead? Probably. But this is more fun.
----

@@ -1,8 +1,0 @@
----
-layout: micro
-title: Testing micro blog
-date: 2023-10-09T13:53:57Z
-categories:
-  - test
-content: This is a test of micro blogging. This is all of the content.
----
