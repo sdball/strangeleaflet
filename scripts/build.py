@@ -110,7 +110,6 @@ def load(path, folder, is_page):
         "tags": [t.strip() for t in meta.get("tags", "").split(",") if t.strip()],
         "aliases": [a.strip().strip("/") for a in meta.get("alias", "").split(",") if a.strip()],
         "publish": meta.get("publish", "true") != "false",
-        "discoverable": meta.get("discoverable", "true") != "false",
         "description": meta.get("meta_description", ""),
         "body": body,
         "is_html": path.suffix == ".html",
@@ -304,7 +303,7 @@ def main():
             seen[url] = e["source"]
 
     posts = sorted(
-        (e for e in entries if not e["is_page"] and e["discoverable"]),
+        (e for e in entries if not e["is_page"]),
         key=lambda p: p["date"],
         reverse=True,
     )
@@ -359,7 +358,7 @@ def main():
     )
 
     write_feed(posts, contents)
-    write_sitemap([e for e in entries if e["is_page"] or e["discoverable"]])
+    write_sitemap(entries)
     print(f"Built {len(posts)} posts and {len(entries) - len(posts)} other pages into public/")
 
 

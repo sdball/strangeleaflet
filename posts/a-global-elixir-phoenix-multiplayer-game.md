@@ -3,7 +3,6 @@ title: A Global Elixir Phoenix Multiplayer Game
 slug: a-global-elixir-phoenix-multiplayer-game
 published_date: 2025-01-11T05:00:00+00:00
 publish: true
-discoverable: true
 is_page: false
 ---
 

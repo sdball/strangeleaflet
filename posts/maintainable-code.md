@@ -4,7 +4,6 @@ slug: maintainable-code
 published_date: 2022-11-15T05:00:00+00:00
 tags: programming
 publish: true
-discoverable: true
 is_page: false
 meta_description: How to write code that is easy to understand and well documented so it is easy to maintain.
 ---

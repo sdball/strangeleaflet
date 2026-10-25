@@ -4,7 +4,6 @@ slug: rewriting-my-protohackers-repo-as-an-umbrella-app
 published_date: 2023-02-15T11:50:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-discoverable: true
 is_page: false
 ---
 

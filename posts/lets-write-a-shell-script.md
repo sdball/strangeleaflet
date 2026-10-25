@@ -4,7 +4,6 @@ slug: lets-write-a-shell-script
 published_date: 2016-09-06T04:00:00+00:00
 tags: shell
 publish: true
-discoverable: true
 is_page: false
 meta_description: Walkthrough how shell scripts work, do some weird things, and then write an actual script that does a real thing.
 ---

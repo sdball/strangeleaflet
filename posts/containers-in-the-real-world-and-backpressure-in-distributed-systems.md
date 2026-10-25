@@ -4,7 +4,6 @@ slug: containers-in-the-real-world-and-backpressure-in-distributed-systems
 published_date: 2021-10-27T04:00:00+00:00
 tags: systems architecture
 publish: true
-discoverable: true
 is_page: false
 meta_description: A real world example of backpressure and unintended ramifications.
 ---

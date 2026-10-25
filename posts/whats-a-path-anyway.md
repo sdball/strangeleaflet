@@ -4,7 +4,6 @@ slug: whats-a-path-anyway
 published_date: 2016-08-30T04:00:00+00:00
 tags: shell
 publish: true
-discoverable: true
 is_page: false
 meta_description: What is $PATH and how does it work? Let's find out.
 ---

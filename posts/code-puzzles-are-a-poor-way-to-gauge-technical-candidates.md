@@ -4,7 +4,6 @@ slug: code-puzzles-are-a-poor-way-to-gauge-technical-candidates
 published_date: 2019-10-24T04:00:00+00:00
 tags: interviews, programming
 publish: true
-discoverable: true
 is_page: false
 meta_description: Technical interviews aren't great, and they're worse if they actively try and trick the interviewee.
 ---

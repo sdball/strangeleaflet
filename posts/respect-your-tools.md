@@ -3,7 +3,6 @@ title: Respect your tools
 slug: respect-your-tools
 published_date: 2026-10-23T13:17:23.171937+00:00
 publish: true
-discoverable: true
 is_page: false
 ---
 

@@ -4,7 +4,6 @@ slug: rewriting-strange-leaflet-in-phoenix-and-livesvelte
 published_date: 2023-12-31T05:00:00+00:00
 tags: elixir, phoenix, programming, svelte
 publish: true
-discoverable: true
 is_page: false
 meta_description: Another rewrite of Strange Leaflet? Yes! Still with the power of Svelte but now with Phoenix on the backend.
 ---

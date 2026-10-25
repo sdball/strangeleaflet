@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-2
 published_date: 2022-06-13T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-discoverable: true
 is_page: false
 meta_description: What is the BEAM and why is it so awesome?
 ---

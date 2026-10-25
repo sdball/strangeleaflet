@@ -4,7 +4,6 @@ slug: add-helix-shortcuts
 published_date: 2023-01-08T14:20:00+00:00
 tags: git blog, helix
 publish: true
-discoverable: true
 is_page: false
 ---
 

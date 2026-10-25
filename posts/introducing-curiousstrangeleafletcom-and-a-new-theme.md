@@ -3,7 +3,6 @@ title: Introducing curious.strangeleaflet.com and a new theme
 slug: introducing-curiousstrangeleafletcom-and-a-new-theme
 published_date: 2026-10-13T23:47:00+00:00
 publish: true
-discoverable: true
 is_page: false
 ---
 

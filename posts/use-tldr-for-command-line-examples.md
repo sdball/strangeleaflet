@@ -4,7 +4,6 @@ slug: use-tldr-for-command-line-examples
 published_date: 2019-11-20T05:00:00+00:00
 tags: shell
 publish: true
-discoverable: true
 is_page: false
 meta_description: What is tldr? Why it's an easy way to quickly get examples for common CLI commands!
 ---

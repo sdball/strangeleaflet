@@ -4,7 +4,6 @@ slug: lets-query-the-github-graphql-api-from-a-livebook-smart-cell
 published_date: 2022-05-22T04:00:00+00:00
 tags: elixir, graphql, livebook
 publish: true
-discoverable: true
 is_page: false
 meta_description: Write a Livebook smart cell to allow querying the Github GraphQL API
 ---

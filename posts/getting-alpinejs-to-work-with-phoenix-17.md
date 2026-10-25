@@ -4,7 +4,6 @@ slug: getting-alpinejs-to-work-with-phoenix-17
 published_date: 2022-11-24T05:00:00+00:00
 tags: alpinejs, elixir, phoenix
 publish: true
-discoverable: true
 is_page: false
 ---
 

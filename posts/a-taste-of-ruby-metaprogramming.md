@@ -4,7 +4,6 @@ slug: a-taste-of-ruby-metaprogramming
 published_date: 2012-03-01T05:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: Ruby metaprogramming is not only a powerful feature, it's easy to use as well.
 ---

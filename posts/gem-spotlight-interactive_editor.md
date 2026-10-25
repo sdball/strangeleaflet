@@ -4,7 +4,6 @@ slug: gem-spotlight-interactive_editor
 published_date: 2013-01-04T05:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: Taking a look at the interactive_editor gem and its capabilities.
 ---

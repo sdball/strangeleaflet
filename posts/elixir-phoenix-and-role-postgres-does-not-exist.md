@@ -4,7 +4,6 @@ slug: elixir-phoenix-and-role-postgres-does-not-exist
 published_date: 2021-08-30T04:00:00+00:00
 tags: elixir, phoenix
 publish: true
-discoverable: true
 is_page: false
 ---
 

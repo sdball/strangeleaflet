@@ -4,7 +4,6 @@ slug: see-where-vim-settings-came-from
 published_date: 2022-03-15T04:00:00+00:00
 tags: vim
 publish: true
-discoverable: true
 is_page: false
 ---
 

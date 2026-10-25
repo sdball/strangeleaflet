@@ -4,7 +4,6 @@ slug: how-to-write-and-test-a-gem-to-serve-static-files-on-the-rails-asset-pipel
 published_date: 2012-03-15T04:00:00+00:00
 tags: rails, ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: Want to write a gem that adds static assets to Rails such as a JavaScript library? I've figured out some things.
 ---

@@ -4,7 +4,6 @@ slug: back-to-a-static-site
 published_date: 2026-10-25T12:00:00+00:00
 tags: blog, tools
 publish: true
-discoverable: true
 is_page: false
 meta_description: Strange Leaflet moves off Bear and back to a static site on GitHub Pages, built by a small custom generator that Claude wrote.
 ---

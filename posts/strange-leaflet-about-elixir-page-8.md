@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-8
 published_date: 2022-07-09T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-discoverable: true
 is_page: false
 meta_description: Looping without mutable data means recursion
 ---

@@ -4,7 +4,6 @@ slug: why-diversity-matters
 published_date: 2019-10-30T04:00:00+00:00
 tags: winning
 publish: true
-discoverable: true
 is_page: false
 meta_description: Diversity is a strength, not a distraction
 ---

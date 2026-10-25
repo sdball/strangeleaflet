@@ -4,7 +4,6 @@ slug: fun-with-rock-paper-scissors
 published_date: 2012-02-28T05:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 ---
 

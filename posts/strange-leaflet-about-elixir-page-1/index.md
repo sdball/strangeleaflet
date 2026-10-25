@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-1
 published_date: 2022-06-12T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-discoverable: true
 is_page: false
 meta_description: Learn how Elixir is a language of independently running processes.
 ---

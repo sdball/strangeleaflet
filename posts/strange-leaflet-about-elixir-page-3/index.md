@@ -4,7 +4,6 @@ slug: strange-leaflet-about-elixir-page-3
 published_date: 2022-06-19T04:00:00+00:00
 tags: elixir, livebook
 publish: true
-discoverable: true
 is_page: false
 ---
 

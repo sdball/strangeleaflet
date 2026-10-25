@@ -4,7 +4,6 @@ slug: programming-with-jq
 published_date: 2019-11-07T05:00:00+00:00
 tags: jq, programming, shell
 publish: true
-discoverable: true
 is_page: false
 meta_description: jq is not only a powerful JSON command line parser, it's a full featured programming language
 ---

@@ -4,7 +4,6 @@ slug: add-unusual-database-protocol-server
 published_date: 2023-01-11T12:03:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-discoverable: true
 is_page: false
 ---
 

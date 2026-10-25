@@ -4,7 +4,6 @@ slug: elixirconf-2022-talk-livebook-smart-cells-are-amazing
 published_date: 2022-11-01T04:00:00+00:00
 tags: elixir, livebook, talk
 publish: true
-discoverable: true
 is_page: false
 ---
 

@@ -4,7 +4,6 @@ slug: connecting-objects-with-observable
 published_date: 2018-12-05T05:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: Examples of how to use the Observable module from Ruby's standard library
 ---

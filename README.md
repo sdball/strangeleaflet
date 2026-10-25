@@ -41,7 +41,6 @@ meta_description: Taking a script and wrapping it up into a Docker image that ca
 
 - `slug` is the URL: `/from-awk-to-a-dockerized-ruby-script/`.
 - `publish: false` leaves the post out of the build entirely (a draft).
-- `discoverable: false` builds the page but leaves it off the lists, the feed and the sitemap.
 - `alias: blog/old-path` adds a redirect from an old URL. Separate several with commas.
 - `meta_description` is optional; without it the description is the start of the post.
 

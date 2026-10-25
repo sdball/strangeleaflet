@@ -4,7 +4,6 @@ slug: lets-use-hwacha-to-scan-urls
 published_date: 2013-12-18T05:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: I've written a gem, Hwacha, that wraps Typhoeus for fast, easy, and powerful URL checking.
 ---

@@ -4,7 +4,6 @@ slug: friday-lunch-links-3
 published_date: 2019-11-15T05:00:00+00:00
 tags: links
 publish: true
-discoverable: true
 is_page: false
 meta_description: Diversity, XKCD on machine learning, and bar chart race graphs!
 ---

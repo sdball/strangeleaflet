@@ -4,7 +4,6 @@ slug: running-kafka-locally-in-kubernetes-using-minikube
 published_date: 2023-10-01T04:00:00+00:00
 tags: kafka, kubernetes, tools
 publish: true
-discoverable: true
 is_page: false
 meta_description: Let's run Kafka in Kubernetes using Minikube and then connect to a topic using kcat running on our host machine.
 ---

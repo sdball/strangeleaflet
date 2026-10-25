@@ -3,7 +3,6 @@ title: About Me
 slug: about-me
 published_date: 2025-09-15T00:36:00+00:00
 publish: true
-discoverable: true
 is_page: true
 ---
 

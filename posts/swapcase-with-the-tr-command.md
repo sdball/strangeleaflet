@@ -4,7 +4,6 @@ slug: swapcase-with-the-tr-command
 published_date: 2022-04-01T04:00:00+00:00
 tags: shell
 publish: true
-discoverable: true
 is_page: false
 ---
 

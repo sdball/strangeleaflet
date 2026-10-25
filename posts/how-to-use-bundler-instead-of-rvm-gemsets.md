@@ -4,7 +4,6 @@ slug: how-to-use-bundler-instead-of-rvm-gemsets
 published_date: 2012-03-20T04:00:00+00:00
 tags: ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: No need to manage gemset environments per project!
 ---

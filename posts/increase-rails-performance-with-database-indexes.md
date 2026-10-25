@@ -4,7 +4,6 @@ slug: increase-rails-performance-with-database-indexes
 published_date: 2013-02-16T05:00:00+00:00
 tags: databases, rails, ruby
 publish: true
-discoverable: true
 is_page: false
 meta_description: If you need to frequently query a database table by a specific column, you should probably index it.
 ---

@@ -3,7 +3,6 @@ title: I’d use Spinel for Ruby projects
 slug: id-use-spinel-for-ruby-projects
 published_date: 2025-09-23T23:52:34.502231+00:00
 publish: true
-discoverable: true
 is_page: false
 ---
 

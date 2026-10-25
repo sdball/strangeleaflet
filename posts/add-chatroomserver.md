@@ -4,7 +4,6 @@ slug: add-chatroomserver
 published_date: 2023-01-09T01:53:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-discoverable: true
 is_page: false
 ---
 

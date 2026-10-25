@@ -4,7 +4,6 @@ slug: friday-lunch-links-2
 published_date: 2019-11-10T05:00:00+00:00
 tags: links
 publish: true
-discoverable: true
 is_page: false
 meta_description: Dark matter, global map projections, APIs, and quines!
 ---

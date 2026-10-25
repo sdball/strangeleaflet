@@ -4,7 +4,6 @@ slug: rewrite-chat-room-server-to-use-active-sockets
 published_date: 2023-01-13T02:52:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-discoverable: true
 is_page: false
 ---
 

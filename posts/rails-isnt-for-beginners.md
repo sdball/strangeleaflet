@@ -4,7 +4,6 @@ slug: rails-isnt-for-beginners
 published_date: 2012-04-03T04:00:00+00:00
 tags: rails
 publish: true
-discoverable: true
 is_page: false
 meta_description: Rails was never meant to simply be a beginner's introduction to web programming.
 ---

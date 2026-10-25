@@ -4,7 +4,6 @@ slug: add-git-blog
 published_date: 2023-01-08T18:35:00+00:00
 tags: bash, git, git blog
 publish: true
-discoverable: true
 is_page: false
 ---
 

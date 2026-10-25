@@ -3,7 +3,6 @@ title: Switched to Bear
 slug: switched-to-bear
 published_date: 2025-09-14T13:56:00+00:00
 publish: true
-discoverable: true
 is_page: false
 ---
 

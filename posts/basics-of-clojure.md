@@ -4,7 +4,6 @@ slug: basics-of-clojure
 published_date: 2021-01-19T05:00:00+00:00
 tags: clojure
 publish: true
-discoverable: true
 is_page: false
 meta_description: See how Clojure's syntax works, how functions work, and some basic data structures.
 ---

@@ -5,7 +5,6 @@ alias: leaflets/programming-videos
 published_date: 2025-09-14T13:09:00+00:00
 tags: curated, programming, videos
 publish: true
-discoverable: true
 is_page: false
 ---
 

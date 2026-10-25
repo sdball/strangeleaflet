@@ -4,7 +4,6 @@ slug: add-more-otp-implementation-of-speed-daemon-new
 published_date: 2023-02-12T23:49:00+00:00
 tags: elixir, git blog, protohackers
 publish: true
-discoverable: true
 is_page: false
 ---
 
