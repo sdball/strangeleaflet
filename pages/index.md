@@ -10,3 +10,5 @@ Curious? Fun toys and guides are in the [Cabinet of Curios](https://curious.stra
 ### Recent posts
 
 {{ posts limit:5 }}
+
+[All posts →](/blog/)
