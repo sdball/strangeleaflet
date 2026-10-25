@@ -2,3 +2,4 @@
 /.venv
 /public
 __pycache__/
+*.swp
