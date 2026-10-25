@@ -1,7 +1,7 @@
 ---
 title: Back to a static site
 slug: back-to-a-static-site
-published_date: 2026-10-25T12:00:00+00:00
+published_date: 2026-10-25T16:12:23+00:00
 tags: blog, tools
 publish: true
 is_page: false
