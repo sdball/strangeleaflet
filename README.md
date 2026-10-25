@@ -21,6 +21,7 @@ scripts/check-links      checks every internal link and image in public/
 ```sh
 scripts/serve        # http://localhost:8000/
 scripts/serve 9000   # or pick a port
+scripts/serve --list # Python servers still running, with their pids
 scripts/build        # rebuild while serve keeps running, then refresh
 scripts/check-links  # after a build: any links or images that go nowhere?
 ```

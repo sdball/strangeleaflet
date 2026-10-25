@@ -10,6 +10,7 @@ isn't obvious from it.
 
 ```sh
 scripts/serve            # build, then serve public/ at http://localhost:8000/
+scripts/serve --list     # Python servers still running, with their pids
 scripts/build            # rebuild while serve keeps running
 scripts/check-links      # after a build
 git config core.hooksPath .githooks   # once per clone
