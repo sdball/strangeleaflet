@@ -58,11 +58,19 @@ class Renderer(mistune.HTMLRenderer):
         return highlight(code, lexer, FORMATTER)
 
     def heading(self, text, level, **attrs):
-        return f'<h{level} id="{slugify(text)}">{text}</h{level}>\n'
+        # A repeated heading gets -1, -2, ... so every anchor on the page is unique
+        base = slug = slugify(text)
+        n = 0
+        while slug in self.heading_ids:
+            n += 1
+            slug = f"{base}-{n}"
+        self.heading_ids.add(slug)
+        return f'<h{level} id="{slug}">{text}</h{level}>\n'
 
 
+renderer = Renderer(escape=False)
 markdown = mistune.create_markdown(
-    renderer=Renderer(escape=False),
+    renderer=renderer,
     plugins=["strikethrough", "footnotes", "table", "url"],
 )
 
@@ -197,6 +205,7 @@ def render_content(entry, posts):
     if entry["is_html"]:
         return entry["body"]
     body = expand_embeds(entry["body"], posts) if entry["is_page"] else entry["body"]
+    renderer.heading_ids = set()
     return markdown(body)
 
 
