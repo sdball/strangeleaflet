@@ -546,7 +546,7 @@ As we add data to our bitfield we'll be adding more and more powers of base-2.
 |               3 |                      0...7 |
 |               4 |                     0...15 |
 
-To explore bitfield length you can try out my [Bitfield Length](/widgets/bitfield-length) widget.
+To explore bitfield length you can try out my [Bitfield Length](https://strangeleaflet.fly.dev/widgets/bitfield-length) widget.
 
 # Constructing a bitfield by hand
 

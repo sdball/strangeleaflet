@@ -185,7 +185,7 @@ I'm writing this post in markdown. And in the SvelteKit ecosystem there's this r
 
 One great plugin I'm using for mdsvex allows me to use relative links for images from the location of the markdown file. That means I can put posts with images into their own directories and finally easily group posts and their images together.
 
-Another nice plugin automatically adds IDs to markdown headers. Another plugin automatically adds links to markdown headers with IDs. Yet another adds support for <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi>T</mi><mspace width="-.14em" /><mpadded height="-.5ex" depth="+.5ex" voffset="-.5ex"><mrow><mi>E</mi></mrow></mpadded><mspace width="-.115em" /><mi>X</mi></mrow></mrow></math> which I've actually used in my [post on bitfields](/blog/posts/shrink-your-data-into-bitfields).
+Another nice plugin automatically adds IDs to markdown headers. Another plugin automatically adds links to markdown headers with IDs. Yet another adds support for <math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow><mrow><mi>T</mi><mspace width="-.14em" /><mpadded height="-.5ex" depth="+.5ex" voffset="-.5ex"><mrow><mi>E</mi></mrow></mpadded><mspace width="-.115em" /><mi>X</mi></mrow></mrow></math> which I've actually used in my [post on bitfields](/shrink-your-data-into-bitfields-and-out-again/).
 
 There are projects to provide similar "write markdown pages in Phoenix" but none that so easily integrate markdown with the frontend experience.
 

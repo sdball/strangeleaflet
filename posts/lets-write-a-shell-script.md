@@ -9,7 +9,7 @@ is_page: false
 meta_description: Walkthrough how shell scripts work, do some weird things, and then write an actual script that does a real thing.
 ---
 
-Now that you have a [$PATH](/blog/whats-a-path-anyway/) let's start using it! Today we'll write a simple shell script in your personal `bin` directory.
+Now that you have a [$PATH](/whats-a-path-anyway/) let's start using it! Today we'll write a simple shell script in your personal `bin` directory.
 
 Let's start by picking the language the shell script will be written in. You can choose any scripting language that you have available on your machine. In our script we'll tell the shell what command to execute to run the script.
 

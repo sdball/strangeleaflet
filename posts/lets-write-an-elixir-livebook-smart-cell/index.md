@@ -17,13 +17,13 @@ The Livebook format is a superset of markdown so can be easily committed into Gi
 
 Here's a snippet of my [Advent of Code 2021 - Day 7 Livebook](https://github.com/sdball/advent-of-code/blob/main/2021/day7.livemd)
 
-![Screenshot of an open Elixir Livebook notebook showing code and data chart](/images/blog/2022/livebook-example.png)
+![Screenshot of an open Elixir Livebook notebook showing code and data chart](livebook-example.png)
 
 What's a Livebook smart cell? It's a UX for handling the automatic generation of some code pattern. For example creating a database connection with a given host, username, and password. The shape of that code will always be the same but the specific host, username, and password can change.
 
 Here's an example of the new database connection smart cell that ships along with Livebook 0.6
 
-![Screenshot of an Elixir Livebook smart cell showing fields to configure a database connection](/images/blog/2022/db-connection-smart-cell.png)
+![Screenshot of an Elixir Livebook smart cell showing fields to configure a database connection](db-connection-smart-cell.png)
 
 At any point you can inspect the underlying Elixir code cell. You can also tell a smart cell to drop the wrapping UX layer and simply become a hardcoded code cell like any other. That conversion is one-way: once you turn a smart cell into an Elixir code cell you can't switch it back again.
 

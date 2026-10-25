@@ -11,7 +11,7 @@ meta_description: Learn about logical grid puzzles and how applying the right to
 
 I've been playing through Dishonored 2 and last night I came across the Jindosh Lock Puzzle. It's straight forward enough. There are five family names and five heirlooms. To unlock the door you need to correct associate each family name with their heirloom and their position at a classic dinner party seating arrangement.
 
-![The Jindosh Lock puzzle]([/images/blog/2019/jindosh_lock_puzzle.png](jindosh_lock_puzzle.webp))
+![The Jindosh Lock puzzle](jindosh_lock_puzzle.webp)
 
 All of the information required to make the right conclusion is obfuscated in a word puzzle with six categories of five items each.
 

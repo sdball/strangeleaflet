@@ -117,7 +117,7 @@ That included Rails application is pretty slick and it was my biggest stumbling 
 
 # Step 2: Switch over to minitest and Capybara
 
-I'm going to skip or skim right over all the standard gem writing pieces. If you need a refresher there check out [Let's Write a Gem, Part 1](lets-write-a-gem-part-one/).
+I'm going to skip or skim right over all the standard gem writing pieces. If you need a refresher there check out [Let's Write a Gem, Part 1](/lets-write-a-gem-part-1/).
 
 Instead of RSpec, this time let's switch this Gem over to minitest for our testing framework. We'll also use Capybara for our integration testing.
 

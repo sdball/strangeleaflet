@@ -9,7 +9,7 @@ is_page: false
 meta_description: Diversity, XKCD on machine learning, and bar chart race graphs!
 ---
 
-[Speaking of Diversity](/blog/why-diversity-matters/): find engineering teams that share your values with [Key Values](https://www.keyvalues.com/). It's a nice tool that allows you to select values you're interested in, e.g. "Team is Diverse" and find companies that share them.
+[Speaking of Diversity](/why-diversity-matters/): find engineering teams that share your values with [Key Values](https://www.keyvalues.com/). It's a nice tool that allows you to select values you're interested in, e.g. "Team is Diverse" and find companies that share them.
 
 [Machine Learning Captcha](https://xkcd.com/2228/)
 

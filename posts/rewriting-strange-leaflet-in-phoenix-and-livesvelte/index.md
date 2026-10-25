@@ -177,9 +177,9 @@ And because it's Elixir I can run my application and connect Livebook to that ru
 
 # LiveSvelte
 
-Thanks to [LiveSvelte](https://github.com/woutdp/live_svelte) I don't have to give up the power of Svelte components for the frontend! Everything in [/widgets](/widgets) is currently a Svelte component. I could add LiveView components as well. I could even have Svelte components wired up to LiveView!
+Thanks to [LiveSvelte](https://github.com/woutdp/live_svelte) I don't have to give up the power of Svelte components for the frontend! Everything in [/widgets](https://strangeleaflet.fly.dev/widgets) is currently a Svelte component. I could add LiveView components as well. I could even have Svelte components wired up to LiveView!
 
-The navigation header you see is still a Flowbite-Svelte component. I still have my customized [penguin component](/widgets/penguin).
+The navigation header you see is still a Flowbite-Svelte component. I still have my customized [penguin component](https://strangeleaflet.fly.dev/widgets/penguin).
 
 # Svelte
 
@@ -213,7 +213,7 @@ And to have a sorted set of `@posts`?
 @posts Enum.sort_by(@posts, & &1.date, {:desc, Date})
 ```
 
-Here's how I build up my [tag list](/blog/tags).
+Here's how I build up my [tag list](/blog/).
 
 ```elixir
 @tags @posts

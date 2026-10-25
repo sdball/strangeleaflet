@@ -11,7 +11,7 @@ meta_description: How to implement Conway's Game of Life using functional progra
 
 ## Context: What is Conway's Game of Life?
 
-It might help to play with a [working Game of Life implementation](/games/life) first.
+It might help to play with a [working Game of Life implementation](https://curious.strangeleaflet.com/conway-life/) first.
 
 The Game of Life is a mathematical game / life simulation invented by John Conway in 1970.
 
@@ -30,7 +30,7 @@ The game is seeded with an initial pattern and from that point the pattern plays
 
 It might seem trivial but the simple system and rules give rise to surprisingly complex living ecosystems. It's even possible to build patterns of such complexity that they can store data and perform calculations.
 
-You can try out my own [LiveView based Game of Life](/games/life). You can try filling out a seed pattern yourself by clicking on the dead cells and then either "step" to see the next interation or "play" to play out the board. If you want a fun way to get started you can click "random" and then "play" to see how a random pattern generates interestingly lifelike behavior.
+You can try out my own [LiveView based Game of Life](https://curious.strangeleaflet.com/conway-life/). You can try filling out a seed pattern yourself by clicking on the dead cells and then either "step" to see the next interation or "play" to play out the board. If you want a fun way to get started you can click "random" and then "play" to see how a random pattern generates interestingly lifelike behavior.
 
 ## Functional programming?
 
@@ -469,7 +469,7 @@ With that we have functionally implemented the Game of Life from a simple data s
 
 If you'd like to play with a Game of Life implementation then you're in luck because it's a very popular thing to implement in impressive ways.
 
-- [My own implementation](/games/life) is running the code from this very blog post
+- [My own implementation](https://curious.strangeleaflet.com/conway-life/) is running the code from this very blog post
 - [https://oimo.io/works/life/](https://oimo.io/works/life/) is one of my favorite things on the Internet: an infinitely zoomable Game of Life implementing itself.
 - [https://playgameoflife.com/](https://playgameoflife.com/) has an extensive lexicon of patterns you can load
 
