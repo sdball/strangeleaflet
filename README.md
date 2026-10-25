@@ -68,7 +68,24 @@ posts/my-post/widget.js
 ```
 
 Every file in the directory is copied next to the page, so `./widget.js` and
-`![a picture](picture.webp)` resolve. A post can also be `index.html` (or
+`![a picture](picture.webp)` resolve.
+
+The existing widgets are custom elements (`<penguin-walker>` in
+`rebooting-this-blog-in-svelte-and-sveltekit/`, `<bitfield-steps>` and friends
+in `shrink-your-data-into-bitfields-and-out-again/`). Put the opening and
+closing tags on lines of their own, and anything between them, separated by
+blank lines, is still rendered as markdown. That content is the fallback that
+feed readers and visitors without JavaScript see, and the element replaces it:
+
+```markdown
+<penguin-walker walk>
+
+![screenshot of the walking penguin](penguin.webp)
+
+</penguin-walker>
+
+<script type="module" src="penguin-walker.js"></script>
+``` A post can also be `index.html` (or
 `<slug>.html`) with the same frontmatter, and its body is used as-is inside the
 layout.
 

@@ -179,7 +179,7 @@ And because it's Elixir I can run my application and connect Livebook to that ru
 
 Thanks to [LiveSvelte](https://github.com/woutdp/live_svelte) I don't have to give up the power of Svelte components for the frontend! Everything in [/widgets](https://strangeleaflet.fly.dev/widgets) is currently a Svelte component. I could add LiveView components as well. I could even have Svelte components wired up to LiveView!
 
-The navigation header you see is still a Flowbite-Svelte component. I still have my customized [penguin component](https://strangeleaflet.fly.dev/widgets/penguin).
+The navigation header you see is still a Flowbite-Svelte component. I still have my customized [penguin component](/rebooting-this-blog-in-svelte-and-sveltekit/#why-svelte).
 
 # Svelte
 

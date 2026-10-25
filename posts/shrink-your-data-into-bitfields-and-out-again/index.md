@@ -35,6 +35,8 @@ To this! The same data!
 
 We'll do that in a series of steps and using less data with each one.
 
+<bitfield-steps>
+
 ## Step 1, the original data
 
 ```json
@@ -71,6 +73,8 @@ In base-2
 ```elixir
 1110001111000
 ```
+
+</bitfield-steps>
 
 How? Incrementally!
 
@@ -519,6 +523,9 @@ The key is that the "pieces" (digits) of our bitfield number in binary are the d
  1 1 0 0 = 4 fields with 2 possible values each
 ```
 
+<bitfield-explorer>
+</bitfield-explorer>
+
 As a quick level set on number "places" in base-10 vs base-2 let's look at what the number `1000` represents in base-2 vs base-10.
 
 | Number | 1 | 0 | 0 | 0 |
@@ -546,7 +553,8 @@ As we add data to our bitfield we'll be adding more and more powers of base-2.
 |               3 |                      0...7 |
 |               4 |                     0...15 |
 
-To explore bitfield length you can try out my [Bitfield Length](https://strangeleaflet.fly.dev/widgets/bitfield-length) widget.
+<bitfield-length>
+</bitfield-length>
 
 # Constructing a bitfield by hand
 
@@ -1161,3 +1169,5 @@ Bitfields are a somewhat obscure data structure: but they're out there! Famously
 If you ever come across an integer that seems to be weirdly treated as data: there's a good chance that's a bitfield!
 
 If you ever need to squish a predefined and rigorously scoped set of data into the smallest possible space: that could be a bitfield!
+
+<script type="module" src="bitfields.js"></script>

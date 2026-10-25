@@ -15,7 +15,7 @@ font-size: 0.8em;
 margin: 3px 0 3em 0;
 border-style: dashed;">
   <h1><span style="font-size: 0.7em">Side note</span></h1>
-  <p>I've migrated this post away from Svelte so its previously embedded JavaScript widgets have been replaced with screenshots.</p>
+  <p>I've migrated this post away from Svelte. The penguins are now plain JavaScript custom elements, but the code samples are still the original Svelte.</p>
 </div>
 
 Hello Internet! After being a happy blot.im customer for years, well, I'm still very happy with Blot. It's a fantastic way to easily get a blog on the Internet with minimal fuss. But I started using Svelte for a work project and loved it so much that I started learning it more and more and picked up SvelteKit as well which has some compelling ideas for creating web pages and even web applications. Then I found some fantastic guides to creating nice blogs in SvelteKit which led me to finding the amazing project mdsvex. The idea of easily creating application experiences alongside and within markdown I just had to switch away from blot.im and use this amazing framework.
@@ -28,7 +28,11 @@ Look check this out, I can drop in a component just like this right in my blog p
 <Penguin walk={true} />
 ```
 
+<penguin-walker walk>
+
 ![screenshot of an animated cartoon walking penguin](19am.webp)
+
+</penguin-walker>
 
 How cool is that!? Yes I shamelessly copied that cute component from mdsvex's homepage but I just had to recreate it locally to see how it works. I also tweaked a few things and learned about Svelte's `tweened` function which gives you a special Svelte store that continually updates its value over a fixed duration: i.e. an easy to use clock with which we can animate.
 
@@ -38,7 +42,11 @@ Want to see the data about the walking penguin? Me too! I added an `insight` att
 <Penguin walk={true} insight={true} />
 ```
 
+<penguin-walker walk insight>
+
 ![screenshot of the animated walking cartoon penguin with a text box of details about its speed, position, direction, and more](penguin-walk-with-details.webp)
+
+</penguin-walker>
 
 Wanna see something cool? Resize your browser window and that insight view's `innerWidth` will change and the penguin walk will correct itself to the new width if needed.
 
@@ -161,7 +169,11 @@ You might note in the code that we can make a zoomy bird. And we can make him st
 >
 ```
 
+<penguin-walker walk insight speed="80" controls>
+
 ![Screenshot of the animated walking cartoon penguin with details and a large button labeled "stop walking"](43am.webp)
+
+</penguin-walker>
 
 How exciting is that? This is so fun!
 
@@ -200,3 +212,5 @@ SvelteKit and Svelte are, obviously, made for each other. With this combination 
 ## Wrap up
 
 SvelteKit and Svelte aren't a fit for all things. But for writing a markdown file focused blog and set of web pages that want to have the capability for joyful interactive browser experiences they're amazing!
+
+<script type="module" src="penguin-walker.js"></script>
