@@ -25,6 +25,13 @@ scripts/build        # rebuild while serve keeps running, then refresh
 It needs Python 3 and installs `mistune` and `Pygments` from
 `requirements.txt` into `.venv`.
 
+After cloning, turn on the pre-commit hook once, so publishing a post stamps
+its date:
+
+```sh
+git config core.hooksPath .githooks
+```
+
 ## Writing a post
 
 Add `posts/<slug>.md`. The frontmatter is the format Bear exported:
@@ -41,6 +48,10 @@ meta_description: Taking a script and wrapping it up into a Docker image that ca
 
 - `slug` is the URL: `/from-awk-to-a-dockerized-ruby-script/`.
 - `publish: false` leaves the post out of the build entirely (a draft).
+- `published_date` is filled in for you. Leave it out of a draft, and the
+  commit that publishes the post (with `publish: true`, or no `publish` line)
+  adds the current time. A local build previews an undated post as "now"; the
+  deploy refuses to build one.
 - `alias: blog/old-path` adds a redirect from an old URL. Separate several with commas.
 - `meta_description` is optional; without it the description is the start of the post.
 

@@ -9,6 +9,7 @@ bare filename.
 
 import html
 import json
+import os
 import re
 import shutil
 import sys
@@ -296,7 +297,11 @@ def main():
     seen = {}
     for e in entries:
         if not e["is_page"] and not e["date"]:
-            sys.exit(f"{e['source'].relative_to(ROOT)}: posts need a published_date")
+            # .githooks/pre-commit adds the date in the commit that publishes a post
+            if os.environ.get("CI"):
+                sys.exit(f"{e['source'].relative_to(ROOT)}: posts need a published_date")
+            e["date"] = datetime.now(timezone.utc)
+            print(f"{e['source'].relative_to(ROOT)}: no published_date yet, previewing it as now")
         for url in [e["url"]] + [f"/{a}/" for a in e["aliases"]]:
             if url in seen:
                 sys.exit(f"{e['source'].relative_to(ROOT)}: {url} is also used by {seen[url].relative_to(ROOT)}")
