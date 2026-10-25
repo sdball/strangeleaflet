@@ -526,6 +526,8 @@ The key is that the "pieces" (digits) of our bitfield number in binary are the d
 <bitfield-explorer>
 </bitfield-explorer>
 
+[Explore more bitfield representations](https://curious.strangeleaflet.com/bitfield-explorer/) in the Cabinet of Curios.
+
 As a quick level set on number "places" in base-10 vs base-2 let's look at what the number `1000` represents in base-2 vs base-10.
 
 | Number | 1 | 0 | 0 | 0 |
