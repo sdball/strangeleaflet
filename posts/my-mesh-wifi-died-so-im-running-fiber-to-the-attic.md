@@ -1,9 +1,9 @@
 ---
 title: My mesh WiFi died, so I'm running fiber to the attic
 slug: my-mesh-wifi-died-so-im-running-fiber-to-the-attic
+published_date: 2026-10-26T17:47:13+00:00
 tags: networking, hardware
 meta_description: My Plume mesh WiFi died on a Saturday morning. Plume has already left the consumer business, so I'm replacing it with the fiber gateway's own WiFi and a 10G single-mode fiber link to my attic office ethernet switch.
-publish: false
 ---
 
 On Saturday morning, October 24th, we all woke up to no Internet. Well almost entirely no Internet. Two of our Plume SuperPods were offline, one was going on and off randomly. Restarting the pods didn't help at all. They'd worked for years with no changes but I guess with Plume's residential support shutting down this was finally the impetus to change our network.
