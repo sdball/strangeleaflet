@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build, then serve public/ locally, the way GitHub Pages will.
+# Build with drafts, then serve public/ locally the way GitHub Pages will,
+# rebuilding and reloading the browser on every change (scripts/serve.py).
 # Usage: scripts/serve [port]   (default 8000, or $PORT)
 #        scripts/serve --list   show the local Python servers still running
 
@@ -70,7 +71,7 @@ free_port() {
 
 case "$1" in
   -l|--list) list_servers; exit 0 ;;
-  -h|--help) sed -n '2,4s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,5s/^# \{0,1\}//p' "$0"; exit 0 ;;
   -*) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
 esac
 
@@ -100,30 +101,5 @@ if [ -n "$holders" ]; then
   fi
 fi
 
-"$root/scripts/build"
-
-echo "Serving $root/public at http://localhost:$port/ (Ctrl-C to stop)"
-cd "$root/public"
-exec "$root/.venv/bin/python" -c '
-import sys
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-
-class Handler(SimpleHTTPRequestHandler):
-    index_pages = ("index.html", "index.xml")  # /feed/ is feed/index.xml
-
-    def send_error(self, code, message=None, explain=None):
-        if code == 404:  # GitHub Pages serves 404.html
-            try:
-                body = open("404.html", "rb").read()
-            except OSError:
-                return super().send_error(code, message, explain)
-            self.send_response(404)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
-        super().send_error(code, message, explain)
-
-ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
-' "$port"
+"$root/scripts/build" --drafts
+exec "$root/.venv/bin/python" "$root/scripts/serve.py" "$port"

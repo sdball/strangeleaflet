@@ -12,7 +12,7 @@ pages/                   index.md (home), blog.md, about-me.md
 templates/layout.html    the page around every post and page
 static/theme.css         the theme (light and dark), copied to public/
 scripts/build            builds public/ (sets up .venv the first time)
-scripts/serve            builds, then serves public/ at http://localhost:8000/
+scripts/serve            builds with drafts, serves public/ at http://localhost:8000/, rebuilds on changes
 scripts/check-links      checks every internal link and image in public/
 ```
 
@@ -22,9 +22,13 @@ scripts/check-links      checks every internal link and image in public/
 scripts/serve        # http://localhost:8000/
 scripts/serve 9000   # or pick a port
 scripts/serve --list # Python servers still running, with their pids
-scripts/build        # rebuild while serve keeps running, then refresh
+scripts/build        # build without drafts, the way the deploy does
 scripts/check-links  # after a build: any links or images that go nowhere?
 ```
+
+While `scripts/serve` runs, saving anything in `posts/`, `pages/`,
+`leaflets/`, `static/`, or `templates/` rebuilds the site, and open pages
+reload themselves. It includes drafts, each marked as one. Ctrl-C stops it.
 
 It needs Python 3 and installs `mistune` and `Pygments` from
 `requirements.txt` into `.venv`.
@@ -51,7 +55,8 @@ meta_description: Taking a script and wrapping it up into a Docker image that ca
 ```
 
 - `slug` is the URL: `/from-awk-to-a-dockerized-ruby-script/`.
-- `publish: false` leaves the post out of the build entirely (a draft).
+- `publish: false` makes it a draft: left out of the site, but shown (marked
+  as a draft) by `scripts/serve`.
 - `published_date` is filled in for you. Leave it out of a draft, and the
   commit that publishes the post (with `publish: true`, or no `publish` line)
   adds the current time. A local build previews an undated post as "now"; the

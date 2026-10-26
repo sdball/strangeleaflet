@@ -5,6 +5,9 @@ markdown. It can also be HTML (`.html`), which is used as-is. A post that
 lives in a directory (`posts/<slug>/index.md`) has every other file in that
 directory copied beside its page, so images and scripts can be referenced by
 bare filename.
+
+`--drafts` builds drafts (publish: false) too, marked as drafts, for
+scripts/serve. The deploy builds without it.
 """
 
 import html
@@ -137,12 +140,12 @@ def load(path, folder, kind, url=None):
 LEAFLET_PAGE = re.compile(r"^page-(\d+)(\.md|\.html)?$")
 
 
-def load_leaflets(folder):
+def load_leaflets(folder, drafts=False):
     """Each leaflets/<name>/ has a cover (index.md) and pages (page-N/index.md or page-N.md).
 
     A cover gets "pages", its published pages in order, and each page gets
     "leaflet" (its cover) and "number". A leaflet with no published pages is
-    left out.
+    left out. With drafts, unpublished covers and pages count as published.
     """
     leaflets = []
     for home in sorted(p for p in folder.iterdir() if p.is_dir()):
@@ -160,10 +163,10 @@ def load_leaflets(folder):
             page = load(source, home, "leaflet page", f"{url}page-{n}/")
             page.update(leaflet=cover, number=n, title=f"{cover['title']}, page {n}")
             pages.append(page)
-        cover["pages"] = sorted((p for p in pages if p["publish"]), key=lambda p: p["number"])
-        if cover["publish"] and cover["pages"]:
+        cover["pages"] = sorted((p for p in pages if p["publish"] or drafts), key=lambda p: p["number"])
+        if (cover["publish"] or drafts) and cover["pages"]:
             leaflets.append(cover)
-        elif cover["publish"]:
+        elif cover["publish"] or drafts:
             print(f"{cover['source'].relative_to(ROOT)}: no published pages yet, leaving it out")
     return leaflets
 
@@ -179,6 +182,15 @@ def time_tag(date):
     return f'<time datetime="{utc:%Y-%m-%dT%H:%MZ}">{utc:%d %b, %Y}</time>'
 
 
+# Only a --drafts build has drafts in it
+DRAFT = '<mark class="draft">draft</mark>'
+DRAFT_NOTE = f'<p>{DRAFT} Only scripts/serve shows this. It isn\'t published.</p>\n'
+
+
+def draft_mark(entry):
+    return "" if entry["publish"] else " " + DRAFT
+
+
 def tag_href(tag):
     return f"/blog/?q={quote(tag)}"
 
@@ -187,7 +199,7 @@ def post_list(posts, embedded=False):
     css = "embedded blog-posts" if embedded else "blog-posts"
     items = "\n".join(
         f'<li data-tags="{esc(",".join(p["tags"]))}"><span><i>{time_tag(p["date"])}</i></span>'
-        f'<a href="{p["url"]}">{esc(p["title"])}</a></li>'
+        f'<a href="{p["url"]}">{esc(p["title"])}</a>{draft_mark(p)}</li>'
         for p in posts
     )
     return f'<ul class="{css}">\n{items}\n</ul>'
@@ -249,7 +261,7 @@ def leaflet_months(cover):
 def cover_main(cover, content):
     first = cover["pages"][0]
     items = "\n".join(
-        f'<li><span>page {p["number"]}</span><a href="{p["url"]}">{esc(p["description"] or p["title"])}</a></li>'
+        f'<li><span>page {p["number"]}</span><a href="{p["url"]}">{esc(p["description"] or p["title"])}</a>{draft_mark(p)}</li>'
         for p in cover["pages"]
     )
     return (
@@ -451,13 +463,13 @@ def write_alias(alias, target):
 
 # Build
 
-def main():
+def main(drafts=False):
     entries = []
     for name, kind in (("posts", "post"), ("pages", "page")):
         folder = ROOT / name
         entries += [load(p, folder, kind) for p in find_sources(folder)]
-    entries = [e for e in entries if e["publish"]]
-    leaflets = load_leaflets(ROOT / "leaflets")
+    entries = [e for e in entries if e["publish"] or drafts]
+    leaflets = load_leaflets(ROOT / "leaflets", drafts)
     for cover in leaflets:
         entries += [cover] + cover["pages"]
 
@@ -513,6 +525,8 @@ def main():
         else:
             body_class = "post"
             main_html = f'<h1>{esc(e["title"])}</h1>\n<p><i>{time_tag(e["date"])}</i></p>\n{content}{tag_links(e["tags"])}'
+        if not e["publish"]:
+            main_html = DRAFT_NOTE + main_html
 
         page(
             Path(path) / "index.html",
@@ -549,8 +563,13 @@ def main():
     write_sitemap([e["url"] for e in entries] + ["/leaflets/"])
     leaflet_pages = sum(len(cover["pages"]) for cover in leaflets)
     others = len(entries) - len(posts) - len(leaflets) - leaflet_pages
-    print(f"Built {len(posts)} posts, {len(leaflets)} leaflets ({leaflet_pages} pages), and {others} other pages into public/")
+    unpublished = sum(not e["publish"] for e in entries)
+    with_drafts = f", with {unpublished} draft{'s' * (unpublished != 1)}," if drafts else ""
+    print(f"Built {len(posts)} posts, {len(leaflets)} leaflets ({leaflet_pages} pages), and {others} other pages{with_drafts} into public/")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main(drafts="--drafts" in sys.argv[1:])
+    except KeyboardInterrupt:
+        sys.exit(130)  # Ctrl-C, from scripts/serve: no traceback

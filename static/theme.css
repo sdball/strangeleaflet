@@ -530,6 +530,16 @@ span.linenos.special { color: var(--code-ink); background-color: var(--code-mark
   border-color: var(--brass);
 }
 
+/* Drafts, which only scripts/serve builds */
+mark.draft {
+  padding: .05rem .55rem;
+  font-family: var(--type);
+  font-size: .85rem;
+  color: var(--bg);
+  background: var(--brass);
+  border-radius: 999px;
+}
+
 /* Leaflets: a running head on each page (the leaflet's name, then its pages as eyelets) */
 .leaflet-head {
   display: flex;

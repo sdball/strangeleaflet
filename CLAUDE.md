@@ -9,9 +9,9 @@ isn't obvious from it.
 ## Running and checking
 
 ```sh
-scripts/serve            # build, then serve public/ at http://localhost:8000/
+scripts/serve            # build with drafts, serve at http://localhost:8000/, rebuild and reload on save
 scripts/serve --list     # Python servers still running, with their pids
-scripts/build            # rebuild while serve keeps running
+scripts/build            # build without drafts, as the deploy does
 scripts/check-links      # after a build
 git config core.hooksPath .githooks   # once per clone
 ```

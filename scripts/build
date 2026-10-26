@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build the site into public/.
-# Usage: scripts/build   (sets up .venv from requirements.txt the first time)
+# Usage: scripts/build [--drafts]   (sets up .venv from requirements.txt the first time)
 
 set -e
 
@@ -11,4 +11,4 @@ if [ ! -x "$root/.venv/bin/python" ]; then
   "$root/.venv/bin/pip" install --quiet -r "$root/requirements.txt"
 fi
 
-exec "$root/.venv/bin/python" "$root/scripts/build.py"
+exec "$root/.venv/bin/python" "$root/scripts/build.py" "$@"
