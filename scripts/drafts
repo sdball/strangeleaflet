@@ -1,0 +1,49 @@
+#!/bin/sh
+# Pick a draft (publish: false) post or leaflet page with gum and open it in $EDITOR.
+# Usage: scripts/drafts          choose one, most recently changed first
+#        scripts/drafts --list   just list them, one path per line
+
+set -e
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$root"
+
+# sources whose frontmatter says publish: false, newest first
+drafts() {
+  find posts leaflets -type f \( -name '*.md' -o -name '*.html' \) -print0 |
+    xargs -0 awk 'FNR == 1 && $0 != "---" { nextfile }
+                  FNR > 1 && $0 == "---" { nextfile }
+                  /^publish:[ \t]*false[ \t]*$/ { print FILENAME; nextfile }' |
+    xargs ls -t 2>/dev/null
+}
+
+# the title from a file's frontmatter, without surrounding quotes
+title() {
+  sed -n '2,/^---$/s/^title:[ \t]*//p' "$1" | head -1 | sed "s/^[\"']\(.*\)[\"']$/\1/"
+}
+
+case "$1" in
+  -l|--list) drafts; exit 0 ;;
+  -h|--help) sed -n '2,4s/^# \{0,1\}//p' "$0"; exit 0 ;;
+  -*) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
+esac
+
+found=$(drafts)
+if [ -z "$found" ]; then
+  echo "No drafts."
+  exit 0
+fi
+
+if ! command -v gum >/dev/null; then
+  echo "$found"
+  echo "Install gum to pick one: brew install gum" >&2
+  exit 1
+fi
+
+# gum shows the label before the tab and prints the path after it
+tab=$(printf '\t')
+choice=$(echo "$found" | while read -r f; do
+  printf '%s  (%s)\t%s\n' "$(title "$f")" "${f%/index.*}" "$f"
+done | gum choose --header "Open a draft:" --label-delimiter "$tab") || exit 0
+
+exec ${VISUAL:-${EDITOR:-vi}} "$choice"

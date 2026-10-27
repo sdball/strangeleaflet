@@ -14,6 +14,7 @@ static/theme.css         the theme (light and dark), copied to public/
 scripts/build            builds public/ (sets up .venv the first time)
 scripts/serve            builds with drafts, serves public/ at http://localhost:8000/, rebuilds on changes
 scripts/check-links      checks every internal link and image in public/
+scripts/drafts           picks a draft with gum and opens it in $EDITOR
 ```
 
 ## Run it locally
@@ -24,6 +25,7 @@ scripts/serve 9000   # or pick a port
 scripts/serve --list # Python servers still running, with their pids
 scripts/build        # build without drafts, the way the deploy does
 scripts/check-links  # after a build: any links or images that go nowhere?
+scripts/drafts       # pick a draft to open in $EDITOR (--list to just list them)
 ```
 
 While `scripts/serve` runs, saving anything in `posts/`, `pages/`,

@@ -13,6 +13,7 @@ scripts/serve            # build with drafts, serve at http://localhost:8000/, r
 scripts/serve --list     # Python servers still running, with their pids
 scripts/build            # build without drafts, as the deploy does
 scripts/check-links      # after a build
+scripts/drafts           # pick a draft (publish: false) to open in $EDITOR; --list
 git config core.hooksPath .githooks   # once per clone
 ```
 
