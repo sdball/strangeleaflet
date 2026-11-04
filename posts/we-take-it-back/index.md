@@ -10,6 +10,7 @@ Wow I'd hoped for good results from election day (November 3, 2026: yesterday) b
 
 <video controls playsinline preload="metadata" poster="poster.jpg" width="854" height="480" style="max-width:100%;height:auto">
   <source src="robin-hood-speech.mp4" type="video/mp4">
+  <track kind="captions" src="robin-hood-speech.vtt" srclang="en" label="English" default>
   <img src="poster.jpg" alt="Robin Hood looking back over his shoulder in a forest, from his speech in Robin Hood: Prince of Thieves">
 </video>
 
