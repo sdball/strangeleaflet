@@ -15,6 +15,7 @@ scripts/build            # build without drafts, as the deploy does
 scripts/check-links      # after a build
 scripts/drafts           # pick a draft (publish: false) to open in $EDITOR; --list
 git config core.hooksPath .githooks   # once per clone
+direnv allow                          # once per clone: .envrc puts scripts/ on PATH
 ```
 
 There's no test suite. `scripts/check-links` (also run by the deploy) fails on

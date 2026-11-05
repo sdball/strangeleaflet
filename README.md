@@ -28,6 +28,9 @@ scripts/check-links  # after a build: any links or images that go nowhere?
 scripts/drafts       # pick a draft to open in $EDITOR (--list to just list them)
 ```
 
+With [direnv](https://direnv.net/), run `direnv allow` once and `.envrc` puts
+`scripts/` on your PATH here, so `serve`, `build` and the rest work without the prefix.
+
 While `scripts/serve` runs, saving anything in `posts/`, `pages/`,
 `leaflets/`, `static/`, or `templates/` rebuilds the site, and open pages
 reload themselves. It includes drafts, each marked as one. Ctrl-C stops it.
