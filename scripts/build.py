@@ -350,7 +350,7 @@ def expand_embeds(body, posts):
 
 
 def absolute_urls(content, base):
-    """Make src and href values absolute, for content read outside the site (the feed)."""
+    """Make src, href, and poster values absolute, for content read outside the site (the feed)."""
 
     def fix(match):
         attr, quote_char, value = match.groups()
@@ -359,7 +359,7 @@ def absolute_urls(content, base):
         url = SITE_URL + value if value.startswith("/") else SITE_URL + base + value
         return f"{attr}={quote_char}{url}{quote_char}"
 
-    return re.sub(r"""\b(src|href)=(["'])(.*?)\2""", fix, content)
+    return re.sub(r"""\b(src|href|poster)=(["'])(.*?)\2""", fix, content)
 
 
 def render_content(entry, posts):

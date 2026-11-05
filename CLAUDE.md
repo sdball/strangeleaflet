@@ -66,6 +66,26 @@ Follow the existing ones (`penguin-walker.js`, `bitfields.js`):
 - Respect `prefers-reduced-motion`, keep tap targets 40–44px, label inputs.
 - No frameworks or CDNs.
 
+## Clips
+
+Short looping captures (gameplay, a moment from a movie) are MP4s, not GIFs: a
+GIF is 5–10× bigger and plays even when the reader prefers reduced motion.
+
+- Encode with `ffmpeg … -c:v libx264 -pix_fmt yuv420p -crf 24 -preset slow
+  -movflags +faststart -an clip.mp4`, from the original video when there is one
+  (sharper than going through a GIF). Pull a representative frame as `clip.jpg`.
+- Markup, as in the ElixirConf clips post: `<video loop muted playsinline controls
+  preload="metadata" poster="clip.jpg" width=… height=… aria-label="…">` holding
+  a `<source>` and the poster as an `<img alt="…">` fallback, then the
+  `<small>` caption. End the post with `<script type="module"
+  src="/loops.js"></script>` (`static/loops.js`, shared by every post that
+  has clips, so it's published even while a post using it is a draft), which
+  plays them like GIFs unless the reader prefers reduced motion; without
+  it (no JS, feed readers) they're posters with controls.
+- Skip stretches with full-screen flashing (Star Raiders' red alert).
+- Clips with sound that matters (the Robin Hood speech in `we-take-it-back`)
+  aren't loops: plain `controls` videos with a captions track.
+
 ## The feed
 
 `/feed/` is `public/feed/index.xml` (GitHub Pages serves `index.xml` as a

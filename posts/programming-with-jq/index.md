@@ -9,7 +9,10 @@ meta_description: jq is not only a powerful JSON command line parser, it's a ful
 
 So [jq is awesome](/command-line-tools-jq/). When you need to process JSON then jq is your factory line transforming the raw JSON ingredients into delicious ice cream sandwiches.
 
-![A machine rapidly producing ice cream sandwiches](ice_cream_sandwiches.gif)
+<video loop muted playsinline controls preload="metadata" poster="ice_cream_sandwiches.jpg" width="460" height="270" aria-label="A machine rapidly producing ice cream sandwiches">
+  <source src="ice_cream_sandwiches.mp4" type="video/mp4">
+  <img src="ice_cream_sandwiches.jpg" alt="A machine rapidly producing ice cream sandwiches">
+</video>
 
 But jq is even more awesome than that! We can actually _program_ using jq! Think of it like AWK. AWK is mostly thought of for easily parsing out fields of data but you can write programs with it as well.
 
@@ -166,3 +169,5 @@ $ jq -r -n -f phrase-reversals.jq
 Pretty cool! jq is an amazing programming tool that does even more than parse JSON! The next time you think you need to combine jq with another programming language to build up whatever you're trying to parse from some JSON you might able to do it all in jq itself in one call.
 
 Shout out to [Rosetta Code](http://rosettacode.org/wiki/Rosetta_Code) for being an awesome resource as always.
+
+<script type="module" src="/loops.js"></script>
