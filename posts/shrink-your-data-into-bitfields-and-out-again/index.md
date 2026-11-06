@@ -79,7 +79,7 @@ How? Incrementally!
 
 <code-choice-picker>
 
-The code here is Elixir. From [Constructing a bitfield by adding powers of two](#constructing-a-bitfield-by-adding-powers-of-two) on, it's also in JavaScript, Python, and Ruby.
+The code is in Elixir, and nearly all of it is in Ruby, JavaScript, and Python too.
 
 </code-choice-picker>
 
@@ -96,6 +96,8 @@ Let's say we have some data
 
 That's some good data. Now let's say we need to represent that data in code. A hash should do nicely.
 
+<code-choice>
+
 ```elixir
 data = %{
   "candy" => "peppermint patties",
@@ -105,7 +107,38 @@ data = %{
 }
 ```
 
+```ruby
+data = {
+  "candy" => "peppermint patties",
+  "location" => "Room 71",
+  "priority" => "urgent",
+  "status" => "empty"
+}
+```
+
+```javascript
+const data = {
+  candy: "peppermint patties",
+  location: "Room 71",
+  priority: "urgent",
+  status: "empty",
+};
+```
+
+```python
+data = {
+    "candy": "peppermint patties",
+    "location": "Room 71",
+    "priority": "urgent",
+    "status": "empty",
+}
+```
+
+</code-choice>
+
 That's some nice data! But if we serialize it to JSON we have 88 bytes!
+
+<code-choice>
 
 ```elixir
 data
@@ -114,11 +147,34 @@ data
 # => 88
 ```
 
+```ruby
+require "json"
+
+data.to_json.bytesize
+# => 88
+```
+
+```javascript
+JSON.stringify(data).length;
+// => 88
+```
+
+```python
+import json
+
+len(json.dumps(data, separators=(",", ":")))
+# => 88
+```
+
+</code-choice>
+
 What can we do to use less bytes?
 
 # Give up the keys
 
 If we agree on the keys ahead of time we can stop sending those around. That means we need to fix the data into an order and coordinate that among all systems using that data. If we're ok with that then that's big step!
+
+<code-choice>
 
 ```elixir
 smaller_data = [
@@ -133,6 +189,44 @@ smaller_data
 |> byte_size()
 # => 49
 ```
+
+```ruby
+smaller_data = [
+  "urgent",
+  "Room 71",
+  "empty",
+  "peppermint patties"
+]
+
+smaller_data.to_json.bytesize
+# => 49
+```
+
+```javascript
+const smallerData = [
+  "urgent",
+  "Room 71",
+  "empty",
+  "peppermint patties",
+];
+
+JSON.stringify(smallerData).length;
+// => 49
+```
+
+```python
+smaller_data = [
+    "urgent",
+    "Room 71",
+    "empty",
+    "peppermint patties",
+]
+
+len(json.dumps(smaller_data, separators=(",", ":")))
+# => 49
+```
+
+</code-choice>
 
 Wooo, 49 bytes! We've already gotten it down to 55% of the original size. We gave up some flexibility because we now we have a fixed set of keys in a fixed order but we saved a lot of space!
 
@@ -164,6 +258,8 @@ But if we know we have a limited set of possible candies then we don't need the 
 
 That means we if replace "peppermint patties" in our data with `0` (our arbitrary agreed upon value to represent that candy) then we can cut our byte usage down a bit.
 
+<code-choice>
+
 ```elixir
 even_smaller_data = [
   "urgent",
@@ -178,9 +274,49 @@ even_smaller_data
 # => 30
 ```
 
+```ruby
+even_smaller_data = [
+  "urgent",
+  "Room 71",
+  "empty",
+  0
+]
+
+even_smaller_data.to_json.bytesize
+# => 30
+```
+
+```javascript
+const evenSmallerData = [
+  "urgent",
+  "Room 71",
+  "empty",
+  0,
+];
+
+JSON.stringify(evenSmallerData).length;
+// => 30
+```
+
+```python
+even_smaller_data = [
+    "urgent",
+    "Room 71",
+    "empty",
+    0,
+]
+
+len(json.dumps(even_smaller_data, separators=(",", ":")))
+# => 30
+```
+
+</code-choice>
+
 Now we're down to 34% of the original size with that optimization alone!
 
 Let's squish down the other data by limiting their options.
+
+<code-choice>
 
 ```elixir
 priority = ~w(low medium high urgent)
@@ -198,7 +334,59 @@ candy = [
 ]
 ```
 
+```ruby
+priority = %w[low medium high urgent]
+
+location = 1..100 # i.e. Room 1 to Room 100
+
+status = ["not empty", "empty"]
+
+candy = [
+  "peppermint patties",
+  "m&ms",
+  "reese's pieces",
+  "butterfingers",
+  "cookies"
+]
+```
+
+```javascript
+const priority = ["low", "medium", "high", "urgent"];
+
+const location = { first: 1, last: 100 }; // i.e. Room 1 to Room 100
+
+const status = ["not empty", "empty"];
+
+const candy = [
+  "peppermint patties",
+  "m&ms",
+  "reese's pieces",
+  "butterfingers",
+  "cookies",
+];
+```
+
+```python
+priority = ["low", "medium", "high", "urgent"]
+
+location = range(1, 101)  # i.e. Room 1 to Room 100
+
+status = ["not empty", "empty"]
+
+candy = [
+    "peppermint patties",
+    "m&ms",
+    "reese's pieces",
+    "butterfingers",
+    "cookies",
+]
+```
+
+</code-choice>
+
 With those contraints our original data becomes much smaller still. Priority can be the value `3` (urgent), location can be `71` (room 71), status can be `1` (empty), and candy can be `0` (peppermint patties).
+
+<code-choice>
 
 ```elixir
 even_smaller_still_data = [3, 71, 1, 0]
@@ -209,9 +397,34 @@ even_smaller_still_data
 # => 10
 ```
 
+```ruby
+even_smaller_still_data = [3, 71, 1, 0]
+
+even_smaller_still_data.to_json.bytesize
+# => 10
+```
+
+```javascript
+const evenSmallerStillData = [3, 71, 1, 0];
+
+JSON.stringify(evenSmallerStillData).length;
+// => 10
+```
+
+```python
+even_smaller_still_data = [3, 71, 1, 0]
+
+len(json.dumps(even_smaller_still_data, separators=(",", ":")))
+# => 10
+```
+
+</code-choice>
+
 10 bytes! We're down to around 11% of the size of the original data!
 
 At this point we could use some code that has explicit knowledge of the data structure to serialize the data down and parse it back out.
+
+<code-choice>
 
 ```elixir
 defmodule CandyData do
@@ -275,6 +488,133 @@ defmodule CandyData do
 end
 ```
 
+```ruby
+module CandyData
+  PRIORITY = %w[low medium high urgent]
+  LOCATION = 1..100
+  STATUS = ["not empty", "empty"]
+  CANDY = [
+    "peppermint patties",
+    "m&ms",
+    "reese's pieces",
+    "butterfingers",
+    "cookies"
+  ]
+
+  def self.serialize(data)
+    [
+      PRIORITY.index(data["priority"]),
+      room(data["location"]),
+      STATUS.index(data["status"]),
+      CANDY.index(data["candy"])
+    ]
+  end
+
+  def self.deserialize((priority, location, status, candy))
+    {
+      "priority" => PRIORITY[priority],
+      "location" => LOCATION.cover?(location) ? "Room #{location}" : nil,
+      "status" => STATUS[status],
+      "candy" => CANDY[candy]
+    }
+  end
+
+  def self.room(location)
+    room = Integer(location.delete_prefix("Room "))
+    raise ArgumentError, "no such room: #{location}" unless LOCATION.cover?(room)
+
+    room
+  end
+end
+```
+
+```javascript
+const CandyData = {
+  priority: ["low", "medium", "high", "urgent"],
+  location: { first: 1, last: 100 },
+  status: ["not empty", "empty"],
+  candy: [
+    "peppermint patties",
+    "m&ms",
+    "reese's pieces",
+    "butterfingers",
+    "cookies",
+  ],
+
+  serialize(data) {
+    return [
+      this.priority.indexOf(data.priority),
+      this.room(data.location),
+      this.status.indexOf(data.status),
+      this.candy.indexOf(data.candy),
+    ];
+  },
+
+  deserialize([priority, location, status, candy]) {
+    return {
+      priority: this.priority[priority],
+      location: this.isRoom(location) ? `Room ${location}` : null,
+      status: this.status[status],
+      candy: this.candy[candy],
+    };
+  },
+
+  room(location) {
+    const room = Number(location.replace(/^Room /, ""));
+    if (!this.isRoom(room)) throw new Error(`no such room: ${location}`);
+    return room;
+  },
+
+  isRoom(room) {
+    return Number.isInteger(room) && room >= this.location.first && room <= this.location.last;
+  },
+};
+```
+
+```python
+class CandyData:
+    PRIORITY = ["low", "medium", "high", "urgent"]
+    LOCATION = range(1, 101)
+    STATUS = ["not empty", "empty"]
+    CANDY = [
+        "peppermint patties",
+        "m&ms",
+        "reese's pieces",
+        "butterfingers",
+        "cookies",
+    ]
+
+    @classmethod
+    def serialize(cls, data):
+        return [
+            cls.PRIORITY.index(data["priority"]),
+            cls.room(data["location"]),
+            cls.STATUS.index(data["status"]),
+            cls.CANDY.index(data["candy"]),
+        ]
+
+    @classmethod
+    def deserialize(cls, values):
+        priority, location, status, candy = values
+        return {
+            "priority": cls.PRIORITY[priority],
+            "location": f"Room {location}" if location in cls.LOCATION else None,
+            "status": cls.STATUS[status],
+            "candy": cls.CANDY[candy],
+        }
+
+    @classmethod
+    def room(cls, location):
+        room = int(location.removeprefix("Room "))
+        if room not in cls.LOCATION:
+            raise ValueError(f"no such room: {location}")
+        return room
+```
+
+</code-choice>
+
+<code-choice>
+
 ```elixir
 data = %{
   "candy" => "peppermint patties",
@@ -293,6 +633,63 @@ data
 #=> }
 ```
 
+```ruby
+data = {
+  "candy" => "peppermint patties",
+  "location" => "Room 71",
+  "priority" => "urgent",
+  "status" => "empty"
+}
+
+CandyData.serialize(data) # => [3, 71, 1, 0]
+
+CandyData.deserialize(CandyData.serialize(data))
+# => {"priority" => "urgent",
+#     "location" => "Room 71",
+#     "status" => "empty",
+#     "candy" => "peppermint patties"}
+```
+
+```javascript
+const data = {
+  candy: "peppermint patties",
+  location: "Room 71",
+  priority: "urgent",
+  status: "empty",
+};
+
+CandyData.serialize(data); // => [3, 71, 1, 0]
+
+CandyData.deserialize(CandyData.serialize(data));
+// => {
+//   priority: "urgent",
+//   location: "Room 71",
+//   status: "empty",
+//   candy: "peppermint patties",
+// }
+```
+
+```python
+data = {
+    "candy": "peppermint patties",
+    "location": "Room 71",
+    "priority": "urgent",
+    "status": "empty",
+}
+
+CandyData.serialize(data)  # => [3, 71, 1, 0]
+
+CandyData.deserialize(CandyData.serialize(data))
+# => {'priority': 'urgent',
+#     'location': 'Room 71',
+#     'status': 'empty',
+#     'candy': 'peppermint patties'}
+```
+
+</code-choice>
+
+<code-choice>
+
 ```elixir
 other_data = %{
   "priority"=>"low",
@@ -310,6 +707,61 @@ other_data
 #=>   "status" => "not empty"
 #=> }
 ```
+
+```ruby
+other_data = {
+  "priority" => "low",
+  "location" => "Room 23",
+  "status" => "not empty",
+  "candy" => "m&ms"
+}
+
+CandyData.serialize(other_data) # => [0, 23, 0, 1]
+
+CandyData.deserialize(CandyData.serialize(other_data))
+# => {"priority" => "low",
+#     "location" => "Room 23",
+#     "status" => "not empty",
+#     "candy" => "m&ms"}
+```
+
+```javascript
+const otherData = {
+  priority: "low",
+  location: "Room 23",
+  status: "not empty",
+  candy: "m&ms",
+};
+
+CandyData.serialize(otherData); // => [0, 23, 0, 1]
+
+CandyData.deserialize(CandyData.serialize(otherData));
+// => {
+//   priority: "low",
+//   location: "Room 23",
+//   status: "not empty",
+//   candy: "m&ms",
+// }
+```
+
+```python
+other_data = {
+    "priority": "low",
+    "location": "Room 23",
+    "status": "not empty",
+    "candy": "m&ms",
+}
+
+CandyData.serialize(other_data)  # => [0, 23, 0, 1]
+
+CandyData.deserialize(CandyData.serialize(other_data))
+# => {'priority': 'low',
+#     'location': 'Room 23',
+#     'status': 'not empty',
+#     'candy': 'm&ms'}
+```
+
+</code-choice>
 
 That's pretty efficient, but since we're already paying the cost to have custom code for serializing and parsing the data we can go even further! Our data _still_ has some lurking flexibility that we could trade for a decrease in size. The data values themselves!
 
@@ -371,17 +823,40 @@ Great! What would it look like to represent our sample data in these bits?
 
 Let's start off simply representing each value as a base-2 string.
 
+<code-choice>
+
 ```elixir
 data
 |> CandyData.serialize()               #=> [3, 71, 1, 0]
 |> Enum.map(&Integer.to_string(&1, 2)) #=> ["11", "1000111", "1", "0"]
 ```
 
+```ruby
+CandyData.serialize(data) # => [3, 71, 1, 0]
+  .map { |n| n.to_s(2) }  # => ["11", "1000111", "1", "0"]
+```
+
+```javascript
+CandyData.serialize(data)     // => [3, 71, 1, 0]
+  .map((n) => n.toString(2)); // => ["11", "1000111", "1", "0"]
+```
+
+```python
+CandyData.serialize(data)  # => [3, 71, 1, 0]
+
+[format(n, "b") for n in CandyData.serialize(data)]
+# => ['11', '1000111', '1', '0']
+```
+
+</code-choice>
+
 Right now you may be thinking how is turning base-10 numbers into base-2 strings any help? Serializing something like "10" to JSON would be twice the data needed to serialize the single digit `2`. How can that be a savings?"
 
 You are right on! If we were to represent our bits with one digit per bit in JSON that would be much too large! Instead we'll push all of our data together into a bitfield integer and represent _that_ as JSON.
 
 Currently we've gotten our data to an array of base-2 number strings instead of array of base-10 numbers. So yeah that's not a size reduction! Not at all!
+
+<code-choice>
 
 ```elixir
 json_base10_numbers #=> "[3,71,1,0]"
@@ -390,6 +865,36 @@ json_base10_numbers #=> "[3,71,1,0]"
 json_base2_strings  #=> "[\"11\",\"1000111\",\"1\",\"0\"]"
 |> byte_size()      #=> 24
 ```
+
+```ruby
+json_base10_numbers = [3, 71, 1, 0].to_json # => "[3,71,1,0]"
+json_base10_numbers.bytesize                # => 10
+
+json_base2_strings = ["11", "1000111", "1", "0"].to_json
+# => "[\"11\",\"1000111\",\"1\",\"0\"]"
+json_base2_strings.bytesize # => 24
+```
+
+```javascript
+const jsonBase10Numbers = JSON.stringify([3, 71, 1, 0]); // => "[3,71,1,0]"
+jsonBase10Numbers.length; // => 10
+
+const jsonBase2Strings = JSON.stringify(["11", "1000111", "1", "0"]);
+// => "[\"11\",\"1000111\",\"1\",\"0\"]"
+jsonBase2Strings.length; // => 24
+```
+
+```python
+json_base10_numbers = json.dumps([3, 71, 1, 0], separators=(",", ":"))
+# => '[3,71,1,0]'
+len(json_base10_numbers)  # => 10
+
+json_base2_strings = json.dumps(["11", "1000111", "1", "0"], separators=(",", ":"))
+# => '["11","1000111","1","0"]'
+len(json_base2_strings)  # => 24
+```
+
+</code-choice>
 
 How is this going to save us any space? We're gonna squish those bits! Instead of keeping all of those bits apart we'll push them right next to each other and treat _that_ resulting value as a single number.
 
@@ -406,6 +911,8 @@ Made up of these components
 | 11       | 1000111  |   1    |   000 |
 
 Would that save us space? Absolutely! Because we can represent that base-2 string of bits as an integer of whatever base we like!
+
+<code-choice>
 
 ```elixir
 bitfield = 0b1110001111000
@@ -424,6 +931,44 @@ bitfield = 0b1110001111000
 end)
 ```
 
+```ruby
+bitfield = 0b1110001111000
+
+[2, 8, 10, 12, 16].each do |base|
+  representation = bitfield.to_s(base).upcase
+  puts "Base #{base}:".ljust(9) + representation
+end
+```
+
+```javascript
+const bitfield = 0b1110001111000;
+
+for (const base of [2, 8, 10, 12, 16]) {
+  const representation = bitfield.toString(base).toUpperCase();
+  console.log(`Base ${base}:`.padEnd(9) + representation);
+}
+```
+
+```python
+def to_base(number, base):
+    # Python's format() does bases 2, 8, 10, and 16, but not 12
+    digits = "0123456789ABCDEF"
+    result = ""
+    while number:
+        number, digit = divmod(number, base)
+        result = digits[digit] + result
+    return result or "0"
+
+
+bitfield = 0b1110001111000
+
+for base in [2, 8, 10, 12, 16]:
+    representation = to_base(bitfield, base)
+    print(f"Base {base}:".ljust(9) + representation)
+```
+
+</code-choice>
+
 ```
 Base 2:  1110001111000
 Base 8:  16170
@@ -440,6 +985,8 @@ It might seem like we could simply take our individual integer values we've deri
 
 As a quick review we've gotten our data values into base-10 integers:
 
+<code-choice>
+
 ```elixir
 data = %{
   "candy" => "peppermint patties",
@@ -450,6 +997,41 @@ data = %{
 
 CandyData.serialize(data) #=> [3, 71, 1, 0]
 ```
+
+```ruby
+data = {
+  "candy" => "peppermint patties",
+  "location" => "Room 71",
+  "priority" => "urgent",
+  "status" => "empty"
+}
+
+CandyData.serialize(data) # => [3, 71, 1, 0]
+```
+
+```javascript
+const data = {
+  candy: "peppermint patties",
+  location: "Room 71",
+  priority: "urgent",
+  status: "empty",
+};
+
+CandyData.serialize(data); // => [3, 71, 1, 0]
+```
+
+```python
+data = {
+    "candy": "peppermint patties",
+    "location": "Room 71",
+    "priority": "urgent",
+    "status": "empty",
+}
+
+CandyData.serialize(data)  # => [3, 71, 1, 0]
+```
+
+</code-choice>
 
 Let's convert them individually to base-2
 
@@ -466,6 +1048,8 @@ Check out that last `0`. Our candy field is _supposed_ to have three bits of dat
 
 Let's see that problem directly:
 
+<code-choice>
+
 ```elixir
 ["11", "1000111", "1", "0"]
 |> Enum.join()          #=> "11100011110"
@@ -476,16 +1060,65 @@ Let's see that problem directly:
 |> String.to_integer(2) #=> 7288
 ```
 
+```ruby
+["11", "1000111", "1", "0"]
+  .join   # => "11100011110"
+  .to_i(2) # => 1822
+
+["11", "1000111", "1", "000"]
+  .join   # => "1110001111000"
+  .to_i(2) # => 7288
+```
+
+```javascript
+["11", "1000111", "1", "0"].join(""); // => "11100011110"
+parseInt("11100011110", 2);           // => 1822
+
+["11", "1000111", "1", "000"].join(""); // => "1110001111000"
+parseInt("1110001111000", 2);           // => 7288
+```
+
+```python
+"".join(["11", "1000111", "1", "0"])  # => '11100011110'
+int("11100011110", 2)  # => 1822
+
+"".join(["11", "1000111", "1", "000"])  # => '1110001111000'
+int("1110001111000", 2)  # => 7288
+```
+
+</code-choice>
+
 7288 is NOT 1822! Let's compare what happens when we convert those back to base-2
+
+<code-choice>
 
 ```elixir
 Integer.to_string(1822, 2) #=> "11100011110"
 Integer.to_string(7288, 2) #=> "1110001111000"
 ```
 
+```ruby
+1822.to_s(2) # => "11100011110"
+7288.to_s(2) # => "1110001111000"
+```
+
+```javascript
+(1822).toString(2); // => "11100011110"
+(7288).toString(2); // => "1110001111000"
+```
+
+```python
+format(1822, "b")  # => '11100011110'
+format(7288, "b")  # => '1110001111000'
+```
+
+</code-choice>
+
 That difference might look like no big deal, but it's literally just like the difference between the number 23 and the number 2300. Those zeros on the right are very important!
 
 Could we solve the problem by simply padding our number to 13 bits? It might seem that way.
+
+<code-choice>
 
 ```elixir
 1822                            #=> 1822
@@ -498,6 +1131,40 @@ Could we solve the problem by simply padding our number to 13 bits? It might see
 |> String.pad_trailing(13, "0") #=> "1110001111000"
 |> String.to_integer(2)         #=> 7288
 ```
+
+```ruby
+1822               # => 1822
+  .to_s(2)         # => "11100011110"
+  .ljust(13, "0")  # => "1110001111000"
+  .to_i(2)         # => 7288
+
+7288               # => 7288
+  .to_s(2)         # => "1110001111000"
+  .ljust(13, "0")  # => "1110001111000"
+  .to_i(2)         # => 7288
+```
+
+```javascript
+(1822).toString(2);                 // => "11100011110"
+(1822).toString(2).padEnd(13, "0"); // => "1110001111000"
+parseInt("1110001111000", 2);       // => 7288
+
+(7288).toString(2);                 // => "1110001111000"
+(7288).toString(2).padEnd(13, "0"); // => "1110001111000"
+parseInt("1110001111000", 2);       // => 7288
+```
+
+```python
+format(1822, "b")  # => '11100011110'
+format(1822, "b").ljust(13, "0")  # => '1110001111000'
+int("1110001111000", 2)  # => 7288
+
+format(7288, "b")  # => '1110001111000'
+format(7288, "b").ljust(13, "0")  # => '1110001111000'
+int("1110001111000", 2)  # => 7288
+```
+
+</code-choice>
 
 But no, we can't simply solve the issue by padding the entire string. Padding the number with zeros only works in this case because the `0` value happens in the last field. If the `0` were in a multi-bit field in the middle of the bitfield then no amount of left or right padding would fix the problem.
 
@@ -630,6 +1297,8 @@ Adding those all up and we get our bitfield value. If we've done things right th
 
 Success! But let's double check by working backwards.
 
+<code-choice>
+
 ```elixir
 7288
 |> Integer.to_string(2)
@@ -637,6 +1306,25 @@ Success! But let's double check by working backwards.
 |> then(fn [_all | rest] -> rest end)
 #=> ["11", "1000111", "1", "000"]
 ```
+
+```ruby
+7288.to_s(2).match(/\A(..)(.......)(.)(...)\z/).captures
+# => ["11", "1000111", "1", "000"]
+```
+
+```javascript
+(7288).toString(2).match(/^(..)(.......)(.)(...)$/).slice(1);
+// => ["11", "1000111", "1", "000"]
+```
+
+```python
+import re
+
+re.fullmatch(r"(..)(.......)(.)(...)", format(7288, "b")).groups()
+# => ('11', '1000111', '1', '000')
+```
+
+</code-choice>
 
 Let's break that down once again, smallest to largest (candy, status, location, priority)
 
@@ -733,6 +1421,31 @@ defmodule Bitfield do
 end
 ```
 
+```ruby
+class Bitfield
+  Field = Struct.new(:name, :length, :units)
+
+  attr_reader :fields, :exponent
+
+  def initialize
+    @fields = []
+    @exponent = 0
+  end
+
+  def add_field(name, bits)
+    @fields << Field.new(name, bits, 2**@exponent)
+    @exponent += bits
+    self
+  end
+
+  def to_integer(values)
+    raise ArgumentError, "invalid values" unless values.size == @fields.size
+
+    @fields.sum { |field| field.units * values.fetch(field.name) }
+  end
+end
+```
+
 ```javascript
 class Bitfield {
   fields = [];
@@ -780,31 +1493,6 @@ class Bitfield:
         return sum(f.units * values[f.name] for f in self.fields)
 ```
 
-```ruby
-class Bitfield
-  Field = Struct.new(:name, :length, :units)
-
-  attr_reader :fields, :exponent
-
-  def initialize
-    @fields = []
-    @exponent = 0
-  end
-
-  def add_field(name, bits)
-    @fields << Field.new(name, bits, 2**@exponent)
-    @exponent += bits
-    self
-  end
-
-  def to_integer(values)
-    raise ArgumentError, "invalid values" unless values.size == @fields.size
-
-    @fields.sum { |field| field.units * values.fetch(field.name) }
-  end
-end
-```
-
 </code-choice>
 
 To use this `Bitfield` module we need to build up a bitfield that knows about our fields, their order, and their bit lengths. For ordering we'll simply go with the order that we add the fields
@@ -818,6 +1506,14 @@ bf =
   |> Bitfield.add_field(:status, 1)
   |> Bitfield.add_field(:location, 7)
   |> Bitfield.add_field(:priority, 2)
+```
+
+```ruby
+bf = Bitfield.new
+  .add_field(:candy, 3)
+  .add_field(:status, 1)
+  .add_field(:location, 7)
+  .add_field(:priority, 2)
 ```
 
 ```javascript
@@ -838,14 +1534,6 @@ bf = (
 )
 ```
 
-```ruby
-bf = Bitfield.new
-  .add_field(:candy, 3)
-  .add_field(:status, 1)
-  .add_field(:location, 7)
-  .add_field(:priority, 2)
-```
-
 </code-choice>
 
 After adding all of those fields our `Bitfield` struct looks like this. Note how the units have already been determined for each field and we know the next base-2 exponent we'd use if we were to add another field.
@@ -862,6 +1550,16 @@ After adding all of those fields our `Bitfield` struct looks like this. Note how
   ],
   exponent: 13
 }
+```
+
+```ruby
+#<Bitfield:0x00000001202502d0
+ @exponent=13,
+ @fields=
+  [#<struct Bitfield::Field name=:candy, length=3, units=1>,
+   #<struct Bitfield::Field name=:status, length=1, units=8>,
+   #<struct Bitfield::Field name=:location, length=7, units=16>,
+   #<struct Bitfield::Field name=:priority, length=2, units=2048>]>
 ```
 
 ```javascript
@@ -884,16 +1582,6 @@ Bitfield(fields=[Field(name='candy', length=3, units=1),
          exponent=13)
 ```
 
-```ruby
-#<Bitfield:0x00000001202502d0
- @exponent=13,
- @fields=
-  [#<struct Bitfield::Field name=:candy, length=3, units=1>,
-   #<struct Bitfield::Field name=:status, length=1, units=8>,
-   #<struct Bitfield::Field name=:location, length=7, units=16>,
-   #<struct Bitfield::Field name=:priority, length=2, units=2048>]>
-```
-
 </code-choice>
 
 We can then use `Bitfield.to_integer/2` to generate a bitfield integer by passing it the `Bitfield` struct and a map of names to values.
@@ -905,6 +1593,11 @@ Bitfield.to_integer(bf, %{candy: 0, status: 1, location: 71, priority: 3})
 # => 7288
 ```
 
+```ruby
+bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
+# => 7288
+```
+
 ```javascript
 bf.toInteger({ candy: 0, status: 1, location: 71, priority: 3 });
 // => 7288
@@ -912,11 +1605,6 @@ bf.toInteger({ candy: 0, status: 1, location: 71, priority: 3 });
 
 ```python
 bf.to_integer({"candy": 0, "status": 1, "location": 71, "priority": 3})
-# => 7288
-```
-
-```ruby
-bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
 # => 7288
 ```
 
@@ -943,7 +1631,7 @@ That's great because instead of doing the work to figure out the unit powers of 
 
 For an example let's build this bitfield up with left shift manually. Of course there are also many ways we could nicely wrap it up into a module.
 
-Note: JavaScript, Python, and Ruby spell bitwise left shift `<<`. In Elixir it's `<<<` from the `Bitwise` module.
+Note: Ruby, JavaScript, and Python spell bitwise left shift `<<`. In Elixir it's `<<<` from the `Bitwise` module.
 
 <code-choice>
 
@@ -998,6 +1686,58 @@ bitfield = bitfield + (priority_value <<< priority_position)
 # => 7288
 
 bitfield |> Integer.to_string(2)
+# => "1110001111000"
+```
+
+```ruby
+bitfield = 0
+
+# -- candy --------
+
+candy_value = 0
+candy_bits = 3
+candy_position = 0
+
+bitfield = bitfield + (candy_value << candy_position)
+# => 0
+
+bitfield.to_s(2)
+# => "0"
+
+# -- status -------
+
+status_value = 1
+status_bits = 1
+status_position = candy_position + candy_bits
+
+bitfield = bitfield + (status_value << status_position)
+# => 8
+
+bitfield.to_s(2)
+# => "1000"
+
+# -- location -----
+
+location_value = 71
+location_bits = 7
+location_position = status_position + status_bits
+
+bitfield = bitfield + (location_value << location_position)
+# => 1144
+
+bitfield.to_s(2)
+# => "10001111000"
+
+# -- priority -----
+
+priority_value = 3
+priority_bits = 2
+priority_position = location_position + location_bits
+
+bitfield = bitfield + (priority_value << priority_position)
+# => 7288
+
+bitfield.to_s(2)
 # => "1110001111000"
 ```
 
@@ -1108,58 +1848,6 @@ format(bitfield, "b")
 # => '1110001111000'
 ```
 
-```ruby
-bitfield = 0
-
-# -- candy --------
-
-candy_value = 0
-candy_bits = 3
-candy_position = 0
-
-bitfield = bitfield + (candy_value << candy_position)
-# => 0
-
-bitfield.to_s(2)
-# => "0"
-
-# -- status -------
-
-status_value = 1
-status_bits = 1
-status_position = candy_position + candy_bits
-
-bitfield = bitfield + (status_value << status_position)
-# => 8
-
-bitfield.to_s(2)
-# => "1000"
-
-# -- location -----
-
-location_value = 71
-location_bits = 7
-location_position = status_position + status_bits
-
-bitfield = bitfield + (location_value << location_position)
-# => 1144
-
-bitfield.to_s(2)
-# => "10001111000"
-
-# -- priority -----
-
-priority_value = 3
-priority_bits = 2
-priority_position = location_position + location_bits
-
-bitfield = bitfield + (priority_value << priority_position)
-# => 7288
-
-bitfield.to_s(2)
-# => "1110001111000"
-```
-
 </code-choice>
 
 Let's call that done for creating a bitfield. Hooray!
@@ -1223,6 +1911,19 @@ import Bitwise
 55 >>> 9 #=> 0
 ```
 
+```ruby
+55 >> 0 #=> 55
+55 >> 1 #=> 27
+55 >> 2 #=> 13
+55 >> 3 #=> 6
+55 >> 4 #=> 3
+55 >> 5 #=> 1
+55 >> 6 #=> 0
+55 >> 7 #=> 0
+55 >> 8 #=> 0
+55 >> 9 #=> 0
+```
+
 ```javascript
 55 >> 0 // => 55
 55 >> 1 // => 27
@@ -1237,19 +1938,6 @@ import Bitwise
 ```
 
 ```python
-55 >> 0 #=> 55
-55 >> 1 #=> 27
-55 >> 2 #=> 13
-55 >> 3 #=> 6
-55 >> 4 #=> 3
-55 >> 5 #=> 1
-55 >> 6 #=> 0
-55 >> 7 #=> 0
-55 >> 8 #=> 0
-55 >> 9 #=> 0
-```
-
-```ruby
 55 >> 0 #=> 55
 55 >> 1 #=> 27
 55 >> 2 #=> 13
@@ -1295,6 +1983,27 @@ end
 55 >>> 9 =  0: "     0"
 ```
 
+```ruby
+(0..9).each do |n|
+  result = 55 >> n
+  base2 = result.to_s(2).rjust(6)
+  puts %(55 >> #{n} = #{result.to_s.rjust(2)}: "#{base2}")
+end
+```
+
+```ruby
+55 >> 0 = 55: "110111"
+55 >> 1 = 27: " 11011"
+55 >> 2 = 13: "  1101"
+55 >> 3 =  6: "   110"
+55 >> 4 =  3: "    11"
+55 >> 5 =  1: "     1"
+55 >> 6 =  0: "     0"
+55 >> 7 =  0: "     0"
+55 >> 8 =  0: "     0"
+55 >> 9 =  0: "     0"
+```
+
 ```javascript
 for (let n = 0; n <= 9; n++) {
   const result = 55 >> n;
@@ -1323,27 +2032,6 @@ for n in range(10):
 ```
 
 ```python
-55 >> 0 = 55: "110111"
-55 >> 1 = 27: " 11011"
-55 >> 2 = 13: "  1101"
-55 >> 3 =  6: "   110"
-55 >> 4 =  3: "    11"
-55 >> 5 =  1: "     1"
-55 >> 6 =  0: "     0"
-55 >> 7 =  0: "     0"
-55 >> 8 =  0: "     0"
-55 >> 9 =  0: "     0"
-```
-
-```ruby
-(0..9).each do |n|
-  result = 55 >> n
-  base2 = result.to_s(2).rjust(6)
-  puts %(55 >> #{n} = #{result.to_s.rjust(2)}: "#{base2}")
-end
-```
-
-```ruby
 55 >> 0 = 55: "110111"
 55 >> 1 = 27: " 11011"
 55 >> 2 = 13: "  1101"
@@ -1394,17 +2082,17 @@ import Bitwise
 # => 8
 ```
 
+```ruby
+0b00011011 & 0b1100
+# => 8
+```
+
 ```javascript
 0b00011011 & 0b1100;
 // => 8
 ```
 
 ```python
-0b00011011 & 0b1100
-# => 8
-```
-
-```ruby
 0b00011011 & 0b1100
 # => 8
 ```
@@ -1429,10 +2117,29 @@ Essentially the bitwise AND operator compares two binary numbers digit by digit 
 00001100 - the comparison number
 ```
 
+<code-choice>
+
 ```elixir
 0b00011011 #=> 27
 0b00001100 #=> 12
 ```
+
+```ruby
+0b00011011 # => 27
+0b00001100 # => 12
+```
+
+```javascript
+0b00011011; // => 27
+0b00001100; // => 12
+```
+
+```python
+0b00011011  # => 27
+0b00001100  # => 12
+```
+
+</code-choice>
 
 <code-choice>
 
@@ -1443,6 +2150,13 @@ import Bitwise
 27 &&& 12
 |> Integer.to_string(2)
 #=> "1000"
+```
+
+```ruby
+27 & 12 # => 8
+
+(27 & 12).to_s(2)
+# => "1000"
 ```
 
 ```javascript
@@ -1457,13 +2171,6 @@ import Bitwise
 
 format(27 & 12, "b")
 # => '1000'
-```
-
-```ruby
-27 & 12 # => 8
-
-(27 & 12).to_s(2)
-# => "1000"
 ```
 
 </code-choice>
@@ -1502,6 +2209,22 @@ extracted >>> 2
 #=> 2
 ```
 
+```ruby
+# extract bits
+extracted = 0b00011011 & 0b1100
+# => 8
+
+# you don't need the leading zeros on the match
+# but it can make the operation easier to read
+0b00011011 &  # bitfield value and bitwise AND
+0b00001100    # binary value to get out the bits
+# => 8
+
+# right shift the result by two bits
+extracted >> 2
+# => 2
+```
+
 ```javascript
 // extract bits
 const extracted = 0b00011011 & 0b1100;
@@ -1527,22 +2250,6 @@ extracted = 0b00011011 & 0b1100
 # but it can make the operation easier to read
 (0b00011011 &  # bitfield value and bitwise AND
  0b00001100)   # binary value to get out the bits
-# => 8
-
-# right shift the result by two bits
-extracted >> 2
-# => 2
-```
-
-```ruby
-# extract bits
-extracted = 0b00011011 & 0b1100
-# => 8
-
-# you don't need the leading zeros on the match
-# but it can make the operation easier to read
-0b00011011 &  # bitfield value and bitwise AND
-0b00001100    # binary value to get out the bits
 # => 8
 
 # right shift the result by two bits
@@ -1630,6 +2337,29 @@ bitfield #=> 7288
 |> Bitwise.bsr(location_shift_right) #=> 71
 ```
 
+```ruby
+bitfield = 0b1110001111000
+
+candy = 0b0000000000111
+candy_shift_right = 0
+
+status = 0b0000000001000
+status_shift_right = 3
+
+location = 0b0011111110000
+location_shift_right = 4
+
+priority = 0b1100000000000
+priority_shift_right = 11
+
+bitfield # => 7288
+bitfield & status # => 8
+(bitfield & status) >> status_shift_right # => 1
+
+bitfield & location # => 1136
+(bitfield & location) >> location_shift_right # => 71
+```
+
 ```javascript
 const bitfield = 0b1110001111000;
 
@@ -1674,29 +2404,6 @@ bitfield & status  # => 8
 
 bitfield & location  # => 1136
 (bitfield & location) >> location_shift_right  # => 71
-```
-
-```ruby
-bitfield = 0b1110001111000
-
-candy = 0b0000000000111
-candy_shift_right = 0
-
-status = 0b0000000001000
-status_shift_right = 3
-
-location = 0b0011111110000
-location_shift_right = 4
-
-priority = 0b1100000000000
-priority_shift_right = 11
-
-bitfield # => 7288
-bitfield & status # => 8
-(bitfield & status) >> status_shift_right # => 1
-
-bitfield & location # => 1136
-(bitfield & location) >> location_shift_right # => 71
 ```
 
 </code-choice>
@@ -1763,6 +2470,38 @@ defmodule Bitfield.V2 do
 end
 ```
 
+```ruby
+class BitfieldV2
+  Field = Struct.new(:name, :length, :position, :units)
+
+  attr_reader :fields, :exponent
+
+  def initialize
+    @fields = []
+    @exponent = 0
+  end
+
+  def add_field(name, bits)
+    @fields << Field.new(name, bits, @exponent, 2**@exponent)
+    @exponent += bits
+    self
+  end
+
+  def to_integer(values)
+    raise ArgumentError, "invalid values" unless values.size == @fields.size
+
+    @fields.sum { |field| field.units * values.fetch(field.name) }
+  end
+
+  def to_fields(value)
+    @fields.map do |field|
+      mask = (1 << field.length) - 1
+      { field.name => (value >> field.position) & mask }
+    end
+  end
+end
+```
+
 ```javascript
 class BitfieldV2 {
   fields = [];
@@ -1824,38 +2563,6 @@ class BitfieldV2:
         ]
 ```
 
-```ruby
-class BitfieldV2
-  Field = Struct.new(:name, :length, :position, :units)
-
-  attr_reader :fields, :exponent
-
-  def initialize
-    @fields = []
-    @exponent = 0
-  end
-
-  def add_field(name, bits)
-    @fields << Field.new(name, bits, @exponent, 2**@exponent)
-    @exponent += bits
-    self
-  end
-
-  def to_integer(values)
-    raise ArgumentError, "invalid values" unless values.size == @fields.size
-
-    @fields.sum { |field| field.units * values.fetch(field.name) }
-  end
-
-  def to_fields(value)
-    @fields.map do |field|
-      mask = (1 << field.length) - 1
-      { field.name => (value >> field.position) & mask }
-    end
-  end
-end
-```
-
 </code-choice>
 
 <code-choice>
@@ -1873,6 +2580,20 @@ value = Bitfield.V2.to_integer(bf, %{candy: 0, status: 1, location: 71, priority
 
 fields = Bitfield.V2.to_fields(bf, value)
 #=> [%{candy: 0}, %{status: 1}, %{location: 71}, %{priority: 3}]
+```
+
+```ruby
+bf = BitfieldV2.new
+  .add_field(:candy, 3)
+  .add_field(:status, 1)
+  .add_field(:location, 7)
+  .add_field(:priority, 2)
+
+value = bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
+# => 7288
+
+fields = bf.to_fields(value)
+# => [{candy: 0}, {status: 1}, {location: 71}, {priority: 3}]
 ```
 
 ```javascript
@@ -1903,20 +2624,6 @@ value = bf.to_integer({"candy": 0, "status": 1, "location": 71, "priority": 3})
 
 fields = bf.to_fields(value)
 # => [{'candy': 0}, {'status': 1}, {'location': 71}, {'priority': 3}]
-```
-
-```ruby
-bf = BitfieldV2.new
-  .add_field(:candy, 3)
-  .add_field(:status, 1)
-  .add_field(:location, 7)
-  .add_field(:priority, 2)
-
-value = bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
-# => 7288
-
-fields = bf.to_fields(value)
-# => [{candy: 0}, {status: 1}, {location: 71}, {priority: 3}]
 ```
 
 </code-choice>
