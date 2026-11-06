@@ -4,8 +4,9 @@ slug: shrink-your-data-into-bitfields-and-out-again
 alias: blog/shrink-your-data-into-bitfields
 published_date: 2020-04-29T04:00:00+00:00
 tags: data, elixir, programming
+code_language: elixir
 publish: true
-meta_description: Some applications want to save every byte. Every last byte! Learn how bitfields allow us to shink complex data down into a bitfield.
+meta_description: Some applications want to save every byte. Every last byte! Learn how bitfields allow us to shrink complex data down into a bitfield.
 ---
 
 Some applications want to save every byte. Every last byte! Maybe they have memory constraints, maybe they're sending data over the network, maybe they just like saving bytes.
@@ -571,20 +572,19 @@ More verbosely our fields will take up these powers of two (from smallest to lar
 
 | Field    | Power of 2 | Value |
 | :------- | ---------: | ----: |
-| candy    |          0 |     0 |
+| candy    |          0 |     1 |
 | candy    |          1 |     2 |
 | candy    |          2 |     4 |
 | status   |          3 |     8 |
 | location |          4 |    16 |
 | location |          5 |    32 |
-| location |          6 |    32 |
-| location |          7 |    64 |
-| location |          8 |   128 |
-| location |          9 |   256 |
-| location |         10 |   512 |
-| location |         11 |  1024 |
-| priority |         12 |  2048 |
-| priority |         13 |  4096 |
+| location |          6 |    64 |
+| location |          7 |   128 |
+| location |          8 |   256 |
+| location |          9 |   512 |
+| location |         10 |  1024 |
+| priority |         11 |  2048 |
+| priority |         12 |  4096 |
 
 We have four fields: priority, location, status, candy. We know the number of bits we need for each and we know the order in which we want to place them. Using that information we can figure out how to turn each of our field values into their respective parts of the bitfield.
 
@@ -639,7 +639,7 @@ Let's break that down once again, smallest to largest (candy, status, location, 
 - `1000111` for location
 - `11` for priority
 
-In base-10 (and separated out of the bitfield) they're respectively the values `3`, `71`, `1`, and `0`. That checks out! (Don't worry we'll parse bitfields for real later on.)
+In base-10 (and separated out of the bitfield) they're respectively the values `0`, `1`, `71`, and `3`. That checks out! (Don't worry we'll parse bitfields for real later on.)
 
 # Constructing a bitfield by adding powers of two
 
@@ -664,7 +664,7 @@ Candy, the first field, starts things off with a unit power of `0` and a value o
 Next is the status field. Since the candy field took three bits status will be represented via the next power of two: `2^3 = 8`. Status only needs one bit so that's the only power of two it will claim. Its value is `1` so we just need to multiply that by its unit power of two.
 
 ```
-2^8 * 1 = 8
+2^3 * 1 = 8
 ```
 
 Location will be represented the very next power of two: `2^4 = 16`. Location data needs to claim seven bits of data so it will take up these powers of two: `4, 5, 6, 7, 8, 9, 10`. Our location's value is `71`.
@@ -794,8 +794,8 @@ candy_position = 0
 bitfield = bitfield + (candy_value <<< candy_position)
 # => 0
 
-bitfield |> String.to_integer(2)
-# => 0
+bitfield |> Integer.to_string(2)
+# => "0"
 
 # -- status --------
 
@@ -806,8 +806,8 @@ status_position = candy_position + candy_bits
 bitfield = bitfield + (status_value <<< status_position)
 # => 8
 
-bitfield |> String.to_integer(2)
-# => 1000
+bitfield |> Integer.to_string(2)
+# => "1000"
 
 # -- location -------
 
@@ -818,8 +818,8 @@ location_position = status_position + status_bits
 bitfield = bitfield + (location_value <<< location_position)
 # => 1144
 
-bitfield |> String.to_integer(2)
-# => 10001111000
+bitfield |> Integer.to_string(2)
+# => "10001111000"
 
 # -- priority -------
 
@@ -830,11 +830,26 @@ priority_position = location_position + location_bits
 bitfield = bitfield + (priority_value <<< priority_position)
 # => 7288
 
-bitfield |> String.to_integer(2)
-# => 1110001111000
+bitfield |> Integer.to_string(2)
+# => "1110001111000"
 ```
 
 Let's call that done for creating a bitfield. Hooray!
+
+Try it yourself! Pick your own values for each field and watch them shift into place. Or go the other way: slide through every possible 13 bit bitfield and see what record each number turns into.
+
+<candy-bitfield>
+
+| Bitfield | Bits              | Priority | Location            | Status    | Candy              |
+| -------: | :---------------- | :------- | :------------------ | :-------- | :----------------- |
+|     7288 | `11 1000111 1 000` | urgent   | Room 71             | empty     | peppermint patties |
+|      369 | `00 0010111 0 001` | low      | Room 23             | not empty | m&ms               |
+|        0 | `00 0000000 0 000` | low      | Room 0 (no such room) | not empty | peppermint patties |
+|     8191 | `11 1111111 1 111` | urgent   | Room 127 (no such room) | empty | 7 (no such candy)  |
+
+</candy-bitfield>
+
+Notice how many of those numbers aren't records at all? Our seven location bits count from 0 to 127 but we only have rooms 1 to 100. Our three candy bits count to 7 but we only have five candies. Only 4000 of the 8192 possible bitfields (4 × 100 × 2 × 5) hold a real record. That's the price of rounding every field up to whole bits, and it's why code that reads a bitfield should still check what it finds.
 
 ## Bitfield creation: recap
 
@@ -911,7 +926,7 @@ Once our right shifting reaches zero there's no more bits to shift and any furth
 
 ## Bitwise AND
 
-The **bitwise AND** operator allows us to query a bitfield for any specific data field to extract any bits we're interested in. Combined with **bitwise RIGHT SHIFT** we can conver those extracted bits back into the original values.
+The **bitwise AND** operator allows us to query a bitfield for any specific data field to extract any bits we're interested in. Combined with **bitwise RIGHT SHIFT** we can convert those extracted bits back into the original values.
 
 Let's say we have a perfectly interesting binary number.
 
@@ -983,7 +998,7 @@ import Bitwise
 
 So we've said we want the value `10` which would be `2` in base-10. But we're getting the value `1000` which is `8` in base-10. What gives?
 
-Zooming in on the field we care about. We know in our bitfield that it's `10`. We hit that `10` with an extraction hammer of `11` to knock out whatever the bits are at that position in our bitfield which is `10`. But Bitwise AND can't simply return "10" because the position of the digits is significiant.
+Zooming in on the field we care about. We know in our bitfield that it's `10`. We hit that `10` with an extraction hammer of `11` to knock out whatever the bits are at that position in our bitfield which is `10`. But Bitwise AND can't simply return "10" because the position of the digits is significant.
 
 We can think of the comparison number as a hammer of `1` bits that will knock out either the `1` or `0` in its corresponding position in the bitfield and then the result will have `0`s everywhere else.
 
@@ -1068,7 +1083,7 @@ status_shift_right = 3
 location = 0b0011111110000
 location_shift_right = 4
 
-priority = 0b11
+priority = 0b1100000000000
 priority_shift_right = 11
 
 
