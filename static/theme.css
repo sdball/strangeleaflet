@@ -351,6 +351,22 @@ pre code {
   }
 }
 
+/* The same code in several languages (static/code-choice.js picks one).
+   Without JS they all show, so each says which it is. */
+code-choice:not(:defined) > .highlight[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  padding: .5rem 1.25rem 0;
+  font-family: var(--type);
+  font-size: .8rem;
+  color: var(--code-comment);
+}
+@media (max-width: 599px) {
+  code-choice:not(:defined) > .highlight[data-lang]::before {
+    padding-left: var(--gutter);
+  }
+}
+
 /* Syntax highlighting for the token classes Pygments emits */
 .highlight .hll { background-color: var(--code-mark) }
 td.linenos .normal,

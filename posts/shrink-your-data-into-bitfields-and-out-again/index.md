@@ -693,6 +693,8 @@ SIDE NOTE: Instead we could use BITWISE LEFT SHIFT instead multiplying and addin
 
 Here's a code example of a generic bitfield generator that has no existing hardcoded knowledge of our fields.
 
+<code-choice>
+
 ```elixir
 defmodule Bitfield do
   defstruct fields: [], exponent: 0
@@ -725,7 +727,83 @@ defmodule Bitfield do
 end
 ```
 
+```javascript
+class Bitfield {
+  fields = [];
+  exponent = 0;
+
+  addField(name, bits) {
+    this.fields.push({ name, length: bits, units: 2 ** this.exponent });
+    this.exponent += bits;
+    return this;
+  }
+
+  toInteger(values) {
+    if (Object.keys(values).length !== this.fields.length) {
+      throw new Error("invalid values");
+    }
+    return this.fields.reduce((acc, field) => acc + field.units * values[field.name], 0);
+  }
+}
+```
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Field:
+    name: str
+    length: int
+    units: int
+
+
+@dataclass
+class Bitfield:
+    fields: list[Field] = field(default_factory=list)
+    exponent: int = 0
+
+    def add_field(self, name, bits):
+        self.fields.append(Field(name, bits, 2**self.exponent))
+        self.exponent += bits
+        return self
+
+    def to_integer(self, values):
+        if len(values) != len(self.fields):
+            raise ValueError("invalid values")
+        return sum(f.units * values[f.name] for f in self.fields)
+```
+
+```ruby
+class Bitfield
+  Field = Struct.new(:name, :length, :units)
+
+  attr_reader :fields, :exponent
+
+  def initialize
+    @fields = []
+    @exponent = 0
+  end
+
+  def add_field(name, bits)
+    @fields << Field.new(name, bits, 2**@exponent)
+    @exponent += bits
+    self
+  end
+
+  def to_integer(values)
+    raise ArgumentError, "invalid values" unless values.size == @fields.size
+
+    @fields.sum { |field| field.units * values.fetch(field.name) }
+  end
+end
+```
+
+</code-choice>
+
 To use this `Bitfield` module we need to build up a bitfield that knows about our fields, their order, and their bit lengths. For ordering we'll simply go with the order that we add the fields
+
+<code-choice>
 
 ```elixir
 bf =
@@ -736,7 +814,37 @@ bf =
   |> Bitfield.add_field(:priority, 2)
 ```
 
+```javascript
+const bf = new Bitfield()
+  .addField("candy", 3)
+  .addField("status", 1)
+  .addField("location", 7)
+  .addField("priority", 2);
+```
+
+```python
+bf = (
+    Bitfield()
+    .add_field("candy", 3)
+    .add_field("status", 1)
+    .add_field("location", 7)
+    .add_field("priority", 2)
+)
+```
+
+```ruby
+bf = Bitfield.new
+  .add_field(:candy, 3)
+  .add_field(:status, 1)
+  .add_field(:location, 7)
+  .add_field(:priority, 2)
+```
+
+</code-choice>
+
 After adding all of those fields our `Bitfield` struct looks like this. Note how the units have already been determined for each field and we know the next base-2 exponent we'd use if we were to add another field.
+
+<code-choice>
 
 ```elixir
 %Bitfield{
@@ -750,12 +858,63 @@ After adding all of those fields our `Bitfield` struct looks like this. Note how
 }
 ```
 
+```javascript
+Bitfield {
+  fields: [
+    { name: 'candy', length: 3, units: 1 },
+    { name: 'status', length: 1, units: 8 },
+    { name: 'location', length: 7, units: 16 },
+    { name: 'priority', length: 2, units: 2048 }
+  ],
+  exponent: 13
+}
+```
+
+```python
+Bitfield(fields=[Field(name='candy', length=3, units=1),
+                 Field(name='status', length=1, units=8),
+                 Field(name='location', length=7, units=16),
+                 Field(name='priority', length=2, units=2048)],
+         exponent=13)
+```
+
+```ruby
+#<Bitfield:0x00000001202502d0
+ @exponent=13,
+ @fields=
+  [#<struct Bitfield::Field name=:candy, length=3, units=1>,
+   #<struct Bitfield::Field name=:status, length=1, units=8>,
+   #<struct Bitfield::Field name=:location, length=7, units=16>,
+   #<struct Bitfield::Field name=:priority, length=2, units=2048>]>
+```
+
+</code-choice>
+
 We can then use `Bitfield.to_integer/2` to generate a bitfield integer by passing it the `Bitfield` struct and a map of names to values.
+
+<code-choice>
 
 ```elixir
 Bitfield.to_integer(bf, %{candy: 0, status: 1, location: 71, priority: 3})
 # => 7288
 ```
+
+```javascript
+bf.toInteger({ candy: 0, status: 1, location: 71, priority: 3 });
+// => 7288
+```
+
+```python
+bf.to_integer({"candy": 0, "status": 1, "location": 71, "priority": 3})
+# => 7288
+```
+
+```ruby
+bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
+# => 7288
+```
+
+</code-choice>
 
 That works! Wow wow wow. Wow.
 
@@ -778,7 +937,9 @@ That's great because instead of doing the work to figure out the unit powers of 
 
 For an example let's build this bitfield up with left shift manually. Of course there are also many ways we could nicely wrap it up into a module.
 
-Note: in Elixir the bitwise left shift operator is `<<<` from the `Bitwise` module.
+Note: JavaScript, Python, and Ruby spell bitwise left shift `<<`. In Elixir it's `<<<` from the `Bitwise` module.
+
+<code-choice>
 
 ```elixir
 import Bitwise
@@ -834,6 +995,167 @@ bitfield |> Integer.to_string(2)
 # => "1110001111000"
 ```
 
+```javascript
+// JavaScript's bitwise operators work on 32 bit integers. That's plenty
+// for 13 bits; past 31 bits, use BigInt.
+
+let bitfield = 0;
+
+// -- candy --------
+
+const candyValue = 0;
+const candyBits = 3;
+const candyPosition = 0;
+
+bitfield = bitfield + (candyValue << candyPosition);
+// => 0
+
+bitfield.toString(2);
+// => "0"
+
+// -- status -------
+
+const statusValue = 1;
+const statusBits = 1;
+const statusPosition = candyPosition + candyBits;
+
+bitfield = bitfield + (statusValue << statusPosition);
+// => 8
+
+bitfield.toString(2);
+// => "1000"
+
+// -- location -----
+
+const locationValue = 71;
+const locationBits = 7;
+const locationPosition = statusPosition + statusBits;
+
+bitfield = bitfield + (locationValue << locationPosition);
+// => 1144
+
+bitfield.toString(2);
+// => "10001111000"
+
+// -- priority -----
+
+const priorityValue = 3;
+const priorityBits = 2;
+const priorityPosition = locationPosition + locationBits;
+
+bitfield = bitfield + (priorityValue << priorityPosition);
+// => 7288
+
+bitfield.toString(2);
+// => "1110001111000"
+```
+
+```python
+bitfield = 0
+
+# -- candy --------
+
+candy_value = 0
+candy_bits = 3
+candy_position = 0
+
+bitfield = bitfield + (candy_value << candy_position)
+# => 0
+
+format(bitfield, "b")
+# => '0'
+
+# -- status -------
+
+status_value = 1
+status_bits = 1
+status_position = candy_position + candy_bits
+
+bitfield = bitfield + (status_value << status_position)
+# => 8
+
+format(bitfield, "b")
+# => '1000'
+
+# -- location -----
+
+location_value = 71
+location_bits = 7
+location_position = status_position + status_bits
+
+bitfield = bitfield + (location_value << location_position)
+# => 1144
+
+format(bitfield, "b")
+# => '10001111000'
+
+# -- priority -----
+
+priority_value = 3
+priority_bits = 2
+priority_position = location_position + location_bits
+
+bitfield = bitfield + (priority_value << priority_position)
+# => 7288
+
+format(bitfield, "b")
+# => '1110001111000'
+```
+
+```ruby
+bitfield = 0
+
+# -- candy --------
+
+candy_value = 0
+candy_bits = 3
+candy_position = 0
+
+bitfield = bitfield + (candy_value << candy_position)
+# => 0
+
+bitfield.to_s(2)
+# => "0"
+
+# -- status -------
+
+status_value = 1
+status_bits = 1
+status_position = candy_position + candy_bits
+
+bitfield = bitfield + (status_value << status_position)
+# => 8
+
+bitfield.to_s(2)
+# => "1000"
+
+# -- location -----
+
+location_value = 71
+location_bits = 7
+location_position = status_position + status_bits
+
+bitfield = bitfield + (location_value << location_position)
+# => 1144
+
+bitfield.to_s(2)
+# => "10001111000"
+
+# -- priority -----
+
+priority_value = 3
+priority_bits = 2
+priority_position = location_position + location_bits
+
+bitfield = bitfield + (priority_value << priority_position)
+# => 7288
+
+bitfield.to_s(2)
+# => "1110001111000"
+```
+
+</code-choice>
+
 Let's call that done for creating a bitfield. Hooray!
 
 Try it yourself! Pick your own values for each field and watch them shift into place. Or go the other way: slide through every possible 13 bit bitfield and see what record each number turns into.
@@ -878,6 +1200,8 @@ In Elixir we can also use binary pattern matching as long as we appropriately de
 
 Bitwise right shift is the opposite of the bitwise left shift we used to assemble the bitfield. A bitwise right shift slides the binary number to the right: essentially dividing the number by powers of two.
 
+<code-choice>
+
 ```elixir
 import Bitwise
 
@@ -893,7 +1217,50 @@ import Bitwise
 55 >>> 9 #=> 0
 ```
 
+```javascript
+55 >> 0 // => 55
+55 >> 1 // => 27
+55 >> 2 // => 13
+55 >> 3 // => 6
+55 >> 4 // => 3
+55 >> 5 // => 1
+55 >> 6 // => 0
+55 >> 7 // => 0
+55 >> 8 // => 0
+55 >> 9 // => 0
+```
+
+```python
+55 >> 0 #=> 55
+55 >> 1 #=> 27
+55 >> 2 #=> 13
+55 >> 3 #=> 6
+55 >> 4 #=> 3
+55 >> 5 #=> 1
+55 >> 6 #=> 0
+55 >> 7 #=> 0
+55 >> 8 #=> 0
+55 >> 9 #=> 0
+```
+
+```ruby
+55 >> 0 #=> 55
+55 >> 1 #=> 27
+55 >> 2 #=> 13
+55 >> 3 #=> 6
+55 >> 4 #=> 3
+55 >> 5 #=> 1
+55 >> 6 #=> 0
+55 >> 7 #=> 0
+55 >> 8 #=> 0
+55 >> 9 #=> 0
+```
+
+</code-choice>
+
 What's happening here? It's easier to see if we represent each result in base-2.
+
+<code-choice>
 
 ```elixir
 import Bitwise
@@ -909,7 +1276,7 @@ for n <- 0..9 do
 end
 ```
 
-```
+```elixir
 55 >>> 0 = 55: "110111"
 55 >>> 1 = 27: " 11011"
 55 >>> 2 = 13: "  1101"
@@ -921,6 +1288,69 @@ end
 55 >>> 8 =  0: "     0"
 55 >>> 9 =  0: "     0"
 ```
+
+```javascript
+for (let n = 0; n <= 9; n++) {
+  const result = 55 >> n;
+  const base2 = result.toString(2).padStart(6, " ");
+  console.log(`55 >> ${n} = ${String(result).padStart(2, " ")}: "${base2}"`);
+}
+```
+
+```javascript
+55 >> 0 = 55: "110111"
+55 >> 1 = 27: " 11011"
+55 >> 2 = 13: "  1101"
+55 >> 3 =  6: "   110"
+55 >> 4 =  3: "    11"
+55 >> 5 =  1: "     1"
+55 >> 6 =  0: "     0"
+55 >> 7 =  0: "     0"
+55 >> 8 =  0: "     0"
+55 >> 9 =  0: "     0"
+```
+
+```python
+for n in range(10):
+    result = 55 >> n
+    print(f'55 >> {n} = {result:2}: "{result:6b}"')
+```
+
+```python
+55 >> 0 = 55: "110111"
+55 >> 1 = 27: " 11011"
+55 >> 2 = 13: "  1101"
+55 >> 3 =  6: "   110"
+55 >> 4 =  3: "    11"
+55 >> 5 =  1: "     1"
+55 >> 6 =  0: "     0"
+55 >> 7 =  0: "     0"
+55 >> 8 =  0: "     0"
+55 >> 9 =  0: "     0"
+```
+
+```ruby
+(0..9).each do |n|
+  result = 55 >> n
+  base2 = result.to_s(2).rjust(6)
+  puts %(55 >> #{n} = #{result.to_s.rjust(2)}: "#{base2}")
+end
+```
+
+```ruby
+55 >> 0 = 55: "110111"
+55 >> 1 = 27: " 11011"
+55 >> 2 = 13: "  1101"
+55 >> 3 =  6: "   110"
+55 >> 4 =  3: "    11"
+55 >> 5 =  1: "     1"
+55 >> 6 =  0: "     0"
+55 >> 7 =  0: "     0"
+55 >> 8 =  0: "     0"
+55 >> 9 =  0: "     0"
+```
+
+</code-choice>
 
 Once our right shifting reaches zero there's no more bits to shift and any further right shifts will always be zero.
 
@@ -950,11 +1380,30 @@ We can extract those bits out using **bitwise AND**.
 
 Check it out!
 
+<code-choice>
+
 ```elixir
 import Bitwise
 0b00011011 &&& 0b1100
 # => 8
 ```
+
+```javascript
+0b00011011 & 0b1100;
+// => 8
+```
+
+```python
+0b00011011 & 0b1100
+# => 8
+```
+
+```ruby
+0b00011011 & 0b1100
+# => 8
+```
+
+</code-choice>
 
 Wow!
 
@@ -979,6 +1428,8 @@ Essentially the bitwise AND operator compares two binary numbers digit by digit 
 0b00001100 #=> 12
 ```
 
+<code-choice>
+
 ```elixir
 import Bitwise
 27 &&& 12 #=> 8
@@ -987,6 +1438,29 @@ import Bitwise
 |> Integer.to_string(2)
 #=> "1000"
 ```
+
+```javascript
+27 & 12; // => 8
+
+(27 & 12).toString(2);
+// => "1000"
+```
+
+```python
+27 & 12  # => 8
+
+format(27 & 12, "b")
+# => '1000'
+```
+
+```ruby
+27 & 12 # => 8
+
+(27 & 12).to_s(2)
+# => "1000"
+```
+
+</code-choice>
 
 ```plaintext
 | Operation    | Base-2   | Base-10 |
@@ -1004,6 +1478,8 @@ We can think of the comparison number as a hammer of `1` bits that will knock ou
 
 What can we do to convert that `8` into the actual value `2`? We can **bitwise RIGHT SHIFT** the result the length of the fields that come before that value in the bitfield. In our example we have a field of two bits that comes before the value we're extracting. That means if we right shift the result by two we'll have the actual value we're trying to extract.
 
+<code-choice>
+
 ```elixir
 # extract bits
 extracted = 0b00011011 &&& 0b1100
@@ -1019,6 +1495,56 @@ extracted = 0b00011011 &&& 0b1100
 extracted >>> 2
 #=> 2
 ```
+
+```javascript
+// extract bits
+const extracted = 0b00011011 & 0b1100;
+// => 8
+
+// you don't need the leading zeros on the match
+// but it can make the operation easier to read
+0b00011011 & // bitfield value and bitwise AND
+0b00001100;  // binary value to get out the bits
+// => 8
+
+// right shift the result by two bits
+extracted >> 2;
+// => 2
+```
+
+```python
+# extract bits
+extracted = 0b00011011 & 0b1100
+# => 8
+
+# you don't need the leading zeros on the match
+# but it can make the operation easier to read
+(0b00011011 &  # bitfield value and bitwise AND
+ 0b00001100)   # binary value to get out the bits
+# => 8
+
+# right shift the result by two bits
+extracted >> 2
+# => 2
+```
+
+```ruby
+# extract bits
+extracted = 0b00011011 & 0b1100
+# => 8
+
+# you don't need the leading zeros on the match
+# but it can make the operation easier to read
+0b00011011 &  # bitfield value and bitwise AND
+0b00001100    # binary value to get out the bits
+# => 8
+
+# right shift the result by two bits
+extracted >> 2
+# => 2
+```
+
+</code-choice>
 
 ## Elixir pattern matching
 
@@ -1071,6 +1597,8 @@ Here are the values to extract our four fields. We simply fill in `1` for each p
 
 Let's look at status and see how its bitwise AND comparison value can extract the actual value of the field while ignoring anything else in the bitfield.
 
+<code-choice>
+
 ```elixir
 bitfield = 0b1110001111000
 
@@ -1096,6 +1624,77 @@ bitfield #=> 7288
 |> Bitwise.bsr(location_shift_right) #=> 71
 ```
 
+```javascript
+const bitfield = 0b1110001111000;
+
+const candy = 0b0000000000111;
+const candyShiftRight = 0;
+
+const status = 0b0000000001000;
+const statusShiftRight = 3;
+
+const location = 0b0011111110000;
+const locationShiftRight = 4;
+
+const priority = 0b1100000000000;
+const priorityShiftRight = 11;
+
+bitfield; // => 7288
+bitfield & status; // => 8
+(bitfield & status) >> statusShiftRight; // => 1
+
+bitfield & location; // => 1136
+(bitfield & location) >> locationShiftRight; // => 71
+```
+
+```python
+bitfield = 0b1110001111000
+
+candy = 0b0000000000111
+candy_shift_right = 0
+
+status = 0b0000000001000
+status_shift_right = 3
+
+location = 0b0011111110000
+location_shift_right = 4
+
+priority = 0b1100000000000
+priority_shift_right = 11
+
+bitfield  # => 7288
+bitfield & status  # => 8
+(bitfield & status) >> status_shift_right  # => 1
+
+bitfield & location  # => 1136
+(bitfield & location) >> location_shift_right  # => 71
+```
+
+```ruby
+bitfield = 0b1110001111000
+
+candy = 0b0000000000111
+candy_shift_right = 0
+
+status = 0b0000000001000
+status_shift_right = 3
+
+location = 0b0011111110000
+location_shift_right = 4
+
+priority = 0b1100000000000
+priority_shift_right = 11
+
+bitfield # => 7288
+bitfield & status # => 8
+(bitfield & status) >> status_shift_right # => 1
+
+bitfield & location # => 1136
+(bitfield & location) >> location_shift_right # => 71
+```
+
+</code-choice>
+
 Success! We can precisely extract only the bits that we need to know about using bitwise AND!
 
 # Putting it all together in a module
@@ -1103,6 +1702,8 @@ Success! We can precisely extract only the bits that we need to know about using
 With this more complete knowledge of bitfields we can put together a module that allows creating a bitfield, storing data, and getting that data back out.
 
 The extraction of the data (`to_fields/2`) gets a little complicated because we can't simply declare a binary pattern. Instead we have to pull values from the binary from greatest to smallest until we have extracted all fields.
+
+<code-choice>
 
 ```elixir
 defmodule Bitfield.V2 do
@@ -1156,6 +1757,103 @@ defmodule Bitfield.V2 do
 end
 ```
 
+```javascript
+class BitfieldV2 {
+  fields = [];
+  exponent = 0;
+
+  addField(name, bits) {
+    this.fields.push({ name, length: bits, position: this.exponent, units: 2 ** this.exponent });
+    this.exponent += bits;
+    return this;
+  }
+
+  toInteger(values) {
+    if (Object.keys(values).length !== this.fields.length) {
+      throw new Error("invalid values");
+    }
+    return this.fields.reduce((acc, field) => acc + field.units * values[field.name], 0);
+  }
+
+  toFields(value) {
+    return this.fields.map((field) => {
+      const mask = (1 << field.length) - 1;
+      return { [field.name]: (value >> field.position) & mask };
+    });
+  }
+}
+```
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Field:
+    name: str
+    length: int
+    position: int
+    units: int
+
+
+@dataclass
+class BitfieldV2:
+    fields: list[Field] = field(default_factory=list)
+    exponent: int = 0
+
+    def add_field(self, name, bits):
+        self.fields.append(Field(name, bits, self.exponent, 2**self.exponent))
+        self.exponent += bits
+        return self
+
+    def to_integer(self, values):
+        if len(values) != len(self.fields):
+            raise ValueError("invalid values")
+        return sum(f.units * values[f.name] for f in self.fields)
+
+    def to_fields(self, value):
+        return [
+            {f.name: (value >> f.position) & ((1 << f.length) - 1)}
+            for f in self.fields
+        ]
+```
+
+```ruby
+class BitfieldV2
+  Field = Struct.new(:name, :length, :position, :units)
+
+  attr_reader :fields, :exponent
+
+  def initialize
+    @fields = []
+    @exponent = 0
+  end
+
+  def add_field(name, bits)
+    @fields << Field.new(name, bits, @exponent, 2**@exponent)
+    @exponent += bits
+    self
+  end
+
+  def to_integer(values)
+    raise ArgumentError, "invalid values" unless values.size == @fields.size
+
+    @fields.sum { |field| field.units * values.fetch(field.name) }
+  end
+
+  def to_fields(value)
+    @fields.map do |field|
+      mask = (1 << field.length) - 1
+      { field.name => (value >> field.position) & mask }
+    end
+  end
+end
+```
+
+</code-choice>
+
+<code-choice>
+
 ```elixir
 bf =
   Bitfield.V2.new()
@@ -1170,6 +1868,52 @@ value = Bitfield.V2.to_integer(bf, %{candy: 0, status: 1, location: 71, priority
 fields = Bitfield.V2.to_fields(bf, value)
 #=> [%{candy: 0}, %{status: 1}, %{location: 71}, %{priority: 3}]
 ```
+
+```javascript
+const bf = new BitfieldV2()
+  .addField("candy", 3)
+  .addField("status", 1)
+  .addField("location", 7)
+  .addField("priority", 2);
+
+const value = bf.toInteger({ candy: 0, status: 1, location: 71, priority: 3 });
+// => 7288
+
+const fields = bf.toFields(value);
+// => [ { candy: 0 }, { status: 1 }, { location: 71 }, { priority: 3 } ]
+```
+
+```python
+bf = (
+    BitfieldV2()
+    .add_field("candy", 3)
+    .add_field("status", 1)
+    .add_field("location", 7)
+    .add_field("priority", 2)
+)
+
+value = bf.to_integer({"candy": 0, "status": 1, "location": 71, "priority": 3})
+# => 7288
+
+fields = bf.to_fields(value)
+# => [{'candy': 0}, {'status': 1}, {'location': 71}, {'priority': 3}]
+```
+
+```ruby
+bf = BitfieldV2.new
+  .add_field(:candy, 3)
+  .add_field(:status, 1)
+  .add_field(:location, 7)
+  .add_field(:priority, 2)
+
+value = bf.to_integer({ candy: 0, status: 1, location: 71, priority: 3 })
+# => 7288
+
+fields = bf.to_fields(value)
+# => [{candy: 0}, {status: 1}, {location: 71}, {priority: 3}]
+```
+
+</code-choice>
 
 Success!
 
@@ -1186,3 +1930,4 @@ If you ever come across an integer that seems to be weirdly treated as data: the
 If you ever need to squish a predefined and rigorously scoped set of data into the smallest possible space: that could be a bitfield!
 
 <script type="module" src="bitfields.js"></script>
+<script type="module" src="/code-choice.js"></script>

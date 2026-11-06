@@ -69,9 +69,10 @@ meta_description: Taking a script and wrapping it up into a Docker image that ca
 - `alias: blog/old-path` adds a redirect from an old URL. Separate several with commas.
 - `meta_description` is optional; without it the description is the start of the post.
 - `code_language: elixir` is the language the post's code is in. A
-  `<code-choice>` (the same code in several languages, one fenced block each)
-  must have a block in it, and the feed shows only that one. The build stops
-  if either is missing.
+  `<code-choice>` (the same code in several languages, fenced blocks inside it,
+  picked between by `static/code-choice.js`) must have a block in it; that one
+  shows first and is the only one in the feed. The build stops if either is
+  missing.
 
 Fenced code blocks are highlighted by Pygments with the language after the
 backticks (` ```elixir `), and `theme.css` colors them.

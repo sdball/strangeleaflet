@@ -367,18 +367,20 @@ def absolute_urls(content, base):
     return re.sub(r"""\b(src|href|poster)=(["'])(.*?)\2""", fix, content)
 
 
-# <code-choice> holds the same code in several languages, one fenced block
-# each, and readers pick one. The post's code_language (frontmatter) is the
-# one the feed keeps, and every <code-choice> needs a block in it.
+# <code-choice> holds the same code in several languages, a fenced block or
+# more (code, then its output) each, and readers pick one (static/code-choice.js). The post's code_language
+# (frontmatter) is the one shown first and the one the feed keeps, and every
+# <code-choice> needs a block in it.
 
 CODE_CHOICE = re.compile(r"<code-choice\b[^>]*>(.*?)</code-choice>", re.S)
 CODE_BLOCK = re.compile(r'<div class="highlight" data-lang="([^"]+)">.*?</pre></div>\n?', re.S)
 
 
-def check_code_choices(entry, content):
+def prepare_code_choices(entry, content):
+    """Check each <code-choice> and give it data-default, the post's code_language."""
     choices = CODE_CHOICE.findall(content)
     if not choices:
-        return
+        return content
     where = entry["source"].relative_to(ROOT)
     lang = entry["code_language"]
     if not lang:
@@ -387,12 +389,13 @@ def check_code_choices(entry, content):
         langs = [m.group(1) for m in CODE_BLOCK.finditer(inner)]
         if lang not in langs:
             sys.exit(f"{where}: a <code-choice> has no {lang} block (it has {', '.join(langs) or 'none'})")
+    return re.sub(r"<code-choice\b", f'<code-choice data-default="{html.escape(lang)}"', content)
 
 
 def feed_code(entry, content):
-    """Each <code-choice> becomes just its code_language block."""
+    """Each <code-choice> becomes just its code_language blocks."""
     def keep(match):
-        return next(m.group(0) for m in CODE_BLOCK.finditer(match.group(1)) if m.group(1) == entry["code_language"])
+        return "".join(m.group(0) for m in CODE_BLOCK.finditer(match.group(1)) if m.group(1) == entry["code_language"])
 
     return CODE_CHOICE.sub(keep, content)
 
@@ -536,8 +539,7 @@ def main(drafts=False):
 
     contents = {}
     for e in entries:
-        content = render_content(e, posts)
-        check_code_choices(e, content)
+        content = prepare_code_choices(e, render_content(e, posts))
         contents[e["url"]] = content
         path = e["url"].strip("/")
 

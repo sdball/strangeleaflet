@@ -67,6 +67,21 @@ Follow the existing ones (`penguin-walker.js`, `bitfields.js`):
 - Respect `prefers-reduced-motion`, keep tap targets 40–44px, label inputs.
 - No frameworks or CDNs.
 
+## Code in several languages
+
+A `<code-choice>` holds the same code as fenced blocks in several languages,
+and `static/code-choice.js` shows one with a picker (shared, like `loops.js`;
+end the post with `<script type="module" src="/code-choice.js"></script>`).
+The bitfields post is the example.
+
+- The post needs `code_language:`, and every choice a block in it: that's the
+  default, and the only one the feed keeps. The build stops otherwise.
+- Output that differs by language goes inside the choice as another block
+  fenced with that language, after its code.
+- Run every translation and paste real output into its `# =>` comments.
+- Only general code gets a choice. Code about one language's feature (Elixir
+  binary pattern matching) stays in that language.
+
 ## Clips
 
 Short looping captures (gameplay, a moment from a movie) are MP4s, not GIFs: a
