@@ -155,7 +155,10 @@ data.to_json.bytesize
 ```
 
 ```javascript
-JSON.stringify(data).length;
+// A string's .length counts UTF-16 code units, not bytes
+const byteSize = (string) => new TextEncoder().encode(string).byteLength;
+
+byteSize(JSON.stringify(data));
 // => 88
 ```
 
@@ -210,7 +213,7 @@ const smallerData = [
   "peppermint patties",
 ];
 
-JSON.stringify(smallerData).length;
+byteSize(JSON.stringify(smallerData));
 // => 49
 ```
 
@@ -294,7 +297,7 @@ const evenSmallerData = [
   0,
 ];
 
-JSON.stringify(evenSmallerData).length;
+byteSize(JSON.stringify(evenSmallerData));
 // => 30
 ```
 
@@ -407,7 +410,7 @@ even_smaller_still_data.to_json.bytesize
 ```javascript
 const evenSmallerStillData = [3, 71, 1, 0];
 
-JSON.stringify(evenSmallerStillData).length;
+byteSize(JSON.stringify(evenSmallerStillData));
 // => 10
 ```
 
@@ -877,11 +880,11 @@ json_base2_strings.bytesize # => 24
 
 ```javascript
 const jsonBase10Numbers = JSON.stringify([3, 71, 1, 0]); // => "[3,71,1,0]"
-jsonBase10Numbers.length; // => 10
+byteSize(jsonBase10Numbers); // => 10
 
 const jsonBase2Strings = JSON.stringify(["11", "1000111", "1", "0"]);
 // => "[\"11\",\"1000111\",\"1\",\"0\"]"
-jsonBase2Strings.length; // => 24
+byteSize(jsonBase2Strings); // => 24
 ```
 
 ```python
