@@ -79,6 +79,9 @@ The bitfields post is the example.
 - Output that differs by language goes inside the choice as another block
   fenced with that language, after its code.
 - Run every translation and paste real output into its `# =>` comments.
+- Put a `<code-choice-picker>` near the top, holding a sentence on where the
+  choices start. Readers get the picker there before they reach any code; it
+  works every choice on the page, and the feed drops it.
 - Only general code gets a choice. Code about one language's feature (Elixir
   binary pattern matching) stays in that language.
 

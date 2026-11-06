@@ -368,18 +368,23 @@ def absolute_urls(content, base):
 
 
 # <code-choice> holds the same code in several languages, a fenced block or
-# more (code, then its output) each, and readers pick one (static/code-choice.js). The post's code_language
+# more (code, then its output) each, and readers pick one (static/code-choice.js).
+# A <code-choice-picker> is the same picker on its own, for the top of a post,
+# holding a note on where the choices are. The post's code_language
 # (frontmatter) is the one shown first and the one the feed keeps, and every
 # <code-choice> needs a block in it.
 
-CODE_CHOICE = re.compile(r"<code-choice\b[^>]*>(.*?)</code-choice>", re.S)
+CODE_CHOICE = re.compile(r"<code-choice(?=[\s>])[^>]*>(.*?)</code-choice>", re.S)
+CODE_CHOICE_PICKER = re.compile(r"<code-choice-picker(?=[\s>])[^>]*>.*?</code-choice-picker>\n?", re.S)
 CODE_BLOCK = re.compile(r'<div class="highlight" data-lang="([^"]+)">.*?</pre></div>\n?', re.S)
 
 
 def prepare_code_choices(entry, content):
-    """Check each <code-choice> and give it data-default, the post's code_language."""
+    """Check each <code-choice> and give it, and any picker, data-default: the post's code_language."""
     choices = CODE_CHOICE.findall(content)
     if not choices:
+        if CODE_CHOICE_PICKER.search(content):
+            sys.exit(f"{entry['source'].relative_to(ROOT)}: has a <code-choice-picker> but no <code-choice>")
         return content
     where = entry["source"].relative_to(ROOT)
     lang = entry["code_language"]
@@ -389,15 +394,15 @@ def prepare_code_choices(entry, content):
         langs = [m.group(1) for m in CODE_BLOCK.finditer(inner)]
         if lang not in langs:
             sys.exit(f"{where}: a <code-choice> has no {lang} block (it has {', '.join(langs) or 'none'})")
-    return re.sub(r"<code-choice\b", f'<code-choice data-default="{html.escape(lang)}"', content)
+    return re.sub(r"<code-choice(-picker)?(?=[\s>])", rf'<code-choice\1 data-default="{html.escape(lang)}"', content)
 
 
 def feed_code(entry, content):
-    """Each <code-choice> becomes just its code_language blocks."""
+    """Each <code-choice> becomes just its code_language blocks, and pickers go."""
     def keep(match):
         return "".join(m.group(0) for m in CODE_BLOCK.finditer(match.group(1)) if m.group(1) == entry["code_language"])
 
-    return CODE_CHOICE.sub(keep, content)
+    return CODE_CHOICE.sub(keep, CODE_CHOICE_PICKER.sub("", content))
 
 
 def render_content(entry, posts):

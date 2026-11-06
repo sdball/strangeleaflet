@@ -77,6 +77,12 @@ In base-2
 
 How? Incrementally!
 
+<code-choice-picker>
+
+The code here is Elixir. From [Constructing a bitfield by adding powers of two](#constructing-a-bitfield-by-adding-powers-of-two) on, it's also in JavaScript, Python, and Ruby.
+
+</code-choice-picker>
+
 # Starting with the data
 
 Let's say we have some data

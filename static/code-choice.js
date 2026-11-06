@@ -19,8 +19,19 @@
 // <code-choice> on the page follows it. A choice without the picked language
 // shows its default.
 //
+// A <code-choice-picker> is the picker on its own, for the top of a post, so
+// readers know there's a choice before they reach one. It holds a note saying
+// where the choices are, and the picker goes after it:
+//
+//   <code-choice-picker>
+//
+//   From [the first one](#its-heading) on, the code is in Elixir, Python, ...
+//
+//   </code-choice-picker>
+//
 // Without this module (no JS) every block shows, each tagged with its language
-// by theme.css. The feed has only the default's block.
+// by theme.css, and a picker is just its note. The feed has only the default's
+// blocks, and no pickers.
 
 const KEY = "code-language";
 const NAMES = { elixir: "Elixir", javascript: "JavaScript", js: "JavaScript", python: "Python", ruby: "Ruby", go: "Go", typescript: "TypeScript", rust: "Rust" };
@@ -48,7 +59,24 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   code-choice:defined > .highlight:not([hidden]) ~ .highlight:not([hidden]) {
     margin-top: .75rem;
   }
-  code-choice fieldset {
+  code-choice-picker:defined {
+    display: block;
+    margin: 1.75rem 0;
+    padding: 1rem 1.25rem 1.25rem;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+  }
+  code-choice-picker > p {
+    margin: 0 0 .75rem;
+  }
+  code-choice-picker legend {
+    margin-bottom: .4rem;
+    padding: 0;
+    font-family: var(--type);
+    font-size: .9rem;
+    color: var(--muted);
+  }
+  :is(code-choice, code-choice-picker) fieldset {
     display: flex;
     flex-wrap: wrap;
     gap: .4rem;
@@ -56,7 +84,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     padding: 0;
     border: 0;
   }
-  code-choice legend {
+  code-choice > fieldset legend {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -64,7 +92,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     clip-path: inset(50%);
     white-space: nowrap;
   }
-  code-choice label {
+  :is(code-choice, code-choice-picker) label {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -77,16 +105,16 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     border-radius: var(--radius);
     cursor: pointer;
   }
-  code-choice label:has(:checked) {
+  :is(code-choice, code-choice-picker) label:has(:checked) {
     color: var(--ink);
     border-color: var(--brass);
     background: var(--tint);
   }
-  code-choice label:has(:focus-visible) {
+  :is(code-choice, code-choice-picker) label:has(:focus-visible) {
     outline: 2px solid var(--brass);
     outline-offset: 2px;
   }
-  code-choice input {
+  :is(code-choice, code-choice-picker) input {
     position: absolute;
     inset: 0;
     margin: 0;
@@ -97,40 +125,69 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 
 let ids = 0;
 
+const everyChoice = () => document.querySelectorAll("code-choice, code-choice-picker");
+
+function makePicker(host, langs, legend) {
+  const group = `code-choice-${++ids}`;
+  const picker = document.createElement("fieldset");
+  picker.innerHTML = `<legend>${legend}</legend>` + langs
+    .map((lang) => `<label><input type="radio" name="${group}" value="${lang}">${langName(lang)}</label>`)
+    .join("");
+  picker.addEventListener("change", (event) => {
+    const lang = event.target.value;
+    remember(lang);
+    // Code above can change height too; keep this picker where the reader is looking
+    const before = host.getBoundingClientRect().top;
+    for (const choice of everyChoice()) choice.show?.(lang);
+    scrollBy(0, host.getBoundingClientRect().top - before);
+  });
+  return picker;
+}
+
+function check(picker, lang) {
+  for (const input of picker.querySelectorAll("input")) input.checked = input.value === lang;
+}
+
 customElements.define("code-choice", class extends HTMLElement {
   connectedCallback() {
+    if (this.picker) return;
     this.blocks = [...this.querySelectorAll(":scope > .highlight[data-lang]")];
     const langs = [...new Set(this.blocks.map((block) => block.dataset.lang))];
-    if (langs.length < 2 || this.querySelector(":scope > fieldset")) return;
-    const group = `code-choice-${++ids}`;
-    const picker = document.createElement("fieldset");
-    picker.innerHTML = `<legend>Code language</legend>` + langs
-      .map((lang) => `<label><input type="radio" name="${group}" value="${lang}">${langName(lang)}</label>`)
-      .join("");
-    this.prepend(picker);
-
-    picker.addEventListener("change", (event) => {
-      const lang = event.target.value;
-      remember(lang);
-      // Blocks above change height too; keep this picker where the reader is looking
-      const before = this.getBoundingClientRect().top;
-      for (const choice of document.querySelectorAll("code-choice")) choice.show?.(lang);
-      scrollBy(0, this.getBoundingClientRect().top - before);
-    });
-
+    if (langs.length < 2) return;
+    this.picker = makePicker(this, langs, "Code language");
+    this.prepend(this.picker);
     this.show(remembered() ?? this.dataset.default);
   }
 
   show(lang) {
+    if (!this.picker) return;
     const has = (l) => this.blocks.some((block) => block.dataset.lang === l);
     const pick = [lang, this.dataset.default].find(has) ?? this.blocks[0].dataset.lang;
     for (const block of this.blocks) block.hidden = block.dataset.lang !== pick;
-    for (const input of this.querySelectorAll(":scope > fieldset input")) input.checked = input.value === pick;
+    check(this.picker, pick);
+  }
+});
+
+customElements.define("code-choice-picker", class extends HTMLElement {
+  connectedCallback() {
+    if (this.picker) return;
+    // Every language any choice on the page has, in the order they first appear
+    const blocks = document.querySelectorAll("code-choice > .highlight[data-lang]");
+    this.langs = [...new Set([...blocks].map((block) => block.dataset.lang))];
+    if (this.langs.length < 2) return;
+    this.picker = makePicker(this, this.langs, "Show the code in");
+    this.append(this.picker);
+    this.show(remembered() ?? this.dataset.default);
+  }
+
+  show(lang) {
+    if (!this.picker) return;
+    check(this.picker, this.langs.includes(lang) ? lang : this.dataset.default);
   }
 });
 
 // Another tab picked a language
 addEventListener("storage", (event) => {
   if (event.key !== KEY || !event.newValue) return;
-  for (const choice of document.querySelectorAll("code-choice")) choice.show?.(event.newValue);
+  for (const choice of everyChoice()) choice.show?.(event.newValue);
 });
