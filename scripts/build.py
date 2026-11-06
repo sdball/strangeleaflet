@@ -59,7 +59,11 @@ class Renderer(mistune.HTMLRenderer):
             lexer = get_lexer_by_name(lang) if lang else TextLexer()
         except ClassNotFound:
             lexer = TextLexer()
-        return highlight(code, lexer, FORMATTER)
+        out = highlight(code, lexer, FORMATTER)
+        # The language goes on the block, for <code-choice> and the feed
+        if lang:
+            out = out.replace('<div class="highlight">', f'<div class="highlight" data-lang="{html.escape(lang)}">', 1)
+        return out
 
     def heading(self, text, level, **attrs):
         # A repeated heading gets -1, -2, ... so every anchor on the page is unique
@@ -132,6 +136,7 @@ def load(path, folder, kind, url=None):
         "publish": meta.get("publish", "true") != "false",
         "description": meta.get("meta_description", ""),
         "feed_id": meta.get("feed_id", "").strip(),
+        "code_language": meta.get("code_language", "").strip(),
         "body": body,
         "is_html": path.suffix == ".html",
     }
@@ -362,6 +367,36 @@ def absolute_urls(content, base):
     return re.sub(r"""\b(src|href|poster)=(["'])(.*?)\2""", fix, content)
 
 
+# <code-choice> holds the same code in several languages, one fenced block
+# each, and readers pick one. The post's code_language (frontmatter) is the
+# one the feed keeps, and every <code-choice> needs a block in it.
+
+CODE_CHOICE = re.compile(r"<code-choice\b[^>]*>(.*?)</code-choice>", re.S)
+CODE_BLOCK = re.compile(r'<div class="highlight" data-lang="([^"]+)">.*?</pre></div>\n?', re.S)
+
+
+def check_code_choices(entry, content):
+    choices = CODE_CHOICE.findall(content)
+    if not choices:
+        return
+    where = entry["source"].relative_to(ROOT)
+    lang = entry["code_language"]
+    if not lang:
+        sys.exit(f"{where}: has <code-choice>, so it needs code_language: in its frontmatter")
+    for inner in choices:
+        langs = [m.group(1) for m in CODE_BLOCK.finditer(inner)]
+        if lang not in langs:
+            sys.exit(f"{where}: a <code-choice> has no {lang} block (it has {', '.join(langs) or 'none'})")
+
+
+def feed_code(entry, content):
+    """Each <code-choice> becomes just its code_language block."""
+    def keep(match):
+        return next(m.group(0) for m in CODE_BLOCK.finditer(match.group(1)) if m.group(1) == entry["code_language"])
+
+    return CODE_CHOICE.sub(keep, content)
+
+
 def render_content(entry, posts):
     if entry["is_html"]:
         return entry["body"]
@@ -407,7 +442,7 @@ def write_feed(posts, contents):
         title = p["title"]
         if p["kind"] == "leaflet page" and p["description"]:
             title += ": " + p["description"]
-        content = absolute_urls(contents[p["url"]], p["url"])
+        content = absolute_urls(feed_code(p, contents[p["url"]]), p["url"])
         categories = "".join(f'\n    <category term="{esc(t)}"/>' for t in p["tags"])
         entries.append(f"""  <entry>
     <id>{entry_id}</id>
@@ -502,6 +537,7 @@ def main(drafts=False):
     contents = {}
     for e in entries:
         content = render_content(e, posts)
+        check_code_choices(e, content)
         contents[e["url"]] = content
         path = e["url"].strip("/")
 
