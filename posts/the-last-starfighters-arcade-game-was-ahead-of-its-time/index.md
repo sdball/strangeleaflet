@@ -83,9 +83,9 @@ So was the movie predicting where videogames were going, or showing them the way
 
 The Last Starfighter holds up when compared to other arcade movies of the time as well. TRON of course had Flynn's arcade showcasing the in-movie game Space Paranoids. But Space Paranoids is more like an enhanced version of Battlezone than an arcade game way ahead of its time.
 
-<video loop muted playsinline controls preload="metadata" poster="space-paranoids.jpg" width="480" height="270" aria-label="Space Paranoids in TRON (1982): the game&#x27;s blue screen inside its cabinet bezel, Flynn playing in front of a watching crowd, then the full-screen view of green HUD brackets and a gunsight around a red wireframe Recognizer that Flynn locks onto with a yellow ring and blows apart">
+<video loop muted playsinline controls preload="metadata" poster="space-paranoids.jpg" width="480" height="270" aria-label="Space Paranoids in TRON (1982): the game&#x27;s blue screen inside its cabinet bezel, then the full-screen view of green HUD brackets and a gunsight around a red wireframe Recognizer that the player locks onto with a yellow ring and blows apart">
   <source src="space-paranoids.mp4" type="video/mp4">
-  <img src="space-paranoids.jpg" alt="Space Paranoids in TRON (1982): the game&#x27;s blue screen inside its cabinet bezel, Flynn playing in front of a watching crowd, then the full-screen view of green HUD brackets and a gunsight around a red wireframe Recognizer that Flynn locks onto with a yellow ring and blows apart">
+  <img src="space-paranoids.jpg" alt="Space Paranoids in TRON (1982): the game&#x27;s blue screen inside its cabinet bezel, then the full-screen view of green HUD brackets and a gunsight around a red wireframe Recognizer that the player locks onto with a yellow ring and blows apart">
 </video>
 
 <small>Clip from *TRON* (1982, Walt Disney Productions), from [Iamthe80sguy2's upload](https://www.youtube.com/watch?v=6QWEcj7UXFs&t=98s).</small>
