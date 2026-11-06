@@ -239,6 +239,12 @@ TAG_FILTER = """<style>.blog-posts li[hidden] { display: none; }</style>
 </script>"""
 
 
+# A search box over the full list (static/search.js), which searches /search.json.
+# It's empty until the module fills it, so feed readers and visitors without
+# JavaScript don't get a search box that can't search.
+SEARCH = '<post-search></post-search>\n<script type="module" src="/search.js"></script>'
+
+
 # Leaflets: a cover with a contents list, and pages strung on eyelets with a page turn at the foot
 
 def page_count(cover):
@@ -349,7 +355,7 @@ def expand_embeds(body, posts):
             return tag_cloud(posts)
         if limit:
             return post_list(posts[: int(limit)], embedded=True)
-        return TAG_FILTER_NOTE + "\n" + post_list(posts) + "\n" + TAG_FILTER
+        return SEARCH + "\n" + TAG_FILTER_NOTE + "\n" + post_list(posts) + "\n" + TAG_FILTER
 
     return re.sub(r"^\{\{ *(posts|tags)(?: +limit: *(\d+))? *\}\}$", embed, body, flags=re.M)
 
@@ -434,7 +440,52 @@ def page(path, *, title, description, canonical, body_class, main, og_type="webs
     ))
 
 
-# Feed, sitemap, aliases
+# Search index, feed, sitemap, aliases
+
+# Tags that separate words; the rest (Pygments' spans, <em>) sit inside them
+BLOCK_TAGS = r"p|div|li|ul|ol|h[1-6]|br|hr|pre|blockquote|table|tr|td|th|figure|figcaption|dt|dd|section|article"
+
+
+def plain_text(content):
+    content = re.sub(r"<(script|style)\b.*?</\1>", " ", content, flags=re.S | re.I)
+    content = re.sub(rf"</?(?:{BLOCK_TAGS})\b[^>]*>", " ", content, flags=re.I)
+    return " ".join(html.unescape(re.sub(r"<[^>]+>", "", content)).split())
+
+
+def prose_and_code(content):
+    """The text, and its code blocks apart, so a result's excerpt can come from the prose."""
+    code = " ".join(plain_text(block) for block in re.findall(r'<div class="highlight".*?</pre></div>', content, re.S))
+    return {"text": plain_text(re.sub(r'<div class="highlight".*?</pre></div>', " ", content, flags=re.S)), "code": code}
+
+
+def write_search_index(entries, contents):
+    """Posts, leaflet covers, and leaflet pages, newest first, for static/search.js.
+
+    Like the feed, a <code-choice> keeps only the post's own language.
+    """
+    found = []
+    for e in entries:
+        if e["kind"] not in ("post", "cover", "leaflet page"):
+            continue
+        date = e["pages"][0]["date"] if e["kind"] == "cover" else e["date"]
+        title = e["title"]
+        if e["kind"] == "leaflet page" and e["description"]:
+            title += ": " + e["description"]
+        utc = date.astimezone(timezone.utc)
+        found.append({
+            "url": e["url"],
+            "title": title,
+            "kind": {"post": "post", "cover": "leaflet", "leaflet page": "leaflet page"}[e["kind"]],
+            "date": f"{utc:%Y-%m-%dT%H:%MZ}",
+            "day": f"{utc:%d %b, %Y}",
+            "tags": e["tags"],
+            "description": e["description"],
+            **prose_and_code(feed_code(e, contents[e["url"]])),
+            **({} if e["publish"] else {"draft": True}),
+        })
+    found.sort(key=lambda f: f["date"], reverse=True)
+    (PUBLIC / "search.json").write_text(json.dumps(found, ensure_ascii=False, separators=(",", ":")))
+
 
 def atom_date(date):
     return date.astimezone(timezone.utc).isoformat()
@@ -603,6 +654,7 @@ def main(drafts=False):
     )
 
     write_feed(newest_first({"post", "leaflet page"}), contents)
+    write_search_index(entries, contents)
     write_sitemap([e["url"] for e in entries] + ["/leaflets/"])
     leaflet_pages = sum(len(cover["pages"]) for cover in leaflets)
     others = len(entries) - len(posts) - len(leaflets) - leaflet_pages

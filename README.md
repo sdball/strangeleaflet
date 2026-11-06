@@ -152,7 +152,9 @@ so readers don't see it twice.
 `pages/` holds pages that aren't posts. They can use Bear's embeds, each on a
 line of its own:
 
-- `{{ posts }}` lists every post, filtered by `?q=<tag>` like Bear's tag links
+- `{{ posts }}` lists every post, filtered by `?q=<tag>` like Bear's tag links,
+  under a search box (`static/search.js`) for posts and leaflets; `?search=<words>`
+  links to a search
 - `{{ posts limit:5 }}` lists the latest five
 - `{{ tags }}` lists every tag
 
@@ -161,6 +163,7 @@ line of its own:
 - a page for every post and page, at `/<slug>/`
 - `/leaflets/`, and each leaflet's cover and pages under it
 - `/feed/` (`feed/index.xml`) and `/feed.xml`: an Atom feed of the latest 10 posts and leaflet pages, with the same entry ids Bear used
+- `/search.json`: every post, leaflet cover, and leaflet page with its text, for the search box on `/blog/`
 - `/sitemap.xml` and `/robots.txt`
 - `/404.html`
 - a redirect page at each alias
