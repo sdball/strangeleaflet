@@ -54,7 +54,7 @@ Here's Gyruss, a Konami game from 1983 that was in arcades while the movie was b
 
 <small>Clip from *Gyruss* (1983, Konami), from [Old Classic Retro Gaming's playthrough](https://www.youtube.com/watch?v=CrrMQBLqqVo&t=33s).</small>
 
-Iconic, classic, great game, very 1980s arcade. But nothing like what the movie's game was showing.
+All great games. Iconic, classic, very 1980s arcade. But nothing like what the movie's game was showing.
 
 For 3D space games at the time the state of the art was Atari's Star Wars, also from 1983. It has real 3D ships and a cockpit view, but the ships are wireframe outlines, the camera is fixed to the cockpit, and the HUD is a shield gauge and a score. Nothing close to the cinematic design of the movie's Starfighter game.
 
@@ -76,6 +76,7 @@ Just look at the artistic beauty of that imagined videogame UI! Sure some games 
 Speaking of actually playing, credit to Lance Guest for really conveying the sense that he's _actually_ playing a game that couldn't have existed. In even more recent movies and tv shows we're all too familiar with the "act like you're playing a videogame" trope that's just mashing buttons and wildly flipping the joystick. In The Last Starfighter the character Alex is playing with careful intent that's completely convincing.
 
 How did they do it? Well from a technical level of course the Starfighter game never had to actually run on arcade hardware. The movie's effects were made by Digital Productions, the company John Whitney Jr. and Gary Demos founded, on a Cray X-MP supercomputer. That was around 25 minutes of computer graphics across nearly 300 shots. An actual arcade game has to draw a new frame many times a second, live. The movie's "game" could take as long as it needed on each frame, so it could show what a game would look like once the hardware caught up.
+
 From a design standpoint I have no idea! I've searched for any kind of explanation and haven't found anything that goes into detail about the making of the movie arcade game concept itself.
 
 So was the movie predicting where videogames were going, or showing them the way? I'd guess predicting, because I've never heard any game developer call out The Last Starfighter as a direct inspiration.
