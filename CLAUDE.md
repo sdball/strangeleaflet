@@ -65,7 +65,11 @@ Follow the existing ones (`penguin-walker.js`, `bitfields.js`):
 - Load assets with `new URL("file", import.meta.url)` so another post can reuse
   the module by absolute path.
 - Respect `prefers-reduced-motion`, keep tap targets 40–44px, label inputs.
-- No frameworks or CDNs.
+- No build step: modules run as written. Libraries from a CDN are fine when
+  they're useful (d3 for a chart, Lit for a widget with a lot of state), and
+  so is Google Fonts for a typeface the theme doesn't have. Load them from the
+  module, as `zork-screen.js` adds VT323's stylesheet `<link>`, and pin an
+  exact version of a script. The layout already preconnects to Google Fonts.
 
 ## Code in several languages
 
