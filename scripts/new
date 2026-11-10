@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""Start a draft post (or the next page of a leaflet) and open it in $EDITOR.
+
+Usage: scripts/new [title words]       a post at posts/<slug>/index.md
+       scripts/new --leaflet [name]    the next page of a leaflet (pick one if no name)
+       scripts/new --no-edit ...       write it and print its path, don't open it
+
+It asks for anything missing (the slug, tags, a meta description) with gum
+when it's installed, plain prompts when it isn't. Enter skips the optional
+ones. The draft is publish: false, with no published_date: the pre-commit hook
+adds that in the commit that publishes it.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+import unicodedata
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+# Top-level paths the build makes itself, besides static/'s files.
+RESERVED = {"blog", "feed", "feed.xml", "leaflets", "search.json", "sitemap.xml",
+            "robots.txt", "404.html", "index.html"}
+GUM = shutil.which("gum") if sys.stdin.isatty() else None
+
+
+# ---------- Frontmatter ----------
+
+def frontmatter(path):
+    text = path.read_text()
+    if not text.startswith("---\n"):
+        return {}
+    head = text[4:text.find("\n---\n", 4)]
+    meta = {}
+    for line in head.splitlines():
+        key, sep, value = line.partition(":")
+        if sep:
+            meta[key.strip()] = value.strip().strip('"')
+    return meta
+
+
+def sources(folder):
+    for path in sorted((ROOT / folder).rglob("*")):
+        if path.suffix in (".md", ".html") and path.is_file():
+            yield path
+
+
+def split(value):
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
+def taken_urls():
+    """Every top-level path in use: slugs, aliases, and what the build makes."""
+    taken = set(RESERVED) | {p.name for p in (ROOT / "static").iterdir()}
+    for folder in ("posts", "pages", "leaflets"):
+        for path in sources(folder):
+            meta = frontmatter(path)
+            if meta.get("slug"):
+                taken.add(meta["slug"].strip("/"))
+            taken.update(a.strip("/") for a in split(meta.get("alias", "")))
+    return taken
+
+
+def known_tags():
+    counts = {}
+    for folder in ("posts", "leaflets"):
+        for path in sources(folder):
+            for tag in split(frontmatter(path).get("tags", "")):
+                counts[tag] = counts.get(tag, 0) + 1
+    return sorted(counts, key=lambda t: (-counts[t], t))
+
+
+def slugify(title):
+    text = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode()
+    text = re.sub(r"['’]", "", text.lower())
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+
+
+def write_draft(path, fields, body=""):
+    lines = [f"{k}: {v}" for k, v in fields.items() if v]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("---\n" + "\n".join(lines) + "\npublish: false\n---\n\n" + body)
+
+
+# ---------- Asking ----------
+
+def gum(*args, stdin=None):
+    """Run gum; None if the person backed out (esc or ctrl-c)."""
+    result = subprocess.run([GUM, *args], input=stdin, text=True,
+                            stdout=subprocess.PIPE)
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def ask(prompt, value="", placeholder=""):
+    if GUM:
+        answer = gum("input", "--header", prompt, "--value", value,
+                     "--placeholder", placeholder)
+        if answer is None:
+            sys.exit("Cancelled.")
+        return answer.strip()
+    suffix = f" [{value}]" if value else ""
+    try:
+        return input(f"{prompt}{suffix}: ").strip() or value
+    except (EOFError, KeyboardInterrupt):
+        sys.exit("\nCancelled.")
+
+
+def choose(header, options):
+    if GUM:
+        return gum("choose", "--header", header, stdin="\n".join(options))
+    for i, option in enumerate(options, 1):
+        print(f"  {i}. {option}")
+    answer = ask(header + " (number)")
+    if answer.isdigit() and 1 <= int(answer) <= len(options):
+        return options[int(answer) - 1]
+    return None
+
+
+def ask_tags(default=()):
+    tags = list(default)
+    if GUM:
+        picked = gum("filter", "--no-limit", "--header",
+                     "Tags: type to filter, tab to pick, enter when done, esc for none",
+                     "--placeholder", "tags", stdin="\n".join(known_tags()))
+        if picked:
+            tags += [t for t in picked.splitlines() if t not in tags]
+        extra = ask("New tags, comma-separated (enter for none)")
+    else:
+        print("Tags in use: " + ", ".join(known_tags()))
+        extra = ask("Tags, comma-separated", ", ".join(tags))
+        tags = []
+    tags += [t for t in split(extra) if t not in tags]
+    return ", ".join(tags)
+
+
+# ---------- Posts and leaflet pages ----------
+
+def new_post(title):
+    title = title or ask("Title", placeholder="What's it called?")
+    if not title:
+        sys.exit("A post needs a title.")
+    taken = taken_urls()
+    slug = slugify(title)
+    while True:
+        slug = slugify(ask("Slug, the URL forever after", slug))
+        folder, single = ROOT / "posts" / slug, ROOT / "posts" / f"{slug}.md"
+        if not slug:
+            print("The slug can't be empty.", file=sys.stderr)
+        elif slug in taken or folder.exists() or single.exists():
+            print(f"/{slug}/ is already taken. Pick another.", file=sys.stderr)
+        else:
+            break
+    fields = {"title": title, "slug": slug, "tags": ask_tags(),
+              "meta_description": ask("Meta description (enter to use the post's start)")}
+    path = folder / "index.md"
+    write_draft(path, fields)
+    return path
+
+
+def page_number(path):
+    match = re.fullmatch(r"page-(\d+)(\.md|\.html)?", path.name)
+    return int(match.group(1)) if match else None
+
+
+def new_leaflet_page(name):
+    leaflets = sorted(p.name for p in (ROOT / "leaflets").iterdir() if (p / "index.md").exists())
+    if not name:
+        name = choose("Which leaflet?", leaflets)
+        if not name:
+            sys.exit("Cancelled.")
+    if name not in leaflets:
+        sys.exit(f"No leaflet called {name}. There's: {', '.join(leaflets)}")
+    folder = ROOT / "leaflets" / name
+    pages = {page_number(p): p for p in folder.iterdir() if page_number(p)}
+    n = max(pages, default=0) + 1
+    last = pages.get(n - 1)
+    if last and last.is_dir():
+        last = next((last / f for f in ("index.md", "index.html") if (last / f).exists()), None)
+    previous_tags = split(frontmatter(last).get("tags", "")) if last else []
+    cover = frontmatter(folder / "index.md").get("title", name)
+    print(f"{cover}, page {n}")
+    fields = {"tags": ask_tags(previous_tags),
+              "meta_description": ask("Meta description (the line under \"Page "
+                                      f"{n}\", and its contents and feed title)")}
+    path = folder / f"page-{n}" / "index.md"
+    write_draft(path, fields)
+    return path
+
+
+# ---------- Main ----------
+
+def main(args):
+    edit = True
+    if "--no-edit" in args:
+        args.remove("--no-edit")
+        edit = False
+    if args and args[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return
+    if args and args[0] in ("-l", "--leaflet"):
+        if len(args) > 2:
+            sys.exit("Usage: scripts/new --leaflet [name]")
+        path = new_leaflet_page(args[1] if len(args) > 1 else None)
+    elif args and args[0].startswith("-"):
+        sys.exit(f"Unknown option: {args[0]} (try --help)")
+    else:
+        path = new_post(" ".join(args).strip())
+
+    rel = path.relative_to(ROOT)
+    print(f"Wrote {rel}")
+    if edit:
+        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vi"
+        os.chdir(ROOT)
+        os.execvp("sh", ["sh", "-c", f'{editor} "$1"', "sh", str(rel)])
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -14,6 +14,7 @@ static/theme.css         the theme (light and dark), copied to public/
 scripts/build            builds public/ (sets up .venv the first time)
 scripts/serve            builds with drafts, serves public/ at http://localhost:8000/, rebuilds on changes
 scripts/check-links      checks every internal link and image in public/
+scripts/new              starts a draft post or leaflet page and opens it in $EDITOR
 scripts/drafts           picks a draft with gum and opens it in $EDITOR
 ```
 
@@ -25,6 +26,8 @@ scripts/serve 9000   # or pick a port
 scripts/serve --list # Python servers still running, with their pids
 scripts/build        # build without drafts, the way the deploy does
 scripts/check-links  # after a build: any links or images that go nowhere?
+scripts/new          # start a draft post (asks for title, slug, tags) and open it in $EDITOR
+scripts/new --leaflet programming-videos   # or the next page of a leaflet
 scripts/drafts       # pick a draft to open in $EDITOR (--list to just list them)
 ```
 
@@ -47,7 +50,13 @@ git config core.hooksPath .githooks
 
 ## Writing a post
 
-Add `posts/<slug>.md`. The frontmatter is the format Bear exported:
+`scripts/new` starts one: it asks for a title, the slug (made from the title,
+and checked against every URL already in use), tags (picked from the ones
+posts already use, or new), and a meta description, writes
+`posts/<slug>/index.md` as a draft, and opens it in `$EDITOR`. Run
+`scripts/serve` beside it to watch the draft as you write.
+
+Or add `posts/<slug>.md` by hand. The frontmatter is the format Bear exported:
 
 ```yaml
 ---
