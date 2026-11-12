@@ -5,6 +5,13 @@
 // up with waits in its queue; with "waits for each reply", the producer
 // sends one message and waits for the consumer's answer before the next.
 //
+// The headline figure is how long the oldest waiting message has waited:
+// about how long any message waits before the consumer gets to it. When the
+// producer outpaces the consumer it grows without limit; when the producer
+// waits for each reply it stays near zero. The consumer shows how busy it's
+// been over the last moment rather than each message's progress, which
+// would flicker at these speeds.
+//
 // It's a simulation, not a replay, and both sides follow the same rules,
 // because in the runs on the page they behaved the same. What differs is
 // where the waiting messages are (the BEAM consumer's mailbox, part of the
@@ -23,6 +30,7 @@ const WORKS = [1, 2, 4]; // ms the consumer spends on each message
 // Simulated milliseconds per real millisecond
 const SPEEDS = { "1/100": 0.01, "1/25": 0.04, "1/5": 0.2 };
 const STEP = 5; // simulated ms per press of Step
+const BUSY_WINDOW = 200; // simulated ms the consumer's busy figure averages over
 // Measured memory per waiting message: queue-memory.exs (the consumer's
 // process memory) and queue-memory.mjs (the Node process's RSS, 770 to 918
 // bytes over five sizes and two runs)
@@ -52,6 +60,7 @@ const GAP = 3;
 const ROWS = 4; // of messages shown; the rest are counted
 
 const number = (n) => n.toLocaleString("en-US");
+const duration = (ms) => (ms < 1000 ? `${number(Math.round(ms))} ms` : `${(ms / 1000).toFixed(2)} s`);
 const size = (bytes) =>
   bytes >= 1e6 ? `${(bytes / 1e6).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MB`
   : bytes >= 1e3 ? `${number(Math.round(bytes / 1e3))} KB`
@@ -176,7 +185,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     beam-mailbox .side {
       display: grid;
       grid-template-rows: subgrid;
-      grid-row: span 4;
+      grid-row: span 5;
       align-content: start;
     }
   }
@@ -233,23 +242,26 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     color: var(--brass);
     font-weight: 700;
   }
-  /* The message the consumer is working on, and how far along it is */
-  beam-mailbox .work {
-    position: relative;
-    flex: 1;
-    height: .7rem;
-    border: 1.5px solid var(--line);
-    border-radius: 3px;
-    overflow: hidden;
+  beam-mailbox .end output {
+    display: inline-block;
+    min-width: 4ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
   }
-  beam-mailbox .work i {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: calc(var(--done, 0) * 100%);
-    background: var(--code-string);
+  /* The headline: how long the oldest waiting message has waited */
+  beam-mailbox .age {
+    display: grid;
+    margin: .6rem 0 0;
+    font-family: var(--type);
+    font-size: .85rem;
+    color: var(--muted);
   }
-  beam-mailbox .work.reply i {
-    background: var(--brass);
+  beam-mailbox .age output {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
   }
   beam-mailbox .queue {
     padding: .4rem .5rem;
@@ -357,10 +369,12 @@ class Pair {
     this.t = 0;
     this.sent = 0;
     this.handled = 0;
-    this.queue = []; // true for a message that wants a reply
+    this.queue = []; // { at: when it was sent, reply: whether it wants one }
     this.head = 0; // the oldest waiting message's index in queue
     this.current = null; // { start, reply } while the consumer works
     this.awaiting = false;
+    this.busy = 0; // ms the consumer has spent working, in all
+    this.history = [[0, 0]]; // [t, busy] at the end of each advance, recent ones
     this.rebase();
   }
 
@@ -381,6 +395,7 @@ class Pair {
       const finish = this.current ? this.current.start + work : Infinity;
       const next = Math.min(send, finish);
       if (next > to) break;
+      if (this.current) this.busy += next - this.t;
       this.t = next;
       if (finish <= send) {
         if (this.current.reply) this.awaiting = false;
@@ -388,13 +403,13 @@ class Pair {
         this.handled++;
       } else {
         const reply = mode === "call";
-        this.queue.push(reply);
+        this.queue.push({ at: this.t, reply });
         this.sent++;
         this.due++;
         if (reply) this.awaiting = true;
       }
       if (!this.current && this.waiting) {
-        this.current = { start: this.t, reply: this.queue[this.head++] };
+        this.current = { start: this.t, reply: this.queue[this.head++].reply };
         // Let go of messages already taken, now and then
         if (this.head > 4096) {
           this.queue = this.queue.slice(this.head);
@@ -402,7 +417,21 @@ class Pair {
         }
       }
     }
+    if (this.current) this.busy += to - this.t;
     this.t = to;
+    this.history.push([to, this.busy]);
+    while (this.history.length > 2 && this.history[1][0] <= to - BUSY_WINDOW) this.history.shift();
+  }
+
+  // How long the oldest waiting message has waited
+  get oldestAge() {
+    return this.waiting ? this.t - this.queue[this.head].at : 0;
+  }
+
+  // The share of the last moment the consumer spent working
+  get busyShare() {
+    const [t0, busy0] = this.history[0];
+    return this.t > t0 ? (this.busy - busy0) / (this.t - t0) : 0;
   }
 
   // The oldest n waiting messages, oldest first
@@ -436,10 +465,10 @@ customElements.define("beam-mailbox", class extends HTMLElement {
             </div>
             <div class="end consumer">
               <span class="name">${s.consumer}</span>
-              <span class="states"><span data-state="working">working</span><span data-state="idle">idle</span></span>
-              <span class="work"><i></i></span>
+              <span>busy <output class="busy"></output></span>
             </div>
           </div>
+          <p class="age"><span>the oldest waiting message has waited</span><output class="oldest"></output></p>
           <table class="readout" aria-label="${s.title}: messages so far">
             <tbody>
               <tr><th scope="row">sent</th><td class="sent"></td></tr>
@@ -464,7 +493,7 @@ customElements.define("beam-mailbox", class extends HTMLElement {
         <fieldset class="choices" data-setting="work"><legend>Each message takes</legend>${radios("work", WORKS.map(String), "2", (v) => `${v} ms`)}</fieldset>
         <fieldset class="choices" data-setting="speed"><legend>Speed</legend>${radios("speed", Object.keys(SPEEDS), "1/25")}</fieldset>
       </div>
-      <p class="note">A simulation of the runs above, slowed down to watch: at 1/25 a millisecond takes 25. Both sides follow the same rules. The memory figures use what one waiting message cost in each runtime (<a href="queue-memory.exs">queue-memory.exs</a>, <a href="queue-memory.mjs">queue-memory.mjs</a>).</p>
+      <p class="note">A simulation of the runs above, slowed down to watch: at 1/25 a millisecond takes 25. Both sides follow the same rules. Watch how long the oldest waiting message has waited. That's about how long every message waits before the consumer gets to it. The memory figures use what one waiting message cost in each runtime (<a href="queue-memory.exs">queue-memory.exs</a>, <a href="queue-memory.mjs">queue-memory.mjs</a>).</p>
       <div class="sides">${side("beam")}${side("node")}</div>
       <p class="key" aria-hidden="true">
         <span style="--swatch: var(--code-string)">a message</span>
@@ -571,7 +600,6 @@ customElements.define("beam-mailbox", class extends HTMLElement {
 
   render() {
     if (!this.sides[0].pair) return;
-    const { work } = this.settings;
     const t = this.sides[0].pair.t;
     const clock = `${(t / 1000).toFixed(3)} s`;
     const out = this.$(".clock output");
@@ -587,21 +615,19 @@ customElements.define("beam-mailbox", class extends HTMLElement {
       set(".handled", number(pair.handled));
       set(".waiting", number(pair.waiting));
       set(".memory", size(pair.waiting * s.bytes));
+      set(".oldest", pair.waiting ? duration(pair.oldestAge) : "none");
+      set(".busy", `${Math.round(pair.busyShare * 100)}%`);
 
       const state = (end, name) => el.querySelectorAll(`.${end} [data-state]`).forEach((span) => span.classList.toggle("on", span.dataset.state === name));
       state("producer", pair.awaiting ? "waiting" : "sending");
-      state("consumer", pair.current ? "working" : "idle");
       el.querySelector(".producer").classList.toggle("held", pair.awaiting);
-      const bar = el.querySelector(".work");
-      bar.classList.toggle("reply", !!pair.current?.reply);
-      bar.style.setProperty("--done", pair.current ? Math.min(1, (pair.t - pair.current.start) / work) : 0);
 
       // The oldest first, in reading order
       const chips = s.chips.children;
       const shown = pair.oldest(chips.length);
       for (let i = 0; i < chips.length; i++) {
         const message = shown[i];
-        chips[i].className = message === undefined ? "chip" : message ? "chip on reply" : "chip on";
+        chips[i].className = !message ? "chip" : message.reply ? "chip on reply" : "chip on";
       }
       const hidden = pair.waiting - shown.length;
       // The message the producer is waiting on is the newest, so it's
