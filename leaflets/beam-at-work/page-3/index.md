@@ -93,6 +93,44 @@ All of this happened inside one process, on its own memory. Nothing in it touche
 
 Here's a bigger job to make that visible. One process builds a list of 10 million pairs and keeps all of it, which is close to the worst case for a copying collector: everything is live, so every collection copies all it looks at and frees nothing. Meanwhile six other processes each try to tick every 10 ms, and note how late each tick was ([gc-alone.exs](gc-alone.exs)):
 
+```elixir
+defmodule Builder do
+  def loop(acc, 0), do: acc
+  def loop(acc, n), do: loop([{n, n} | acc], n - 1)
+end
+
+defmodule Ticker do
+  # Returns every tick as {how late it was, when it was due}, in µs.
+  def run(due, stop, ticks) do
+    now = System.monotonic_time(:microsecond)
+    if now >= stop do
+      ticks
+    else
+      Process.sleep(max(0, div(due - now, 1000)))
+      late = System.monotonic_time(:microsecond) - due
+      run(due + 10_000, stop, [{late, due} | ticks])
+    end
+  end
+end
+
+me = self()
+t0 = System.monotonic_time(:microsecond)
+for _ <- 1..6, do: spawn(fn -> send(me, {:ticks, Ticker.run(t0 + 10_000, t0 + 4_000_000, [])}) end)
+
+builder = spawn(fn ->
+  receive do: (:go -> :ok)
+  list = Builder.loop([], 10_000_000)
+  send(me, :built)
+  receive do: (:stop -> length(list))
+end)
+:erlang.trace(builder, true, [:garbage_collection, :monotonic_timestamp])
+Process.sleep(500)
+send(builder, :go)
+
+# ...then collect the trace messages and the ticks, and sort the ticks into
+# those that came due while the builder was collecting and the rest
+```
+
 ```text
 $ for i in 1 2 3; do elixir gc-alone.exs; done
 schedulers: 8, dirty CPU schedulers: 8
@@ -133,6 +171,35 @@ V8 has worked hard on its pauses. Its young collections run in parallel on sever
 
 Here's the same job in Node: a list of 10 million pairs, all kept, and a ticker every 10 ms ([gc-pause.mjs](gc-pause.mjs)). To keep page 1's problem out of it, the builder works in chunks of 10,000 and lets the ticker run between chunks, so the longest the ticker waits on the builder's own code is a chunk, 2 to 4 ms. `perf_hooks` reports each collection and how long it took.
 
+```javascript
+import { PerformanceObserver } from "node:perf_hooks";
+import { setImmediate as letOthersRun } from "node:timers/promises";
+
+const gcs = [];
+new PerformanceObserver((list) => gcs.push(...list.getEntries())).observe({ entryTypes: ["gc"] });
+
+const t0 = performance.now();
+const ticks = []; // every tick as { late, due }, in ms
+let due = t0 + 10;
+const tick = () => {
+  ticks.push({ late: performance.now() - due, due });
+  due += 10;
+  if (due < t0 + 4000) setTimeout(tick, Math.max(0, due - performance.now()));
+};
+setTimeout(tick, 10);
+
+await new Promise((resolve) => setTimeout(resolve, 500));
+let list = null;
+for (let n = 10_000_000; n > 0; ) {
+  for (const end = n - 10_000; n > end; n--) list = { a: n, b: n, tail: list };
+  await letOthersRun();
+}
+
+// (each chunk is also timed, for the longest chunk of work in the output)
+// ...then sort the ticks into those that came due while V8 was collecting
+// and the rest, as in gc-alone.exs
+```
+
 ```text
 $ for i in 1 2 3; do node gc-pause.mjs; done
 node v25.9.0, heap used 465 MB, longest chunk of work 4 ms
@@ -158,6 +225,15 @@ But look at who waited. In Node the ticks that came due during a collection wait
 There's a cheaper way still to deal with garbage: don't collect it. When a process ends, the BEAM frees its heaps whole, garbage and all, without a collection. A process that finishes before its heap fills up never collects once.
 
 Here are 100,000 short-lived processes that each build a list, sum it, and exit ([die-young.exs](die-young.exs)), with the whole system's count of garbage collections from `:erlang.statistics/1` before and after:
+
+```elixir
+{gcs_before, _, _} = :erlang.statistics(:garbage_collection)
+for _ <- 1..100_000 do
+  spawn(fn -> send(me, Enum.sum(Enum.to_list(1..size))) end)
+end
+for _ <- 1..100_000, do: (receive do: (_ -> :ok))
+{gcs_after, _, _} = :erlang.statistics(:garbage_collection)
+```
 
 ```text
 $ for size in 50 100 1000 10000; do elixir die-young.exs $size; done
