@@ -87,6 +87,50 @@ GenServer gives a client two ways to send a server a request, page 4's two ways 
 
 Buying a ticket is a call, because a buyer needs to know whether they got one.
 
+## Where the state lives
+
+The thing that surprises most people about a GenServer is where the state is. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback hands back the next one as part of what it returns.
+
+Here are two more callbacks for the ticket server, a call that asks how many tickets are left and a cast that adds some:
+
+```elixir
+def handle_call(:left, _from, left), do: {:reply, left, left}
+def handle_cast({:add, n}, left), do: {:noreply, left + n}
+```
+
+Every callback returns a tuple, and GenServer reads it to know what to do next:
+
+- `{:reply, reply, new_state}` from `handle_call`: send `reply` back to the caller, and carry on with `new_state`.
+- `{:noreply, new_state}` from `handle_cast`: there's nobody waiting for a reply, so just carry on with `new_state`.
+- `{:ok, state}` from `init`: the server has started, and `state` is its first state.
+
+So `{:reply, :ok, left - 1}` means reply `:ok`, and from now on there's one ticket fewer. It's the server by hand's last two lines, `send(from, {ref, reply})` and `loop(left)`, written as a value for GenServer to act on. And `{:reply, left, left}` replies with how many tickets are left and keeps the state as it was. A callback always returns the state, even when it hasn't changed.
+
+Here's the loop unrolled, one turn for each message. Send the server a few, and watch each callback start from the state the last one returned:
+
+<genserver-loop>
+
+```text
+init(2)
+  returns {:ok, 2}                     the server is up
+  ↓ loop(2)
+handle_call(:buy, from, 2)
+  returns {:reply, :ok, 1}             the caller gets :ok
+  ↓ loop(1)
+handle_cast({:add, 2}, 1)
+  returns {:noreply, 3}                no reply: a cast doesn't wait for one
+  ↓ loop(3)
+handle_call(:left, from, 3)
+  returns {:reply, 3, 3}               the caller gets 3
+  ↓ loop(3)
+```
+
+*The live version of this needs JavaScript. In it, you send the server calls and casts and watch each turn of its loop: the callback called with the current state, the tuple it returns, and the new state carried on to the next turn.*
+
+</genserver-loop>
+
+<script type="module" src="genserver-loop.js"></script>
+
 So what does that get you over twenty lines you could write yourself? Most of the answer is in `call`. First, though, something the two versions share.
 
 ## One message at a time
@@ -528,7 +572,7 @@ What Elixir programs do instead depends on the state. Work that doesn't touch it
 
 ## Watch it happen
 
-The thing that surprises most people about a GenServer is where the state is. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback returns the next one as part of its answer, `{:reply, reply, new_state}`, or `{:noreply, new_state}` for a cast. The loop goes round again with whatever came back. Even a call that changes nothing, like asking how many tickets are left, returns the state, the same one it was given.
+The unrolled loop in "Where the state lives" showed the state going from one callback to the next. Here's the same thing inside a running server, with its mailbox and a client sending it requests.
 
 Here's the ticket server again, with a call that buys `n` tickets, a call that asks how many are left, and a cast that adds `n`:
 
