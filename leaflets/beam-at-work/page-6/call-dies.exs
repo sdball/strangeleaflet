@@ -29,6 +29,7 @@ call = fn ->
   end
 end
 
+IO.puts("## GenServer.call")
 call.()
 IO.puts("server alive? #{Process.alive?(server)}")
 call.()
@@ -36,7 +37,7 @@ call.()
 {:messages, messages} = Process.info(self(), :messages)
 IO.puts("caller's mailbox: #{inspect(messages)}")
 
-IO.puts("by hand, with no monitor:")
+IO.puts("\n## By hand, with no monitor")
 ref = make_ref()
 send(server, {:"$gen_call", {self(), ref}, :crash})
 

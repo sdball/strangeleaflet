@@ -226,11 +226,13 @@ end
 
 ```text
 $ elixir call-dies.exs
+## GenServer.call
 caller exited: the server raised %RuntimeError{message: "oops"}
 server alive? false
 caller exited: :noproc
 caller's mailbox: []
-by hand, with no monitor:
+
+## By hand, with no monitor
 still waiting after 5 seconds
 ```
 
@@ -254,13 +256,13 @@ The caller, with `GenServer.call` and then by hand, looking in its own mailbox h
 ```elixir
 show_mailbox = fn ->
   {:messages, messages} = Process.info(self(), :messages)
-  IO.puts("  500 ms later, the caller's mailbox: #{inspect(messages)}")
+  IO.puts("500 ms later, the caller's mailbox: #{inspect(messages)}")
 end
 
 try do
   GenServer.call(server, :work, 100)
 catch
-  :exit, {reason, _where} -> IO.puts("  caller exited: #{inspect(reason)}")
+  :exit, {reason, _where} -> IO.puts("caller exited: #{inspect(reason)}")
 end
 
 Process.sleep(500)
@@ -270,9 +272,9 @@ ref = make_ref()
 send(server, {:"$gen_call", {self(), ref}, :work})
 
 receive do
-  {^ref, reply} -> IO.puts("  reply: #{inspect(reply)}")
+  {^ref, reply} -> IO.puts("reply: #{inspect(reply)}")
 after
-  100 -> IO.puts("  gave up")
+  100 -> IO.puts("gave up")
 end
 
 Process.sleep(500)
@@ -281,12 +283,13 @@ show_mailbox.()
 
 ```text
 $ elixir call-timeout.exs
-GenServer.call, giving up after 100 ms
-  caller exited: :timeout
-  500 ms later, the caller's mailbox: []
-by hand, giving up after 100 ms
-  gave up
-  500 ms later, the caller's mailbox: [{#Reference<0.1738014522.4186439684.211130>, :done}]
+## GenServer.call, giving up after 100 ms
+caller exited: :timeout
+500 ms later, the caller's mailbox: []
+
+## By hand, giving up after 100 ms
+gave up
+500 ms later, the caller's mailbox: [{#Reference<0.3433416021.1507852296.193126>, :done}]
 ```
 
 Giving up doesn't stop the server. It still did the work and sent the reply 200 ms later. With the call by hand, that late reply landed in the caller's mailbox, where nothing will ever receive it: page 4's stray message, taking memory and slowing every receive that has to look past it. With `GenServer.call` it never arrived. On a timeout, `do_call` removes the monitor, and with it the alias, so the late reply goes nowhere. (The second, `after 0` receive is for a reply that made it in before the alias was turned off. Then the call takes it after all.)
