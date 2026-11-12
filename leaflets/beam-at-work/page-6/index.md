@@ -353,9 +353,14 @@ Two more things come with it that later pages need. `use GenServer` writes a `ch
 
 ## And in Node?
 
-Inside one Node thread, the fair equivalent of the ticket server is an object with methods. It's just as safe for code that doesn't wait: one callback runs at a time (page 1), so a method with no `await` in it runs to completion before anything else can touch the object. The difference shows when there's waiting in the middle. Here's the same sale with the same 100 ms payment ([wait-inside.mjs](wait-inside.mjs)):
+Inside one Node thread, the fair equivalent of the ticket server is an object with methods. It's just as safe for code that doesn't wait: one callback runs at a time (page 1), so a method with no `await` in it runs to completion before anything else can touch the object. The difference shows when there's waiting in the middle. Here's the same sale with the same 100 ms payment, and three buyers at once for the last two tickets ([wait-inside.mjs](wait-inside.mjs)):
 
 ```js
+const charge = async () => {
+  await sleep(100);
+  return "paid";
+};
+
 class Tickets {
   constructor(left) {
     this.left = left;
@@ -368,25 +373,31 @@ class Tickets {
     return "ok";
   }
 }
+
+const tickets = new Tickets(2);
+const start = performance.now();
+
+await Promise.all(
+  [1, 2, 3].map(async (buyer) => {
+    const reply = await tickets.buy();
+    console.log(`${Math.round(performance.now() - start)} ms: buyer ${buyer}: ${reply}`);
+  }),
+);
+console.log(`tickets left: ${tickets.left}`);
 ```
 
 ```text
-$ node wait-inside.mjs; node wait-inside.mjs queue
-node v25.9.0, plain
-107 ms: buyer 1: ok
-108 ms: buyer 2: ok
-108 ms: buyer 3: ok
+$ node wait-inside.mjs
+node v25.9.0
+106 ms: buyer 1: ok
+106 ms: buyer 2: ok
+106 ms: buyer 3: ok
 tickets left: -1
-node v25.9.0, queue
-101 ms: buyer 1: ok
-204 ms: buyer 2: ok
-204 ms: buyer 3: sold out
-tickets left: 0
 ```
 
 Three tickets sold out of two. `await` hands the thread back while the payment is out, so the other two buyers ran their checks before the first sale took its ticket. All three saw one left.
 
-The second run is the fix, a queue that makes each sale wait for the one before it:
+The fix is a queue that makes each sale wait for the one before it. Here's the same script with the buyers using this instead of `Tickets` ([wait-inside-queue.mjs](wait-inside-queue.mjs)):
 
 ```js
 class QueuedTickets extends Tickets {
@@ -398,6 +409,17 @@ class QueuedTickets extends Tickets {
     return result;
   }
 }
+
+const tickets = new QueuedTickets(2);
+```
+
+```text
+$ node wait-inside-queue.mjs
+node v25.9.0
+103 ms: buyer 1: ok
+204 ms: buyer 2: ok
+204 ms: buyer 3: sold out
+tickets left: 0
 ```
 
 That matches the GenServer exactly, down to the times, and it's eight lines. So Node can do it. The difference is which way the default goes. In Node, everything interleaves at an `await` unless you queue it, and you have to spot where. In a GenServer, nothing interleaves unless you arrange it.
@@ -566,7 +588,7 @@ Start the server, then send it requests. Watch the state, drawn in brass: it goe
 
 ## Sources
 
-- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), [wait-inside-queue.mjs](wait-inside-queue.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - A tail-recursive call using no stack, so a loop can "run forever": the Erlang reference manual, [Tail recursion](https://www.erlang.org/doc/system/ref_man_functions.html#tail-recursion).
 - GenServer as "a process like any other Elixir process" with "a standard set of interface functions" and tracing: [GenServer](https://hexdocs.pm/elixir/1.19.5/GenServer.html). `GenServer.call` passing the request to `:gen.call` with the label `:"$gen_call"` and a default timeout of 5,000: [gen_server.ex at v1.19.5](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1108-L1146). `cast` returning `:ok` whether or not the server exists: [L1149–L1161](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1149-L1161). `handle_info` handling "all other messages": [L650–L656](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L650-L656). `code_change`: [L749–L760](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L749-L760). The bottleneck warning: [L380–L396](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L381-L396). `child_spec/1` and the `:sys` functions: [Debugging with the :sys module](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-debugging-with-the-sys-module) and [How to supervise](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-how-to-supervise).
 - The server loop taking the oldest message and dispatching `'$gen_call'` to `handle_call`: [gen_server.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2320-L2326) and [L2498–L2518](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2498-L2518). `do_call`: [gen.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L231-L281); the reply sent to the alias: [L549–L554](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L549-L554). Late replies not received: [`gen_server:call/3`](https://www.erlang.org/doc/apps/stdlib/gen_server.html#call/3).

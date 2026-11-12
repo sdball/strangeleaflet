@@ -1,6 +1,5 @@
 // Three buyers at once, two tickets, and the seller has to wait 100 ms on a
-// payment in the middle of each sale. Run with "queue" to make each sale wait
-// for the one before it.
+// payment in the middle of each sale. wait-inside-queue.mjs is the fix.
 
 import { setTimeout as sleep } from "node:timers/promises";
 
@@ -22,26 +21,14 @@ class Tickets {
   }
 }
 
-class QueuedTickets extends Tickets {
-  queue = Promise.resolve();
-
-  buy() {
-    const result = this.queue.then(() => super.buy());
-    this.queue = result.catch(() => {});
-    return result;
-  }
-}
-
-const mode = process.argv[2] ?? "plain";
-const tickets = mode === "queue" ? new QueuedTickets(2) : new Tickets(2);
+const tickets = new Tickets(2);
 const start = performance.now();
 
-console.log(`node ${process.version}, ${mode}`);
+console.log(`node ${process.version}`);
 await Promise.all(
   [1, 2, 3].map(async (buyer) => {
     const reply = await tickets.buy();
-    const ms = Math.round(performance.now() - start);
-    console.log(`${ms} ms: buyer ${buyer}: ${reply}`);
+    console.log(`${Math.round(performance.now() - start)} ms: buyer ${buyer}: ${reply}`);
   }),
 );
 console.log(`tickets left: ${tickets.left}`);
