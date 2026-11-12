@@ -7,14 +7,18 @@
 const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
 
 const start = performance.now();
+const elapsed = () => performance.now() - start;
 
-const log = (message) => {
-  const elapsed = Math.round(performance.now() - start);
-  console.log(`${String(elapsed).padStart(4)} ms  ${message}`);
+const log = (message, at = elapsed()) => {
+  console.log(`${String(Math.floor(at)).padStart(4)} ms  ${message}`);
 };
 
+// n counts the ticks that ran. The clock says how many were due.
 let n = 0;
-const ticker = setInterval(() => log(`tick ${++n}`), 100);
+const ticker = setInterval(() => {
+  const at = elapsed();
+  log(`tick ${++n} (${Math.floor(at / 100)} due)`, at);
+}, 100);
 
 setTimeout(() => {
   log("busy loop starts");

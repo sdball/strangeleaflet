@@ -91,7 +91,7 @@ All of this happened inside one process, on its own memory. Nothing in it touche
 
 ## Who waits?
 
-Here's a bigger job to make that visible. One process builds a list of 10 million pairs and keeps all of it, which is close to the worst case for a copying collector: everything is live, so every collection copies everything. Meanwhile six other processes each try to tick every 10 ms, and note how late each tick was ([gc-alone.exs](gc-alone.exs)):
+Here's a bigger job to make that visible. One process builds a list of 10 million pairs and keeps all of it, which is close to the worst case for a copying collector: everything is live, so every collection copies all it looks at and frees nothing. Meanwhile six other processes each try to tick every 10 ms, and note how late each tick was ([gc-alone.exs](gc-alone.exs)):
 
 ```text
 $ for i in 1 2 3; do elixir gc-alone.exs; done
@@ -167,13 +167,13 @@ $ for size in 50 100 1000 10000; do elixir die-young.exs $size; done
 100000 processes, each summing a list of 10000: 1500090 garbage collections
 ```
 
-With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. (Tracing every new process's collections in a second run counted zero. The 90 were other processes'.) Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
+With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. [children-gcs.exs](children-gcs.exs) runs the same thing while tracing every new process's collections, and it counts zero for the children, at both sizes. The 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
 
 That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
 
 ## Watch it happen
 
-Here are both runs again, side by side and slowed down. It's a replay, not a simulation: everything in it comes from recording the real thing ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)). The job is the one above, a builder keeping a list of 10 million pairs, with one change: the tickers make a little garbage every tick, the way a small request would, so their heaps fill and get collected too.
+Here are both runs again, side by side and slowed down. It's a replay, not a simulation: everything in it comes from recording the real thing ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)). The job is the one above, a builder keeping a list of 10 million pairs, with two changes: three tickers, and they make a little garbage every tick, the way a small request would, so their heaps fill and get collected too. It's a different run, so its numbers aren't quite the ones above. In it the BEAM builder's longest collection was 260 ms, and V8's longest pause was 80 ms, where the runs above had 46 to 58.
 
 On the BEAM side, every process has its own young and old heap. Watch the tickers' heaps fill and collect on their own, and then the builder's long collections, each on a dirty CPU scheduler, while the tickers' strips keep their even rhythm. On the Node side there's one heap. When V8 collects, the builder and all three tickers stop together, and the ticks they owed come out late in a bunch.
 
@@ -195,13 +195,9 @@ Big binaries are shared. A binary (a string, a chunk of a file, a network packet
 
 And one process with a huge heap is slow to collect, as the builder showed. The BEAM keeps that from holding anyone else up, but it doesn't make it fast. Page 8 comes back to that, and to what Elixir programs do instead of keeping hundreds of megabytes in one process.
 
-<!-- TODO: the widget. Plan in todo/beam-leaflet.md, page 3: per-process heaps filling and
-collecting on their own (fed from gc-steps.exs's real snapshots), one with a big heap handed
-to a dirty scheduler, against Node's one heap pausing every callback. -->
-
 ## Sources
 
-- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), and [die-young.exs](die-young.exs), run 2026-11-12. The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), [die-young.exs](die-young.exs), and [children-gcs.exs](children-gcs.exs), run 2026-11-12. The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - The stack and heap in one block growing toward each other, a collection when they meet, the collector being a "per process generational semi-space copying collector", generations and the old heap, the full sweep, growth starting at 233 words in "a variation of the Fibonacci sequence" then by 20%, shrinking, and cost "proportional to the amount of live data on the heap": the ERTS docs, [Erlang Garbage Collector](https://www.erlang.org/doc/apps/erts/garbagecollection.html): [Overview](https://www.erlang.org/doc/apps/erts/garbagecollection.html#overview), [Generational Garbage Collection](https://www.erlang.org/doc/apps/erts/garbagecollection.html#generational-garbage-collection), and [Sizing the heap](https://www.erlang.org/doc/apps/erts/garbagecollection.html#sizing-the-heap). The same, from another angle: *The BEAM Book*, [The PCB](https://blog.stenmans.org/theBeamBook/#_the_pcb), [The Garbage Collector (GC)](https://blog.stenmans.org/theBeamBook/#_the_garbage_collector_gc), and [Copying Garbage Collection](https://blog.stenmans.org/theBeamBook/#_copying_garbage_collection) ("most terms die young").
 - Tracing collections and the sizes in each trace message: `garbage_collection` in [`erlang:trace/3`](https://www.erlang.org/doc/apps/erts/erlang.html#trace/3). Counting them system-wide: `garbage_collection` in [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
 - Collections of 128K words or more going to a dirty CPU scheduler: `check_for_possibly_long_gc` in [erl_gc.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.c#L688-L716), with `ERTS_POTENTIALLY_LONG_GC_HSIZE` in [erl_gc.h](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.h#L30), and dirty system work going on the dirty CPU queue in [erl_process.c](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L6507-L6509).

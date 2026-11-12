@@ -4,27 +4,31 @@ publish: false
 meta_description: How Elixir runs code, and why one busy loop can't stop everything else
 ---
 
-Here's a tiny experiment. A ticker prints a line every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math that takes about a second. The question: does the ticker keep ticking while the math runs?
+Here's a tiny experiment. A ticker prints a line every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math in a CPU-bound loop that takes about a second. Does the ticker keep ticking while the math runs?
 
 Let's ask Node.js first, then Elixir.
 
 ## The experiment in Node
 
-The slow math is the classic slow Fibonacci: `fib(n)` calls itself twice, for every number down to 1. Asking for `fib(40)` makes about 331 million calls. That's our busy loop.
+The slow math is the classic slow recursive Fibonacci: `fib(n)` calls itself twice, for every number down to 1. Asking for `fib(40)` makes about 331 million calls. That's our busy loop.
 
 ```javascript
 // The slow way on purpose: about 330 million calls for fib(40)
 const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
 
 const start = performance.now();
+const elapsed = () => performance.now() - start;
 
-const log = (message) => {
-  const elapsed = Math.round(performance.now() - start);
-  console.log(`${String(elapsed).padStart(4)} ms  ${message}`);
+const log = (message, at = elapsed()) => {
+  console.log(`${String(Math.floor(at)).padStart(4)} ms  ${message}`);
 };
 
+// n counts the ticks that ran. The clock says how many were due.
 let n = 0;
-const ticker = setInterval(() => log(`tick ${++n}`), 100);
+const ticker = setInterval(() => {
+  const at = elapsed();
+  log(`tick ${++n} (${Math.floor(at / 100)} due)`, at);
+}, 100);
 
 setTimeout(() => {
   log("busy loop starts");
@@ -50,36 +54,38 @@ defmodule Fib do
 end
 
 defmodule Ticker do
-  def loop(log, n) do
+  # n counts the ticks that ran. The clock says how many were due.
+  def loop(log, elapsed, n) do
     receive do
       :tick ->
-        log.("tick #{n}")
-        loop(log, n + 1)
+        at = elapsed.()
+        log.("tick #{n} (#{div(at, 100)} due)", at)
+        loop(log, elapsed, n + 1)
     end
   end
 end
 
 start = System.monotonic_time(:millisecond)
+elapsed = fn -> System.monotonic_time(:millisecond) - start end
 
-log = fn message ->
-  elapsed = System.monotonic_time(:millisecond) - start
-  IO.puts("#{String.pad_leading("#{elapsed}", 4)} ms  #{message}")
+log = fn message, at ->
+  IO.puts("#{String.pad_leading("#{at}", 4)} ms  #{message}")
 end
 
-log.("schedulers online: #{System.schedulers_online()}")
+log.("schedulers online: #{System.schedulers_online()}", elapsed.())
 
 spawn(fn ->
   :timer.send_interval(100, :tick)
-  Ticker.loop(log, 1)
+  Ticker.loop(log, elapsed, 1)
 end)
 
 Process.sleep(350)
 me = self()
 
 spawn(fn ->
-  log.("busy loop starts")
+  log.("busy loop starts", elapsed.())
   Fib.fib(40)
-  log.("busy loop ends")
+  log.("busy loop ends", elapsed.())
   send(me, :done)
 end)
 
@@ -92,77 +98,77 @@ Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs)
 
 ## What happened
 
-I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). This is the real output.
+I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). Each tick prints two numbers: which tick it is, counting the ones that ran, and how many ticks were due by then, going by the clock. If they ever differ, ticks went missing.
 
 ```text
 $ node ticker.mjs
- 101 ms  tick 1
- 202 ms  tick 2
- 303 ms  tick 3
+ 100 ms  tick 1 (1 due)
+ 201 ms  tick 2 (2 due)
+ 302 ms  tick 3 (3 due)
  350 ms  busy loop starts
-1347 ms  busy loop ends
-1348 ms  tick 4
-1450 ms  tick 5
-1550 ms  tick 6
-1652 ms  tick 7
+1390 ms  busy loop ends
+1391 ms  tick 4 (13 due)
+1494 ms  tick 5 (14 due)
+1594 ms  tick 6 (15 due)
+1695 ms  tick 7 (16 due)
 ```
 
-Node's ticker went quiet for a whole second. Not one tick while `fib(40)` ran. And the nine ticks it missed never showed up: the interval just carried on from tick 4.
+Node's ticker went quiet for a whole second. Not one tick while `fib(40)` ran. When it came back, 13 ticks were due by the clock and it printed tick 4. The nine it missed never showed up: it stayed nine behind the clock from then on.
 
 ```text
 $ elixir ticker.exs
-   0 ms  schedulers online: 8
- 102 ms  tick 1
- 202 ms  tick 2
- 302 ms  tick 3
- 351 ms  busy loop starts
- 402 ms  tick 4
- 502 ms  tick 5
- 602 ms  tick 6
- 702 ms  tick 7
- 802 ms  tick 8
- 902 ms  tick 9
-1002 ms  tick 10
-1102 ms  tick 11
-1150 ms  busy loop ends
-1202 ms  tick 12
-1302 ms  tick 13
-1402 ms  tick 14
-1502 ms  tick 15
+   1 ms  schedulers online: 8
+ 103 ms  tick 1 (1 due)
+ 203 ms  tick 2 (2 due)
+ 303 ms  tick 3 (3 due)
+ 352 ms  busy loop starts
+ 403 ms  tick 4 (4 due)
+ 503 ms  tick 5 (5 due)
+ 603 ms  tick 6 (6 due)
+ 703 ms  tick 7 (7 due)
+ 803 ms  tick 8 (8 due)
+ 903 ms  tick 9 (9 due)
+1003 ms  tick 10 (10 due)
+1103 ms  tick 11 (11 due)
+1157 ms  busy loop ends
+1203 ms  tick 12 (12 due)
+1303 ms  tick 13 (13 due)
+1403 ms  tick 14 (14 due)
+1503 ms  tick 15 (15 due)
 ```
 
-Elixir's ticker didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop.
+Elixir's ticker didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop, and never behind the clock.
 
 But hang on. The BEAM had 8 **schedulers** there (more on those in a moment), one per core, and Node runs JavaScript on one thread. Maybe the busy loop just went to another core? So here's Elixir again, held to a single scheduler with the `+S 1` flag:
 
 ```text
 $ elixir --erl "+S 1" ticker.exs
    0 ms  schedulers online: 1
- 102 ms  tick 1
- 202 ms  tick 2
- 302 ms  tick 3
+ 102 ms  tick 1 (1 due)
+ 202 ms  tick 2 (2 due)
+ 302 ms  tick 3 (3 due)
  351 ms  busy loop starts
- 402 ms  tick 4
- 502 ms  tick 5
- 602 ms  tick 6
- 702 ms  tick 7
- 802 ms  tick 8
- 902 ms  tick 9
-1002 ms  tick 10
-1102 ms  tick 11
-1202 ms  tick 12
-1302 ms  tick 13
-1402 ms  tick 14
-1502 ms  tick 15
-1602 ms  tick 16
-1702 ms  tick 17
-1802 ms  tick 18
-1902 ms  tick 19
-1992 ms  busy loop ends
-2002 ms  tick 20
-2102 ms  tick 21
-2202 ms  tick 22
-2302 ms  tick 23
+ 402 ms  tick 4 (4 due)
+ 502 ms  tick 5 (5 due)
+ 602 ms  tick 6 (6 due)
+ 702 ms  tick 7 (7 due)
+ 802 ms  tick 8 (8 due)
+ 902 ms  tick 9 (9 due)
+1002 ms  tick 10 (10 due)
+1102 ms  tick 11 (11 due)
+1202 ms  tick 12 (12 due)
+1302 ms  tick 13 (13 due)
+1402 ms  tick 14 (14 due)
+1502 ms  tick 15 (15 due)
+1602 ms  tick 16 (16 due)
+1702 ms  tick 17 (17 due)
+1802 ms  tick 18 (18 due)
+1902 ms  tick 19 (19 due)
+1990 ms  busy loop ends
+2002 ms  tick 20 (20 due)
+2102 ms  tick 21 (21 due)
+2202 ms  tick 22 (22 due)
+2302 ms  tick 23 (23 due)
 ```
 
 Still ticking. One scheduler, one core's worth of work, and the busy loop still couldn't shut the ticker out.
@@ -234,7 +240,7 @@ With one scheduler, even one busy loop makes some of the BEAM's ticks late: a ti
 
 In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait in each ticker's mailbox. Every one gets printed, some of them late, and then the tickers are back on the ideal beat. (That's why the BEAM's "late so far" can run higher than Node's. It prints every tick.)
 
-In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, Node's ticks came at 1348, 1450, and 1550 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600.
+In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, Node's ticks came at 1391, 1494, and 1594 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, and nine ticks behind the clock for good.
 
 That new beat has a side effect when there's more than one interval. Here are four: A, B, and D every 100 ms, C every 150 ms, with a short busy loop at 500 ms and a longer one at 1000 ms. ([intervals.mjs](intervals.mjs), same machine.)
 
@@ -265,7 +271,7 @@ Press Enter a few times while each one runs. In Elixir each busy loop is a new p
 
 ## Sources
 
-- The busy loop and ticker runs: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs), run 2026-11-11 on an Apple M1 (8 cores) with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1). The calls-per-second figure comes from the 8-scheduler run. The interactive runs: [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs), same machine and versions, with the keypresses piped in.
+- The busy loop and ticker runs: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs), run 2026-11-12 (again, to print the ticks due) on an Apple M1 (8 cores) with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1). The calls-per-second figure comes from the 8-scheduler run. The interactive runs: [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs), same machine and versions, with the keypresses piped in.
 - The 4,000 reduction budget: `CONTEXT_REDS` in erts's [erl_vm.h at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_vm.h#L53), and 2,000 in [erl_vm.h at OTP-19.3](https://github.com/erlang/otp/blob/OTP-19.3/erts/emulator/beam/erl_vm.h#L39).
 - Preemptive multitasking (the scheduler suspends a process and lets another run): *The BEAM Book*, [Concurrency, Parallelism, and Preemptive Multitasking](https://blog.stenmans.org/theBeamBook/#_concurrency_parallelism_and_preemptive_multitasking). The BEAM as "preemptive scheduling on top of cooperative scheduling", switching only at a function call or a `receive`: [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions).
 - Node's scheduling as cooperative: Node's guide puts fair turns on your code, and its fix for long work is code that "regularly yields (gives turns to) other pending events" ([Don't Block the Event Loop](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#what-does-this-mean-for-application-design), [Partitioning](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#partitioning)). Node's docs don't use the word "cooperative"; the definition (scheduling where the running code has to allow for its own suspension) is *The BEAM Book*'s, in [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions).

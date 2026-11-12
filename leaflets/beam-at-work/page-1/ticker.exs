@@ -11,36 +11,38 @@ defmodule Fib do
 end
 
 defmodule Ticker do
-  def loop(log, n) do
+  # n counts the ticks that ran. The clock says how many were due.
+  def loop(log, elapsed, n) do
     receive do
       :tick ->
-        log.("tick #{n}")
-        loop(log, n + 1)
+        at = elapsed.()
+        log.("tick #{n} (#{div(at, 100)} due)", at)
+        loop(log, elapsed, n + 1)
     end
   end
 end
 
 start = System.monotonic_time(:millisecond)
+elapsed = fn -> System.monotonic_time(:millisecond) - start end
 
-log = fn message ->
-  elapsed = System.monotonic_time(:millisecond) - start
-  IO.puts("#{String.pad_leading("#{elapsed}", 4)} ms  #{message}")
+log = fn message, at ->
+  IO.puts("#{String.pad_leading("#{at}", 4)} ms  #{message}")
 end
 
-log.("schedulers online: #{System.schedulers_online()}")
+log.("schedulers online: #{System.schedulers_online()}", elapsed.())
 
 spawn(fn ->
   :timer.send_interval(100, :tick)
-  Ticker.loop(log, 1)
+  Ticker.loop(log, elapsed, 1)
 end)
 
 Process.sleep(350)
 me = self()
 
 spawn(fn ->
-  log.("busy loop starts")
+  log.("busy loop starts", elapsed.())
   Fib.fib(40)
-  log.("busy loop ends")
+  log.("busy loop ends", elapsed.())
   send(me, :done)
 end)
 
