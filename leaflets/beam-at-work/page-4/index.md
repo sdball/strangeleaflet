@@ -226,7 +226,7 @@ So messages work much the same in both. The difference is how much they're used.
 
 ## Watch it happen
 
-Here's the slow consumer again, in both runtimes side by side and slowed down. It's a simulation with the settings from the runs above: the producer sends 1,000 messages a second, and each one takes the consumer 2 ms. Both sides follow the same rules, because in the runs they behaved the same. You can change how fast messages come in and how long each one takes, and switch the producer between sending and moving on and waiting for each reply.
+Here's the slow consumer again, in both runtimes side by side and slowed down. It's a simulation with the settings from the runs above: the producer sends 1,000 messages a second, and each one takes the consumer 2 ms. Both sides follow the same rules, because in the runs they behaved the same. It waits at the start until you press Play. You can change how fast messages come in and how long each one takes, and switch the producer between sending and moving on and waiting for each reply.
 
 The number to watch is how long the oldest waiting message has waited, because that's about how long every message waits before the consumer gets to it. With the producer sending 1,000 a second and moving on, that wait grows by half a second every second, for as long as it keeps up: each message waits longer than the one before. Have the producer wait for each reply, or send 250 a second, and it stays at nothing.
 

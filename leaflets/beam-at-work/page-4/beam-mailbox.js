@@ -20,8 +20,10 @@
 // page is about milliseconds and rates, not reductions and schedulers.
 //
 // It holds a static fallback (what feed readers and no-JS visitors see) and
-// replaces it once this module runs. Readers who prefer reduced motion get
-// it paused, with Step.
+// replaces it once this module runs. It starts paused at zero, since the
+// start (an empty queue beginning to fill) is the part worth watching, and
+// a reader scrolling to it would otherwise miss it. Step moves it along a
+// few milliseconds at a time while it's paused.
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -507,7 +509,7 @@ customElements.define("beam-mailbox", class extends HTMLElement {
     });
     this.settings = { mode: "send", rate: 1000, work: 2 };
     this.speed = SPEEDS["1/25"];
-    this.playing = !reducedMotion.matches;
+    this.playing = false;
     this.visible = false;
 
     this.$(".play").addEventListener("click", () => this.setPlaying(!this.playing));
