@@ -14,7 +14,8 @@
 // its reply the client can't send anything, because a caller is blocked in
 // receive; casts return at once, so several can wait in the mailbox. The
 // state is drawn in brass wherever it appears, so it can be followed around
-// the loop, and every state so far is listed under the server.
+// the loop: at the last step it flies up into the state box, which changes
+// when it lands, and every state so far is listed under the server.
 //
 // It's a simulation of state.exs, whose :sys.trace output shows the same
 // states. It holds a static fallback (what feed readers and no-JS visitors
@@ -348,6 +349,15 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   genserver-state .flying.reply {
     border-color: var(--brass);
   }
+  genserver-state .flying.state {
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--brass);
+    border-color: var(--brass);
+  }
+  genserver-state .flying.state .sv {
+    padding: 0;
+  }
   genserver-state .messages .none {
     font-family: var(--type);
     font-size: .8rem;
@@ -568,6 +578,7 @@ customElements.define("genserver-state", class extends HTMLElement {
   reset() {
     clearTimeout(this.timer);
     this.timer = null;
+    this.generation = (this.generation ?? 0) + 1; // a flight from before this lands nowhere
     this.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     this.querySelectorAll(".flying").forEach((el) => el.remove());
     this.started = false;
@@ -576,6 +587,11 @@ customElements.define("genserver-state", class extends HTMLElement {
     this.current = null; // what's going through the steps: start-up or a message
     this.step = 0;
     this.history = [];
+    // What the state box and the history show: they catch up when the new
+    // state's flight from the "then" row lands
+    this.shownState = null;
+    this.shownHistory = 0;
+    this.landing = false;
     this.waiting = null; // the call the client is blocked on
     this.said = "";
     this.render();
@@ -643,6 +659,7 @@ customElements.define("genserver-state", class extends HTMLElement {
       if (this.step === 4) this.finish();
       else this.say(plain(this.texts()[this.step - 1]));
       this.render();
+      if (this.landing) this.land();
     } else if (this.mailbox.length) {
       this.take();
     } else {
@@ -669,11 +686,29 @@ customElements.define("genserver-state", class extends HTMLElement {
       if (c.kind === "call") {
         this.waiting = null;
         this.said = `got the reply ${code(reply.startsWith(":") ? atom(reply) : num(reply))}`;
-        this.fly(reply.startsWith(":") ? atom(reply) : num(reply), this.rows[3].getBoundingClientRect(), this.youOut, true);
+        this.fly(reply.startsWith(":") ? atom(reply) : num(reply), this.rows[3].getBoundingClientRect(), this.youOut, "reply");
       }
       this.say(`${c.kind === "call" ? `replied ${reply}; ` : ""}the new state is ${next}`);
     }
-    this.flash = true;
+    this.landing = true;
+  }
+
+  // The new state goes up from the "then" row into the state box
+  land() {
+    this.landing = false;
+    const generation = this.generation;
+    const value = this.state;
+    const count = this.history.length;
+    const done = () => {
+      if (generation !== this.generation) return;
+      this.shownState = value;
+      this.shownHistory = count;
+      this.flash = true;
+      this.render();
+    };
+    const chip = this.rows[3].querySelector(".sv");
+    if (!chip) return done();
+    this.fly(st(value), chip.getBoundingClientRect(), this.stateOut, "state", done);
   }
 
   schedule() {
@@ -686,12 +721,12 @@ customElements.define("genserver-state", class extends HTMLElement {
   }
 
   // A message or reply moving from one place to another
-  fly(html, fromRect, toEl, reply, done) {
+  fly(html, fromRect, toEl, kind, done) {
     if (reducedMotion.matches || !toEl) return done?.();
     const host = this.getBoundingClientRect();
     const to = toEl.getBoundingClientRect();
     const el = document.createElement("span");
-    el.className = `flying${reply ? " reply" : ""}`;
+    el.className = `flying${kind ? ` ${kind}` : ""}`;
     el.innerHTML = html;
     el.style.left = `${fromRect.left - host.left}px`;
     el.style.top = `${fromRect.top - host.top}px`;
@@ -753,8 +788,9 @@ customElements.define("genserver-state", class extends HTMLElement {
     this.serverBox.classList.toggle("down", !this.started);
     this.serverName.textContent = this.started ? "The server process" : "No server yet";
     const hasState = this.state !== null;
-    this.stateOut.textContent = hasState ? this.state : "–";
-    this.stateOut.classList.toggle("empty", !hasState);
+    const stateShown = this.shownState !== null;
+    this.stateOut.textContent = stateShown ? this.shownState : "–";
+    this.stateOut.classList.toggle("empty", !stateShown);
     if (this.flash) {
       this.flash = false;
       this.stateOut.classList.add("new");
@@ -779,8 +815,9 @@ customElements.define("genserver-state", class extends HTMLElement {
     });
 
     // The history
-    this.historyEl.innerHTML = this.history.length
-      ? this.history.map((h) => `<span class="entry" role="listitem">${st(h.value)}<small>${escape(h.label)}</small></span>`).join("")
+    const history = this.history.slice(0, this.shownHistory);
+    this.historyEl.innerHTML = history.length
+      ? history.map((h) => `<span class="entry" role="listitem">${st(h.value)}<small>${escape(h.label)}</small></span>`).join("")
       : `<span class="none">none yet</span>`;
     this.historyEl.scrollLeft = this.historyEl.scrollWidth;
 
