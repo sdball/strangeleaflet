@@ -111,7 +111,7 @@ receive do
 end
 ```
 
-0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it. Page 5 is about GenServer.
+0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it. Page 6 is about GenServer.
 
 ## When messages come in faster than they go out
 
@@ -162,7 +162,7 @@ mode: call
 6000 ms: sent 2997, handled 2997, waiting    0, consumer 20 KB
 ```
 
-The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't. Page 5 comes back to both.
+The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't. Page 6 comes back to both.
 
 ## And in Node?
 
@@ -222,7 +222,7 @@ node v25.9.0, mode: call
 
 The queue grows without limit, and waiting for a reply fixes it, exactly as in the BEAM. Where Node is ahead is streams: a writable stream's `write()` returns `false` once its buffer passes a threshold, and well-behaved code waits for the `'drain'` event before writing more. That's backpressure built into the API, though nothing forces you to respect it: "Node.js will buffer all written chunks until maximum memory usage occurs".
 
-So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 7's monitors, which report a crash with a message.
+So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 5's monitors, which report a crash with a message.
 
 ## Watch it happen
 
@@ -269,7 +269,7 @@ Whatever the settings, the consumer can only do so much. At 2 ms a message that'
 
 That's what backpressure is for. The work done is the same; what changes is where the overload goes. Instead of a queue that grows until it runs out of memory, the producer finds out it's going too fast, and the whole flow settles at the pace of its slowest part, with short waits and flat memory. The producer then has to decide what to do about the extra, wait or drop it, but that's a decision it can make, where a queue that grows without limit decides for it.
 
-One message at a time is the simplest kind of backpressure. It also means the consumer has nothing to start on while each reply goes back and the next message comes in. Page 6 is about GenStage, which lets a consumer ask for many messages at once and still never get more than it asked for.
+One message at a time is the simplest kind of backpressure. It also means the consumer has nothing to start on while each reply goes back and the next message comes in. Page 8 is about GenStage, which lets a consumer ask for many messages at once and still never get more than it asked for.
 
 ## Sources
 

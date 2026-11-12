@@ -6,7 +6,7 @@ meta_description: GenServer, where most Elixir programs keep their state, isn't 
 
 Page 4 ended with two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
 
-GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what page 4 covered: `send`, `receive`, and references, plus monitors, which page 4 only mentioned. This page writes a small server by hand, then writes it again as a GenServer, and then opens up the part that does the most work, `GenServer.call`.
+GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then opens up the part that does the most work, `GenServer.call`.
 
 (If you haven't met GenServer before, page 6 of the [About Elixir leaflet](/leaflets/about-elixir/page-6/) introduces it.)
 
@@ -183,7 +183,7 @@ still waiting after 5 seconds
 
 The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails (page 4), so without a monitor nothing tells the caller, and the call by hand would wait forever. I gave it five seconds.
 
-When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and what happens then is page 7.
+When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and pages 5 and 7 are about what happens then.
 
 ### The caller gives up
 
@@ -230,7 +230,7 @@ resumed: the buyer got :ok
 
 `:sys.get_state` reads the server's state, `:sys.trace` prints every request, reply, and new state as they happen, `:sys.statistics` counts them, and `:sys.replace_state` sets the state from outside. `:sys.suspend` makes the server answer only system messages, so a buy waited in its mailbox until `:sys.resume`. All of that works on a server while it runs, without changing or restarting it.
 
-Two more things come with it that later pages need. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server (page 7). And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded" (page 9).
+Two more things come with it that later pages need. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server (page 7). And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded" (page 10).
 
 ## And in Node?
 
@@ -371,7 +371,7 @@ $ for i in 1 2 3; do elixir bottleneck.exs; done
 
 Through the server it's about 1,000 a second however many callers there are. Without it, the work spreads over the schedulers. (Not eight times as much with eight callers, because four of the M1's eight cores are slower efficiency cores.) The extra callers through the server just wait in its mailbox.
 
-Elixir's docs warn about exactly this: putting code behind "a single process that will potentially become a bottleneck in your system", and "If you don't need a process, then you don't need a process." What Elixir programs do instead depends on the state. Work that doesn't touch it shouldn't go through the server at all, as in the second column. State that splits by key can live in several servers, one per part: the docs for `PartitionSupervisor`, which starts them, open with "Certain processes may become bottlenecks in large systems." And state that's read far more than it's written can go in an ETS table, a store built into the BEAM that, in the words of Elixir's guide, any process can read from, "but writes are still serialized through a single process." Page 10 has more about what the BEAM is slow at.
+Elixir's docs warn about exactly this: putting code behind "a single process that will potentially become a bottleneck in your system", and "If you don't need a process, then you don't need a process." What Elixir programs do instead depends on the state. Work that doesn't touch it shouldn't go through the server at all, as in the second column. State that splits by key can live in several servers, one per part: the docs for `PartitionSupervisor`, which starts them, open with "Certain processes may become bottlenecks in large systems." And state that's read far more than it's written can go in an ETS table, a store built into the BEAM that, in the words of Elixir's guide, any process can read from, "but writes are still serialized through a single process." Page 11 has more about what the BEAM is slow at.
 
 ## Watch it happen
 
