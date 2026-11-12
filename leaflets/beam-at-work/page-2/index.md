@@ -139,9 +139,62 @@ Here's what 2.6 KB looks like next to an operating system process. The top bar i
 
 What's the closest thing in Node? It depends which part of a BEAM process you want.
 
-If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 12 uses them to fix page 1's ticker. They're not cheap. Starting 8 idle ones on the same M1 ([worker-cost.mjs](worker-cost.mjs)), each took 6 to 8 ms and about 9.3 MB.
+If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 12 uses them to fix page 1's ticker. They're not cheap. Here's a script that starts 8 idle ones and waits until each is up ([worker-cost.mjs](worker-cost.mjs)):
 
-If you want something that waits cheaply for a message, that's an async function paused on a promise. It's the shape a Node server's request handlers take while they wait on a database or the network. And it's cheaper than a BEAM process ([pending.mjs](pending.mjs)):
+```javascript
+// What does an idle worker thread cost? Start N, wait until each is up, measure.
+import { Worker, isMainThread, parentPort } from "node:worker_threads";
+if (isMainThread) {
+  const n = Number(process.argv[2] ?? 8);
+  global.gc?.();
+  const before = process.memoryUsage().rss;
+  const t0 = performance.now();
+  const ws = [];
+  await Promise.all(Array.from({ length: n }, () => new Promise((resolve) => {
+    const w = new Worker(new URL(import.meta.url));
+    w.once("message", resolve);
+    ws.push(w);
+  })));
+  const ms = performance.now() - t0;
+  const after = process.memoryUsage().rss;
+  console.log(`${n} idle workers: ${((after - before) / n / 1024 / 1024).toFixed(1)} MB of RSS each, ${(ms / n).toFixed(1)} ms each to start (${ms.toFixed(0)} ms total)`);
+  ws.forEach((w) => w.terminate());
+} else {
+  parentPort.postMessage("up");
+  setInterval(() => {}, 1 << 30);
+}
+```
+
+```text
+$ for i in 1 2 3; do node --expose-gc worker-cost.mjs; done
+8 idle workers: 9.7 MB of RSS each, 9.2 ms each to start (74 ms total)
+8 idle workers: 9.4 MB of RSS each, 5.3 ms each to start (43 ms total)
+8 idle workers: 9.4 MB of RSS each, 5.5 ms each to start (44 ms total)
+```
+
+Each one took 5 to 9 ms to start, and about 9.5 MB.
+
+If you want something that waits cheaply for a message, that's an async function paused on a promise. It's the shape a Node server's request handlers take while they wait on a database or the network. And it's cheaper than a BEAM process. Here's the spawn script above, done in Node with N async functions that each wait on a promise ([pending.mjs](pending.mjs)):
+
+```javascript
+// Node's cheapest unit of waiting: N async functions, each paused on a promise
+// that a later "message" would resolve. Measure time and V8 heap per one.
+const n = Number(process.argv[2] ?? 100000);
+const wake = [];
+const waiter = async () => { await new Promise((resolve) => wake.push(resolve)); };
+
+global.gc();
+const heap0 = process.memoryUsage().heapUsed;
+const t0 = performance.now();
+const tasks = [];
+for (let i = 0; i < n; i++) tasks.push(waiter());
+const us = (performance.now() - t0) * 1000;
+global.gc();
+const heap = process.memoryUsage().heapUsed - heap0;
+console.log(`${n} pending async functions: ${(us / n).toFixed(2)} µs each to start, ${Math.round(heap / n)} bytes each of V8 heap`);
+wake.forEach((resolve) => resolve());
+await Promise.all(tasks);
+```
 
 ```text
 $ for n in 1000 10000 100000 1000000; do node --expose-gc pending.mjs $n; done
