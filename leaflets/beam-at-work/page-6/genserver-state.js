@@ -766,7 +766,7 @@ customElements.define("genserver-state", class extends HTMLElement {
     }
     const r = c.result;
     return [
-      `takes the oldest message, ${code(messageCode(c))}`,
+      code(messageCode(c)),
       `${source(highlight(clause(r.clause).head))}${r.bindings}`,
       `${source(highlight(clause(r.clause).body))}${code(r.returns)}`,
       c.kind === "call"
