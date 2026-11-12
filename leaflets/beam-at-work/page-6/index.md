@@ -128,7 +128,7 @@ The times show what that costs. The second buyer waited for the first sale, and 
 
 A call is synchronous: the caller sends its request and then does nothing else until the reply comes back. The waiting is the hard part. What if the reply never comes, because the server has died, or is stuck, or is just slow?
 
-`GenServer.call` hands the work to Erlang's `gen:call`, and the part that does it is a function called `do_call` in `gen.erl`. Here's the clause for a call with a timeout, with a comment taken out:
+`GenServer.call` hands the work to Erlang's `gen:call`, and the part that does it is a function called `do_call` in `gen.erl`. Here's the clause for a call with a timeout:
 
 ```erlang
 do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
