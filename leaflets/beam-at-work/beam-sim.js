@@ -176,9 +176,13 @@ export class Beam extends Clock {
     }
   }
 
+  // Only from a scheduler that's busy running something else, so its queue is
+  // really waiting. The schedulers step in lockstep, and without this an idle
+  // one would grab a process the moment it was preempted, before its own
+  // scheduler could pick it back up.
   steal(thief) {
     const victim = this.schedulers
-      .filter((s) => s !== thief && s.queue.length)
+      .filter((s) => s !== thief && s.queue.length && s.current)
       .sort((a, b) => b.queue.length - a.queue.length)[0];
     if (!victim) return null;
     const p = victim.queue.shift();

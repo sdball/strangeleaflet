@@ -227,6 +227,35 @@ first ran on:   1  1  8  7  7  6  5  8  8  8  1  1  1  1  1  1
 
 Right after spawning, all sixteen were waiting in scheduler 1's queue, the parent's. (The seventeenth was already there before.) But schedulers 5 through 8 had nothing to do, so they took eight of them before those had even run once. That's the "first ran on" row: processes 3 to 10 first ran somewhere other than scheduler 1. Half a second later, every scheduler had work. Not perfectly even, but nobody wrote any code to spread it out. The exact numbers change from run to run, but the shape doesn't.
 
+### A busy process gets no special treatment
+
+Does the BEAM notice an expensive process and give it a scheduler of its own? No. Balancing looks at how much is waiting in each run queue, not at what any one process costs. And when there isn't enough work to keep every scheduler busy, it does the opposite of spreading out: it packs the work onto as few schedulers as it can keep fully loaded, so the rest can sleep. The docs call that scheduler compaction of load, and it's on by default.
+
+Here's page 1's kind of busy loop among six tickers that tick every 10 ms ([busy-alone.exs](busy-alone.exs)). Every tick notes which scheduler it ran on, and so does the busy loop after each chunk of its work:
+
+```text
+$ elixir busy-alone.exs
+schedulers online: 8
+
+0–200 ms
+  ticks on       8: 114
+  busy loop on   
+
+200–1000 ms
+  ticks on       1: 429  2: 24  3: 1  4: 2  5: 6  6: 6  7: 9  8: 3
+  busy loop on   1: 119  2: 314  3: 7  4: 8  5: 8  6: 7  7: 8  8: 1
+
+1000–2000 ms
+  ticks on       1: 565  2: 35
+  busy loop on   1: 49  2: 567
+
+2000–3000 ms
+  ticks on       1: 399  2: 165  3: 36
+  busy loop on   1: 391  2: 197  3: 24
+```
+
+Before the busy loop started, all six tickers ran on one scheduler. Once it started, the BEAM settled on two of its eight schedulers, with a few stray turns elsewhere. For a second the busy loop and the tickers happened to split up, one scheduler each, and then they mixed again. In three runs the shape was the same: a couple of schedulers, shared.
+
 ## Watch it happen
 
 Here's the same thing as a simulation, slowed way down. Each row is a scheduler: the process it's running, then its run queue.
@@ -258,7 +287,7 @@ running or waiting:   9  1  1  1  1  1  1  1
 
 <script type="module" src="beam-spread.js"></script>
 
-The simulation's migration is simpler than the real one. It checks the loads every three turns instead of every 2,000, and it doesn't keep track of how long each queue got in between, so it evens things out faster and more neatly than the BEAM does. The real run above ended half a second later with 4 on one scheduler and 1 on another.
+The simulation's migration is simpler than the real one. It checks the loads every three turns instead of every 2,000, and it doesn't keep track of how long each queue got in between, so it evens things out faster and more neatly than the BEAM does. The real run above ended half a second later with 4 on one scheduler and 1 on another. It also has no compaction: give it light work and the simulation spreads it out, where the real BEAM packs it onto a few schedulers.
 
 ## Sources
 
@@ -272,5 +301,6 @@ The simulation's migration is simpler than the real one. It checks the loads eve
 - 327 words at spawn, a 233-word starting heap kept small for systems with millions of processes, and message data being copied: the Erlang efficiency guide, [Creating an Erlang Process](https://www.erlang.org/doc/system/eff_guide_processes.html#creating-an-erlang-process), [Initial Heap Size](https://www.erlang.org/doc/system/eff_guide_processes.html#initial-heap-size), and [Sending Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#sending-messages). Processes growing and shrinking: the Erlang reference manual, [Processes](https://www.erlang.org/doc/system/ref_man_processes.html#processes).
 - Cowboy's process per connection and per request: [Cowboy's guide, Flow diagram](https://github.com/ninenines/cowboy/blob/2.21.0/doc/src/guide/flow_diagram.asciidoc#number-of-processes-per-connection).
 - Counting each scheduler's waiting processes (`:run_queue_lengths`) and its running or waiting ones (`:active_tasks`): [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
+- Scheduler compaction of load, on by default: the [erl command docs](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+scl) for `+scl`, and the [`+sub`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+sub) flag that balances scheduler utilization instead. The busy loop among tickers: [busy-alone.exs](busy-alone.exs), run three times on the same machine and versions.
 - A new process going on its parent's run queue: `erl_create_process` in [erl_process.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L12527-L12535).
 - Stealing and migration, including migration paths worked out every `2000*CONTEXT_REDS` reductions by comparing run queue lengths: *The BEAM Book*, [Task Stealing](https://blog.stenmans.org/theBeamBook/#_task_stealing) and [Migration](https://blog.stenmans.org/theBeamBook/#_migration). `CONTEXT_REDS` is 4,000 (page 1's sources).
