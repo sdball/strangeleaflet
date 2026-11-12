@@ -80,6 +80,13 @@ buyer 3: :sold_out
 
 The loop is gone, because GenServer has one, in Erlang's `gen_server`, and it's the same loop: a `receive` that takes the oldest message, whatever it is, hands it to the module's callback, and calls itself with the state the callback returns. `handle_call` gets the request, who it's from, and the state, and returns the reply and the new state. GenServer sends the reply.
 
+GenServer gives a client two ways to send a server a request, page 4's two ways to send:
+
+- `GenServer.call(server, request)` is synchronous. It sends the request, waits for the server's reply, and returns it, so `buy` returns `:ok` or `:sold_out`. The server handles a call in `handle_call`, which returns a reply along with the new state.
+- `GenServer.cast(server, request)` is asynchronous. It sends the request and returns `:ok` straight away, without waiting for the server to do anything with it. The server handles a cast in `handle_cast`, which returns only the new state, since nobody is waiting for a reply.
+
+Buying a ticket is a call, because a buyer needs to know whether they got one.
+
 So what does that get you over twenty lines you could write yourself? Most of the answer is in `call`. First, though, something the two versions share.
 
 ## One message at a time
@@ -118,6 +125,8 @@ Two tickets, two sales, and the third buyer hears they're sold out. While the se
 The times show what that costs. The second buyer waited for the first sale, and the third for both. The server does one thing at a time, waiting included. That comes back at the end of the page.
 
 ## What `call` does
+
+A call is synchronous: the caller sends its request and then does nothing else until the reply comes back. The waiting is the hard part. What if the reply never comes, because the server has died, or is stuck, or is just slow?
 
 `GenServer.call` hands the work to Erlang's `gen:call`, and the part that does it is a function called `do_call` in `gen.erl`. Here's the clause for a call with a timeout, with a comment taken out:
 
@@ -205,9 +214,9 @@ Giving up doesn't stop the server. It still did the work and sent the reply 200 
 
 The third thing `call` gives you is page 4's backpressure. The caller waits for each reply, so it can't send faster than the server answers.
 
-## Other ways in
+## Casts and other messages
 
-Not every message to a server is a call. `GenServer.cast` sends a request and returns `:ok` at once, "regardless of whether the destination `server` (or node) exists", and the server handles it in `handle_cast`, with no reply. That's page 4's send-and-move-on: no monitor, no timeout, no backpressure, and a mailbox that can grow. Every other message, a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, goes to `handle_info`. They all share one mailbox and the same loop, one at a time, oldest first.
+A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's page 4's send-and-move-on: no monitor, no timeout, no backpressure, and a mailbox that can grow. Every other message, a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, goes to `handle_info`. They all share one mailbox and the same loop, one at a time, oldest first.
 
 ## What every GenServer comes with
 
