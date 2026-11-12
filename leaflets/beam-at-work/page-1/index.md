@@ -203,6 +203,8 @@ Ten microseconds is too fast to see, so here's the same workload as a simulation
 
 Press **Add a busy loop**. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
 
+For the closest look, set the speed to **extra slow**, where one turn lasts about ten seconds. Then you can see preemption happen. The scheduler hands the busy loop its 4,000 reductions, counts every one of them down, and sends it to the back of the line, behind any ticker that came due while it ran. The ticker prints its tick, and then the busy loop gets its next turn.
+
 <beam-vs-node>
 
 ```text

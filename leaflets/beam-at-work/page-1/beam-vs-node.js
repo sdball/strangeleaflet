@@ -26,7 +26,9 @@ const TICK_WORK = 150; // printing one tick
 const BUSY_WORK = 3 * CONTEXT_REDS; // one busy loop: three full slices
 const MAX_BUSY = 3;
 const WINDOW = 30000; // how much time the tick strip shows
-const SPEEDS = { slow: 1200, normal: 3000, fast: 9000 }; // reductions per second
+// Reductions per second. Extra slow makes a turn last ten seconds, long
+// enough to read the countdown and watch a tick go through.
+const SPEEDS = { "extra-slow": 400, slow: 1200, normal: 3000, fast: 9000 };
 const LOG_LINES = 6;
 const GRACE = 600; // a tick that starts later than this after it's due is late
 
@@ -390,7 +392,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
       </div>
       <div class="settings">
         ${radios("schedulers", "BEAM schedulers", [["1", "1"], ["2", "2"], ["4", "4"]], "1")}
-        ${radios("speed", "Speed", [["slow", "slow"], ["normal", "normal"], ["fast", "fast"]], "normal")}
+        ${radios("speed", "Speed", [["extra-slow", "extra slow"], ["slow", "slow"], ["normal", "normal"], ["fast", "fast"]], "normal")}
       </div>
       <p class="note">A simulation, slowed way down to watch. Both sides do the same work at the same pace; only the scheduling differs: preemptive in the BEAM, cooperative in Node. Node runs its JavaScript on one thread however many cores you give the BEAM.</p>
       <div class="views">
