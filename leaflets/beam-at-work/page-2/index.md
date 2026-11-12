@@ -64,7 +64,7 @@ A hundred thousand new processes, and the operating system saw nothing new. Same
 
 The 59 processes before we started are the BEAM's own, and Elixir's: the code server, the logger, the processes that read your keyboard and write to your terminal. They're ordinary BEAM processes too. (`Process.registered()` lists the ones with names, like `:code_server`, `:logger`, and `:user_drv_reader`.)
 
-The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. Page 8 comes back to them. And the one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
+The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. Page 9 comes back to them. And the one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
 
 So there are two layers of scheduling. The operating system decides which cores the BEAM's scheduler threads run on, and each scheduler decides which BEAM process runs on it. The operating system only ever sees the threads.
 
@@ -79,7 +79,7 @@ Because they act like operating system processes in the ways that matter for wri
 | What keeps others out | the operating system: it maps out what each process may touch, and the CPU checks every memory access against that map | the language: nothing in Elixir or Erlang can point at another process's memory |
 | Talks to others by | pipes, sockets, signals | messages (page 4) |
 | Who decides when it runs | the operating system, preemptively | a BEAM scheduler, preemptively, by counting reductions (page 1) |
-| When it crashes | it ends, and its parent process can find out | it ends, and processes watching it are notified (page 5) |
+| When it crashes | it ends, and its parent process can find out | it ends, and processes watching it are notified (page 6) |
 | Cost to start, on my M1 | about 1.4 ms and 830 KB | about 1 µs and 2.6 KB |
 
 BEAM processes aren't threads either. The book again: "Erlang processes are not like threads — they have no shared memory to modify, they can only communicate via messages". Threads in most languages share their memory with each other, so any thread can change data another thread is using. Data sent from one BEAM process to another is copied, so neither can change what the other is using.
@@ -139,7 +139,7 @@ Here's what 2.6 KB looks like next to an operating system process. The top bar i
 
 What's the closest thing in Node? It depends which part of a BEAM process you want.
 
-If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 9 uses them to fix page 1's ticker. They're not cheap. Starting 8 idle ones on the same M1 ([worker-cost.mjs](worker-cost.mjs)), each took 6 to 8 ms and about 9.3 MB.
+If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 10 uses them to fix page 1's ticker. They're not cheap. Starting 8 idle ones on the same M1 ([worker-cost.mjs](worker-cost.mjs)), each took 6 to 8 ms and about 9.3 MB.
 
 If you want something that waits cheaply for a message, that's an async function paused on a promise. It's the shape a Node server's request handlers take while they wait on a database or the network. And it's cheaper than a BEAM process ([pending.mjs](pending.mjs)):
 
