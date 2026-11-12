@@ -98,7 +98,22 @@ def handle_call(:left, _from, left), do: {:reply, left, left}
 def handle_cast({:add, n}, left), do: {:noreply, left + n}
 ```
 
-Every callback returns a tuple, and GenServer reads it to know what to do next:
+Every callback returns a tuple, and GenServer reads it to know what to do next. Here's what `handle_call` returns:
+
+<return-tuple>
+
+```text
+{  :reply,          reply,           new_state  }
+   ───────          ──────           ─────────
+   what to do:      sent back to     the state the loop
+   send a reply     the caller       carries on with
+```
+
+</return-tuple>
+
+<script type="module" src="return-tuple.js"></script>
+
+And all three:
 
 - `{:reply, reply, new_state}` from `handle_call`: send `reply` back to the caller, and carry on with `new_state`.
 - `{:noreply, new_state}` from `handle_cast`: there's nobody waiting for a reply, so just carry on with `new_state`.
