@@ -26,11 +26,12 @@ at the pages it affects in a browser, in both light and dark, and at phone width
 
 ## Rules
 
-- **URLs never change.** A post's URL is `/<slug>/`, a leaflet page's is
-  `/leaflets/<name>/page-N/` from its folders, and the feed's entry ids are
-  those URLs. Renaming a slug or moving a page needs an `alias:` for the old
-  path, or readers and feed subscribers break; a page that was already in the
-  feed also needs `feed_id:` with its old path.
+- **URLs can change.** It's a small personal blog, so renaming a slug or
+  moving a page is fine, and an old URL breaking is acceptable. A post's URL
+  is `/<slug>/`, a leaflet page's is `/leaflets/<name>/page-N/` from its
+  folders, and the feed's entry ids are those URLs. When it's cheap, add an
+  `alias:` for the old path, and give a page that's still in the feed (the
+  latest 10) a `feed_id:` with its old path so subscribers don't see it twice.
 - **Don't write `published_date` on a new post or leaflet page.** The pre-commit
   hook stamps it in the commit that publishes it (`publish: true` or no
   `publish` line). Leaflet covers have no date; theirs is their pages' range.
