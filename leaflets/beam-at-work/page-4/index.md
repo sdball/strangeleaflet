@@ -257,7 +257,7 @@ They're different measures. The BEAM's is the consumer process's own memory, and
 
 <beam-mailbox>
 
-![The simulation 601 ms in, with the producer sending and moving on, side by side. On the BEAM side the producer sends 1,000 a second, and the consumer's mailbox is full of waiting messages, four rows of them and 221 more. The consumer handles 500 a second and is busy 100% of the time, and the oldest waiting message has waited 300 ms. Sent 602, handled 300, waiting 301, and 517 KB in the consumer's mailbox. The Node side shows the same: the main thread sending 1,000 a second, the worker's message queue just as full, the worker handling 500 a second and busy 100%, the oldest message 300 ms old, the same counts, and 241 KB in the worker's queue.](beam-mailbox.webp)
+![The simulation 601 ms in, with the producer sending and moving on, side by side. On the BEAM side the producer is sending 1,000 a second, and the consumer's mailbox is full of waiting messages, four rows of them and 221 more. The consumer is handling 500 a second and is busy 100% of the time, and the oldest waiting message has waited 300 ms. Sent 602, handled 300, waiting 301, and 517 KB in the consumer's mailbox. The Node side shows the same: the main thread sending 1,000 a second, the worker's message queue just as full, the worker handling 500 a second and busy 100%, the oldest message 300 ms old, the same counts, and 241 KB in the worker's queue.](beam-mailbox.webp)
 
 *The live version of this needs JavaScript. In it, you can watch a producer and a slow consumer in the BEAM and in Node side by side, and change how fast messages are sent, how long each takes, and whether the producer waits for each reply.*
 

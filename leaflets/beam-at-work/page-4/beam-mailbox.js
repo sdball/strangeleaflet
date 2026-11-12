@@ -11,7 +11,7 @@
 // waits for each reply it stays near zero. The consumer shows how busy it's
 // been over the last moment rather than each message's progress, which
 // would flicker at these speeds, and each end shows its rate: the producer
-// sends and the consumer handles so many a second, counted over the last
+// is sending and the consumer handling so many a second, counted over the last
 // WINDOW of simulated time. Waiting for replies doesn't raise the
 // consumer's rate; it brings the producer's down to match.
 //
@@ -477,7 +477,7 @@ customElements.define("beam-mailbox", class extends HTMLElement {
           <div class="flow" aria-hidden="true">
             <div class="end producer">
               <span class="top"><span class="name">${s.producer}</span><span class="states"><span data-state="sending"></span><span data-state="waiting" class="alert">waiting for a reply</span></span></span>
-              <span>sends <output class="sends"></output> a second</span>
+              <span>sending <output class="sends"></output> a second</span>
             </div>
             <div class="queue">
               <span class="queue-name">${s.queue}</span>
@@ -486,7 +486,7 @@ customElements.define("beam-mailbox", class extends HTMLElement {
             </div>
             <div class="end consumer">
               <span class="top"><span class="name">${s.consumer}</span></span>
-              <span>handles <output class="handles"></output> a second, busy <output class="busy"></output></span>
+              <span>handling <output class="handles"></output> a second, busy <output class="busy"></output></span>
             </div>
           </div>
           <p class="age"><span>the oldest waiting message has waited</span><output class="oldest"></output></p>
