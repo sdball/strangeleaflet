@@ -253,7 +253,15 @@ Nothing ever spreads them back out. A long-running Node process that now and the
 
 So why did the real Elixir run never fall behind, even on one scheduler? Scale. In the simulation a turn is long next to the time between ticks, so a few busy loops push ticks late. On my M1 a turn is about 10 microseconds and the ticks are 100 milliseconds apart: room for 10,000 turns between ticks. You'd need around ten thousand busy processes on one scheduler before a ticker waited a whole tick.
 
-Want to press the button on a real machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) tick until you type `q` and Enter, and every press of Enter starts another `fib(40)` busy loop. In Elixir each busy loop is a new process, so it starts the moment you press Enter, and the ticker keeps ticking: with two busy loops sharing one scheduler (`elixir --erl "+S 1" ticker-live.exs`), the longest gap between ticks in my run was still 100 ms. In Node, reading the keyboard is a callback too, so a second Enter waits in line behind the busy loop that's running. When I tried it, one late tick slipped out between the two busy loops, and then the ticker went quiet again until the second one finished.
+Want to press the button on a real machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) tick until you type `q` and Enter, and every press of Enter starts another `fib(40)` busy loop. Save them somewhere, and with Elixir and Node installed (I used the versions above), run them from that folder:
+
+```sh
+elixir ticker-live.exs                  # Elixir, the default schedulers
+elixir --erl "+S 1" ticker-live.exs     # Elixir, one scheduler
+node ticker-live.mjs                    # Node
+```
+
+Press Enter a few times while each one runs. In Elixir each busy loop is a new process (BEAM process, not operating system process), so it starts the moment you press Enter, and the ticker keeps ticking: with two busy loops sharing one scheduler (`elixir --erl "+S 1" ticker-live.exs`), the longest gap between ticks in my run was still 100 ms. In Node, reading the keyboard is a callback too, so a second Enter waits in line behind the busy loop that's running. When I tried it, one late tick slipped out between the two busy loops, and then the ticker went quiet again until the second one finished.
 
 ## Sources
 
