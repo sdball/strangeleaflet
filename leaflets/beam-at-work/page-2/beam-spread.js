@@ -471,7 +471,7 @@ customElements.define("beam-spread", class extends HTMLElement {
       n + s.queue.filter((p) => p.kind === "idle").length + (s.current?.kind === "idle" ? 1 : 0), 0);
     const idleWaiting = this.idle - idleQueued;
     const memory = !alive ? "No processes yet."
-      : `${number(alive)} processes alive, ${megabytes(alive * BYTES_EACH)} or more.` +
+      : `${number(alive)} ${alive === 1 ? "process" : "processes"} alive, ${megabytes(alive * BYTES_EACH)} or more.` +
         (idleWaiting ? ` ${number(idleWaiting)} of them are waiting for a message, in no run queue, taking no scheduler time.` : "");
     if (this.$(".memory").textContent !== memory) this.$(".memory").textContent = memory;
 

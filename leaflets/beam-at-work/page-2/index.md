@@ -127,22 +127,9 @@ Here's what 2.6 KB looks like next to an operating system process. The top bar i
 
 <process-scale>
 
-```text
-An idle operating system process (sleep), 834 KB
-  Stack                     32 KB
-  Heap                     288 KB
-  Libraries' data          289 KB
-  Kernel's page tables     161 KB
-  Other                     64 KB
+![The scale bar: an idle operating system process (sleep) of 834 KB, split into its stack (32 KB), heap (288 KB), libraries' data (289 KB), the kernel's page tables (161 KB), and other (64 KB), drawn the full width. Below it, a new BEAM process of 2,616 bytes is a sliver at the same scale: its memory would hold 326 of them.](process-scale.webp)
 
-A new BEAM process, 2,616 bytes
-  Heap and stack         1,864 bytes
-  The BEAM's record of it  752 bytes
-
-The operating system process's memory would hold 326 new BEAM processes.
-```
-
-*The live version of this needs JavaScript. In it, the two are drawn as bars to the same scale, and you can pick a part to read what it is.*
+*The live version of this needs JavaScript. In it, you can zoom in until the BEAM process fills the width, and pick a part to read what it is.*
 
 </process-scale>
 
@@ -258,36 +245,23 @@ Before the busy loop started, all six tickers ran on one scheduler. Once it star
 
 ## Watch it happen
 
-Here's the same thing as a simulation, slowed way down. Each row is a scheduler: the process it's running, then its run queue.
+Here's the sixteen busy processes from spread.exs as a simulation, slowed way down. Each row is a scheduler: the process it's running, then its run queue.
 
 Press **Spawn 16 busy processes**. A parent process starts on one scheduler and spawns sixteen children onto that scheduler's queue. Watch the idle schedulers take processes from it, and then migration move a few more, until each scheduler has about the same amount of work. Press it again while the first sixteen are still running and see where the next batch goes.
 
-Then press **Spawn 1,000 waiting processes**. Each one runs just long enough to reach its `receive`, then waits for a message that never comes. A waiting process isn't in any run queue, so the rows barely change. That's most of what makes processes cheap: one that's waiting costs its memory and nothing else.
+Then press **Spawn 1,000 waiting processes**. Each one runs just long enough to reach its `receive`, then waits for a message that never comes. They pass through the run queues on the way and then leave them, because a waiting process isn't in any run queue. That's most of what makes processes cheap: one that's waiting costs its memory and nothing else.
 
 <beam-spread>
 
-```text
-A moment from the simulation, just after the parent spawned sixteen busy processes
+![A moment from the simulation, a few turns after a parent spawned sixteen busy processes onto scheduler 1. Scheduler 1 is running P12 with six more in its queue; schedulers 2 and 3 have two each; schedulers 4 to 8 one each. Running or waiting per scheduler: 7 2 2 1 1 1 1 1. The log: schedulers 6, 7, and 8 had nothing to do and took P5, P6, and P7 from scheduler 1, then migration moved P10 to scheduler 2 and P11 to scheduler 3.](beam-spread.webp)
 
-scheduler 1   running: P8   queue: P9 P10 P11 P12 P13 P14 P15 P16
-scheduler 2   running: P1
-scheduler 3   running: P2
-scheduler 4   running: P3
-scheduler 5   running: P4
-scheduler 6   running: P5
-scheduler 7   running: P6
-scheduler 8   running: P7
-
-running or waiting:   9  1  1  1  1  1  1  1
-```
-
-*The live version of this needs JavaScript. In it, the idle schedulers take processes from scheduler 1's queue, and migration evens out the rest.*
+*The live version of this needs JavaScript. In it, the idle schedulers take processes from scheduler 1's queue, migration evens out the rest, and you can spawn a thousand waiting processes too.*
 
 </beam-spread>
 
 <script type="module" src="beam-spread.js"></script>
 
-The simulation's migration is simpler than the real one. It checks the loads every three turns instead of every 2,000, and it doesn't keep track of how long each queue got in between, so it evens things out faster and more neatly than the BEAM does. The real run above ended half a second later with 4 on one scheduler and 1 on another. It also has no compaction: give it light work and the simulation spreads it out, where the real BEAM packs it onto a few schedulers.
+The simulation's migration is simpler than the real one. It checks the loads every three turns instead of every 2,000, and it doesn't keep track of how long each queue got in between, so it evens things out faster and more neatly than the BEAM does. The real spread.exs run ended half a second later with 4 on one scheduler and 1 on another. It also has no compaction: give it light work and the simulation spreads it out, where the real BEAM packs it onto a few schedulers.
 
 ## Sources
 
