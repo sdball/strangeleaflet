@@ -171,6 +171,22 @@ With lists of 50 or 100, the whole system did 90 collections, and none of them w
 
 That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
 
+## Watch it happen
+
+Here are both runs again, side by side and slowed down. It's a replay, not a simulation: everything in it comes from recording the real thing ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)). The job is the one above, a builder keeping a list of 10 million pairs, with one change: the tickers make a little garbage every tick, the way a small request would, so their heaps fill and get collected too.
+
+On the BEAM side, every process has its own young and old heap. Watch the tickers' heaps fill and collect on their own, and then the builder's long collections, each on a dirty CPU scheduler, while the tickers' strips keep their even rhythm. On the Node side there's one heap. When V8 collects, the builder and all three tickers stop together, and the ticks they owed come out late in a bunch.
+
+<beam-heaps>
+
+![The replay 640 ms into both runs, side by side. On the BEAM side the collecting badge is lit: when the builder collects, it's on a dirty CPU scheduler, and the tickers run on. The builder is collecting, its young heap 19 of 19 MB and its old heap 39 of 47 MB. The three tickers each have their own small heaps, 1.2 of 4.8 KB young and 2.8 of 7.7 KB old, are marked ticking, and their strips show evenly spaced ticks: 189 so far, the worst 1 ms late, 39 of them while the builder was collecting. On the Node side the collecting badge is lit too: when V8 collects, no JavaScript runs, not even a ticker. Its one heap is 207 of 208 MB old. The builder and all three tickers are marked paused, and each ticker's strip ends in a red bar for a tick that's still waiting.](beam-heaps.webp)
+
+*The live version of this needs JavaScript. In it, you can play the replay or drag through it, and spawn short-lived processes that never collect at all.*
+
+</beam-heaps>
+
+<script type="module" src="beam-heaps.js"></script>
+
 ## Where it gives ground
 
 Two things don't fit the picture of each process alone with its heap.
@@ -185,7 +201,7 @@ to a dirty scheduler, against Node's one heap pausing every callback. -->
 
 ## Sources
 
-- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), and [die-young.exs](die-young.exs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), and [die-young.exs](die-young.exs), run 2026-11-12. The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - The stack and heap in one block growing toward each other, a collection when they meet, the collector being a "per process generational semi-space copying collector", generations and the old heap, the full sweep, growth starting at 233 words in "a variation of the Fibonacci sequence" then by 20%, shrinking, and cost "proportional to the amount of live data on the heap": the ERTS docs, [Erlang Garbage Collector](https://www.erlang.org/doc/apps/erts/garbagecollection.html): [Overview](https://www.erlang.org/doc/apps/erts/garbagecollection.html#overview), [Generational Garbage Collection](https://www.erlang.org/doc/apps/erts/garbagecollection.html#generational-garbage-collection), and [Sizing the heap](https://www.erlang.org/doc/apps/erts/garbagecollection.html#sizing-the-heap). The same, from another angle: *The BEAM Book*, [The PCB](https://blog.stenmans.org/theBeamBook/#_the_pcb), [The Garbage Collector (GC)](https://blog.stenmans.org/theBeamBook/#_the_garbage_collector_gc), and [Copying Garbage Collection](https://blog.stenmans.org/theBeamBook/#_copying_garbage_collection) ("most terms die young").
 - Tracing collections and the sizes in each trace message: `garbage_collection` in [`erlang:trace/3`](https://www.erlang.org/doc/apps/erts/erlang.html#trace/3). Counting them system-wide: `garbage_collection` in [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
 - Collections of 128K words or more going to a dirty CPU scheduler: `check_for_possibly_long_gc` in [erl_gc.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.c#L688-L716), with `ERTS_POTENTIALLY_LONG_GC_HSIZE` in [erl_gc.h](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.h#L30), and dirty system work going on the dirty CPU queue in [erl_process.c](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L6507-L6509).
