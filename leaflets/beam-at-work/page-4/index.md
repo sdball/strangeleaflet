@@ -111,41 +111,58 @@ receive do
 end
 ```
 
-0.2 µs, however full the mailbox. Elixir code rarely writes that by hand, because `GenServer.call`, the usual way to ask a process something and wait for the answer, already does it: it makes a reference (by monitoring the other process) and waits for a reply carrying it.
+0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it. Page 5 is about GenServer.
 
 ## When messages come in faster than they go out
 
-Nothing limits how many messages a mailbox can hold, and nothing slows a sender down when the receiver falls behind. Here's a process sending a message, sleeping a millisecond, and sending another, to a consumer that sleeps 2 ms over each message. Every second it reports what it's sent, how many are waiting in the consumer's mailbox, and the consumer's size ([slow-consumer.exs](slow-consumer.exs)):
+Nothing limits how many messages a mailbox can hold, and nothing slows a sender down when the receiver falls behind. Here's a producer sending 1,000 messages a second to a consumer that works on each one for 2 ms, so it can only handle 500 a second. Every second the producer reports how many it's sent, how many the consumer has handled, how many are waiting in the consumer's mailbox, and the consumer's size ([slow-consumer.exs](slow-consumer.exs)):
 
 ```text
 $ elixir slow-consumer.exs send
 mode: send
-1000 ms: sent  500, handled  333, waiting  167, consumer 628 KB
-2000 ms: sent  998, handled  666, waiting  332, consumer 1075 KB
-3000 ms: sent 1498, handled 1000, waiting  498, consumer 2562 KB
-4000 ms: sent 1995, handled 1332, waiting  663, consumer 2576 KB
-5000 ms: sent 2495, handled 1665, waiting  830, consumer 2590 KB
-6000 ms: sent 2995, handled 1999, waiting  996, consumer 3366 KB
+1000 ms: sent  998, handled  498, waiting  500, consumer 1089 KB
+2000 ms: sent 1999, handled  998, waiting 1001, consumer 2656 KB
+3000 ms: sent 2999, handled 1498, waiting 1501, consumer 3857 KB
+4000 ms: sent 3999, handled 1998, waiting 2001, consumer 6713 KB
+5000 ms: sent 4999, handled 2498, waiting 2501, consumer 6778 KB
+6000 ms: sent 5999, handled 2998, waiting 3001, consumer 6923 KB
 ```
 
-(The sleeps took longer than asked, 2 ms and 3 ms, so it sent about 500 a second and handled about 333.) The mailbox grows by about 166 messages a second, and it would go on growing until the machine ran out of memory. The consumer grows with it, because messages waiting in a mailbox are the consumer's data. They sit on its heap, and its collector copies them along with everything else, since as far as the collector can tell they're all still in use. *The BEAM Book*: "If the receiver is backed up and is receiving more messages than it has time to handle, it might actually start using more memory". For a process that may pile up messages, the docs recommend setting its `message_queue_data` flag to `off_heap`, which keeps them out of its heap and out of its collections.
+The mailbox grows by 500 messages a second, and it would go on growing until the machine ran out of memory. The consumer grows with it, because messages waiting in a mailbox are the consumer's data. They sit on its heap, and its collector copies them along with everything else, since as far as the collector can tell they're all still in use. *The BEAM Book*: "If the receiver is backed up and is receiving more messages than it has time to handle, it might actually start using more memory". For a process that may pile up messages, the docs recommend setting its `message_queue_data` flag to `off_heap`, which keeps them out of its heap and out of its collections.
 
 That's the most common way an Elixir system gets into trouble. Page 1's BEAM never skipped a tick: under load, work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
 
-The fix is for the sender to wait. Here's the same script, but now the sender waits for a reply before sending the next message:
+The fix is for the producer to wait. `send` never waits, so the waiting is built from a second message going the other way. The producer puts its own address, `self()`, in each message and goes straight into a `receive`. The consumer sends `:done` back to that address when it's finished. Until `:done` arrives, the producer's `receive` has nothing to match, so it waits:
+
+```elixir
+# The producer
+send(consumer, {:work, self(), payload})
+receive do: (:done -> :ok)
+
+# The consumer
+receive do
+  {:work, from, _payload} ->
+    Work.busy(2)
+    if from, do: send(from, :done)
+end
+```
+
+(In the first run the producer sent `nil` in place of its address, so the consumer didn't reply.)
+
+Here's the same script run that way:
 
 ```text
 $ elixir slow-consumer.exs call
 mode: call
-1000 ms: sent  200, handled  200, waiting    0, consumer 33 KB
-2000 ms: sent  400, handled  400, waiting    0, consumer 25 KB
-3000 ms: sent  599, handled  599, waiting    0, consumer 33 KB
-4000 ms: sent  799, handled  799, waiting    0, consumer 33 KB
-5000 ms: sent  998, handled  998, waiting    0, consumer 25 KB
-6000 ms: sent 1198, handled 1198, waiting    0, consumer 33 KB
+1000 ms: sent  499, handled  499, waiting    0, consumer 33 KB
+2000 ms: sent  998, handled  998, waiting    0, consumer 25 KB
+3000 ms: sent 1498, handled 1498, waiting    0, consumer 33 KB
+4000 ms: sent 1997, handled 1997, waiting    0, consumer 33 KB
+5000 ms: sent 2497, handled 2497, waiting    0, consumer 25 KB
+6000 ms: sent 2997, handled 2997, waiting    0, consumer 20 KB
 ```
 
-The sender now goes at the consumer's pace, and nothing piles up. That's backpressure: a slow receiver slows the sender down. `GenServer.call` gives it for free, because it waits for the reply. Its fire-and-forget sibling, `GenServer.cast`, doesn't, and a process that's sent a lot of casts is a process to keep an eye on.
+The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't. Page 5 comes back to both.
 
 ## And in Node?
 
@@ -183,29 +200,29 @@ SharedArrayBuffer of 16 MB, shared:     9 µs
 
 Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
 
-A slow worker falls behind the same way, too. Here's the slow consumer again, with the main thread posting to a worker that spends 2 ms on each message ([slow-worker.mjs](slow-worker.mjs)):
+A slow worker falls behind the same way, too. Here's the slow consumer again, with the main thread posting 1,000 messages a second to a worker that works on each one for 2 ms ([slow-worker.mjs](slow-worker.mjs)):
 
 ```text
 $ node slow-worker.mjs send; node slow-worker.mjs call
 node v25.9.0, mode: send
-1000 ms: sent  794, handled  349, waiting  445
-2000 ms: sent 1568, handled  700, waiting  868
-3000 ms: sent 2351, handled 1052, waiting 1299
-4000 ms: sent 3128, handled 1405, waiting 1723
-5000 ms: sent 3905, handled 1758, waiting 2147
-6000 ms: sent 4686, handled 2106, waiting 2580
+1000 ms: sent  999, handled  482, waiting  517
+2000 ms: sent 1998, handled  981, waiting 1017
+3000 ms: sent 2999, handled 1480, waiting 1519
+4000 ms: sent 3999, handled 1979, waiting 2020
+5000 ms: sent 4999, handled 2478, waiting 2521
+6000 ms: sent 5999, handled 2978, waiting 3021
 node v25.9.0, mode: call
-1000 ms: sent  226, handled  226, waiting    0
-2000 ms: sent  457, handled  457, waiting    0
-3000 ms: sent  688, handled  688, waiting    0
-4000 ms: sent  918, handled  918, waiting    0
-5000 ms: sent 1150, handled 1150, waiting    0
-6000 ms: sent 1382, handled 1382, waiting    0
+1000 ms: sent  489, handled  489, waiting    0
+2000 ms: sent  983, handled  983, waiting    0
+3000 ms: sent 1478, handled 1478, waiting    0
+4000 ms: sent 1971, handled 1971, waiting    0
+5000 ms: sent 2466, handled 2466, waiting    0
+6000 ms: sent 2960, handled 2960, waiting    0
 ```
 
-The queue grows without limit, and waiting for a reply fixes it, exactly as in the BEAM. (Node's timers slept closer to what was asked, so it sent faster.) Where Node is ahead is streams: a writable stream's `write()` returns `false` once its buffer passes a threshold, and well-behaved code waits for the `'drain'` event before writing more. That's backpressure built into the API, though nothing forces you to respect it: "Node.js will buffer all written chunks until maximum memory usage occurs".
+The queue grows without limit, and waiting for a reply fixes it, exactly as in the BEAM. Where Node is ahead is streams: a writable stream's `write()` returns `false` once its buffer passes a threshold, and well-behaved code waits for the `'drain'` event before writing more. That's backpressure built into the API, though nothing forces you to respect it: "Node.js will buffer all written chunks until maximum memory usage occurs".
 
-So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 6's monitors, which report a crash with a message.
+So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 7's monitors, which report a crash with a message.
 
 ## Watch it happen
 

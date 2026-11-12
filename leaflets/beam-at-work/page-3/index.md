@@ -193,7 +193,7 @@ Two things don't fit the picture of each process alone with its heap.
 
 Big binaries are shared. A binary (a string, a chunk of a file, a network packet) bigger than 64 bytes isn't kept on a process's heap. It's kept once, outside every heap, with a count of the processes using it, and each process holds a small reference to it. That makes sending one to another process cheap, since only the reference is copied. But the count only goes down when the processes holding a reference collect or exit, so a big binary can stay in memory well after it was last used, if a process holding it rarely collects.
 
-And one process with a huge heap is slow to collect, as the builder showed. The BEAM keeps that from holding anyone else up, but it doesn't make it fast. Page 9 comes back to that, and to what Elixir programs do instead of keeping hundreds of megabytes in one process.
+And one process with a huge heap is slow to collect, as the builder showed. The BEAM keeps that from holding anyone else up, but it doesn't make it fast. Page 10 comes back to that, and to what Elixir programs do instead of keeping hundreds of megabytes in one process.
 
 ## Sources
 
