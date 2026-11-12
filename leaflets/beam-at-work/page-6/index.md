@@ -524,7 +524,7 @@ Elixir's docs warn about exactly this: putting code behind "a single process tha
 
 It happens in big systems too. Discord's write-up of reaching five million users at once is largely about single processes that couldn't keep up. Each Discord server is a guild process that sends everything posted in it on to the session of every member who's connected, and at peak hours the guild processes fell behind their mailboxes.
 
-What Elixir programs do instead depends on the state. Work that doesn't touch it shouldn't go through the server at all, as in the second column. State that splits by key can live in several servers, one per part: the docs for `PartitionSupervisor`, which starts them, open with "Certain processes may become bottlenecks in large systems." And state that's read far more than it's written can go in an ETS table, a store built into the BEAM that, in the words of Elixir's guide, any process can read from, "but writes are still serialized through a single process." Page 11 has more about what the BEAM is slow at.
+What Elixir programs do instead depends on the state. Work that doesn't touch it shouldn't go through a server at all, as in the second column. State that splits by key can live in several servers, one per part: the docs for `PartitionSupervisor`, which starts them, open with "Certain processes may become bottlenecks in large systems." And state that's read far more than it's written can go in an ETS table, a store built into the BEAM that, in the words of Elixir's guide, any process can read from, "but writes are still serialized through a single process." Page 11 has more about what the BEAM is slow at.
 
 ## Watch it happen
 
