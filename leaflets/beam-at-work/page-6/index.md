@@ -104,6 +104,16 @@ def handle_call(:buy, _from, {left, payments}) do
 end
 ```
 
+`Payments.charge` is a call written by hand, like `buy` in the server by hand. The payment process replies 100 ms later:
+
+```elixir
+def charge(payments) do
+  ref = make_ref()
+  send(payments, {:charge, self(), ref})
+  receive do: ({^ref, reply} -> reply)
+end
+```
+
 ```text
 $ for i in 1 2 3; do elixir wait-inside.exs; done
 103 ms: buyer 1: :ok
@@ -174,11 +184,45 @@ $ elixir call-scan.exs
 
 The whole round trip, server included, takes a microsecond however many messages are waiting.
 
-Each of those is there because of a way a call can go wrong. Here are two of them, with the same calls written by hand beside them for comparison: a reference and a receive, the way `buy` was written above, with no monitor and no alias.
+Each of those is there because of a way a call can go wrong. Here are two of them, each with the same call written by hand beside it. The call by hand sends the server the same message `GenServer.call` does, so the server can't tell them apart, but it waits the way `buy` did in the server by hand: a reference and a receive, with no monitor and no alias.
 
 ### The server dies
 
-Here the server crashes in the middle of a call, and then gets called again after it's gone ([call-dies.exs](call-dies.exs)):
+Here the server crashes in the middle of a call, and then gets called again after it's gone ([call-dies.exs](call-dies.exs)). The server:
+
+```elixir
+def handle_call(:crash, _from, _state) do
+  Process.sleep(100)
+  raise "oops"
+end
+```
+
+The caller, with `GenServer.call`, run twice:
+
+```elixir
+try do
+  GenServer.call(server, :crash)
+catch
+  :exit, {{%RuntimeError{} = e, _stacktrace}, _where} ->
+    IO.puts("caller exited: the server raised #{inspect(e)}")
+
+  :exit, {reason, _where} ->
+    IO.puts("caller exited: #{inspect(reason)}")
+end
+```
+
+And by hand:
+
+```elixir
+ref = make_ref()
+send(server, {:"$gen_call", {self(), ref}, :crash})
+
+receive do
+  {^ref, reply} -> IO.puts("reply: #{inspect(reply)}")
+after
+  5_000 -> IO.puts("still waiting after 5 seconds")
+end
+```
 
 ```text
 $ elixir call-dies.exs
@@ -190,13 +234,50 @@ by hand, with no monitor:
 still waiting after 5 seconds
 ```
 
-The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails (page 4), so without a monitor nothing tells the caller, and the call by hand would wait forever. I gave it five seconds.
+The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails (page 4), so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
 
 When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and pages 5 and 7 are about what happens then.
 
 ### The caller gives up
 
-Here the server takes 300 ms over a request, and the caller only waits 100 ([call-timeout.exs](call-timeout.exs)):
+Here the server takes 300 ms over a request, and the caller only waits 100 ([call-timeout.exs](call-timeout.exs)). The server:
+
+```elixir
+def handle_call(:work, _from, state) do
+  Process.sleep(300)
+  {:reply, :done, state}
+end
+```
+
+The caller, with `GenServer.call` and then by hand, looking in its own mailbox half a second after each one gives up:
+
+```elixir
+show_mailbox = fn ->
+  {:messages, messages} = Process.info(self(), :messages)
+  IO.puts("  500 ms later, the caller's mailbox: #{inspect(messages)}")
+end
+
+try do
+  GenServer.call(server, :work, 100)
+catch
+  :exit, {reason, _where} -> IO.puts("  caller exited: #{inspect(reason)}")
+end
+
+Process.sleep(500)
+show_mailbox.()
+
+ref = make_ref()
+send(server, {:"$gen_call", {self(), ref}, :work})
+
+receive do
+  {^ref, reply} -> IO.puts("  reply: #{inspect(reply)}")
+after
+  100 -> IO.puts("  gave up")
+end
+
+Process.sleep(500)
+show_mailbox.()
+```
 
 ```text
 $ elixir call-timeout.exs
@@ -222,6 +303,32 @@ A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether t
 
 Because every GenServer runs the same loop, tools can work with any of them. The loop understands a few *system messages* besides yours, and Erlang's `:sys` module sends them. Here's the ticket server again, with nothing added to it ([sys.exs](sys.exs)):
 
+```elixir
+{:ok, server} = Tickets.start(2)
+
+IO.puts("get_state: #{:sys.get_state(server)}")
+
+:sys.trace(server, true)
+:sys.statistics(server, true)
+Tickets.buy(server)
+Tickets.buy(server)
+Tickets.buy(server)
+:sys.trace(server, false)
+{:ok, stats} = :sys.statistics(server, :get)
+IO.puts("statistics: #{inspect(Keyword.take(stats, [:messages_in, :messages_out]))}")
+
+:sys.replace_state(server, fn _ -> 1 end)
+IO.puts("replace_state, then get_state: #{:sys.get_state(server)}")
+
+:sys.suspend(server)
+buyer = Task.async(fn -> Tickets.buy(server) end)
+Process.sleep(1_000)
+{:message_queue_len, waiting} = Process.info(server, :message_queue_len)
+IO.puts("suspended for 1 s: #{waiting} request waiting")
+:sys.resume(server)
+IO.puts("resumed: the buyer got #{inspect(Task.await(buyer))}")
+```
+
 ```text
 $ elixir sys.exs
 get_state: 2
@@ -237,7 +344,7 @@ suspended for 1 s: 1 request waiting
 resumed: the buyer got :ok
 ```
 
-`:sys.get_state` reads the server's state, `:sys.trace` prints every request, reply, and new state as they happen, `:sys.statistics` counts them, and `:sys.replace_state` sets the state from outside. `:sys.suspend` makes the server answer only system messages, so a buy waited in its mailbox until `:sys.resume`. All of that works on a server while it runs, without changing or restarting it.
+`:sys.get_state` reads the server's state, `:sys.trace` prints every request, reply, and new state as they happen, `:sys.statistics` counts them, and `:sys.replace_state` sets the state from outside. `:sys.suspend` makes the server answer only system messages, so a buy waited in its mailbox until `:sys.resume`. (The buy runs in a separate process, started with `Task.async`, because a call would block the script until the reply came.) All of that works on a server while it runs, without changing or restarting it.
 
 Two more things come with it that later pages need. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server (page 7). And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded" (page 10).
 
