@@ -168,7 +168,22 @@ The producer now goes at the consumer's pace, 500 a second, and nothing piles up
 
 Inside one Node thread there's nothing to send. Pass an object to a function, or to an event listener, and the other end gets the same object, not a copy. That's fast, it's free, and it's safe only because of page 1: one callback runs at a time, so nobody else can be changing the object while you use it. Even an `EventEmitter`, the closest thing in plain Node to a message, isn't a mailbox. `emit` calls every listener right away, "synchronously," before it returns.
 
-Node does have messages, between threads. A worker thread (page 2's 9 MB thread) and the main thread talk with `postMessage`, and like a BEAM send, it copies: the value is cloned "in a way which is compatible with the HTML structured clone algorithm," and "The message object is cloned immediately, and can be modified after posting without having side effects." Here's what that costs ([post-copy.mjs](post-copy.mjs)):
+Node does have messages, between threads. A worker thread (page 2's 9 MB thread) and the main thread talk with `postMessage`, and like a BEAM send, it copies: the value is cloned "in a way which is compatible with the HTML structured clone algorithm," and "The message object is cloned immediately, and can be modified after posting without having side effects." Here's what that costs, measured the way copy.exs did, with a worker that never reads its messages ([post-copy.mjs](post-copy.mjs)):
+
+```javascript
+const worker = new Worker("setInterval(() => {}, 60_000);", { eval: true }); // stays up, never reads its messages
+
+for (const n of [1_000, 10_000, 100_000, 1_000_000]) {
+  const array = Array.from({ length: n }, (_, i) => i + 1);
+  // ...print how long worker.postMessage(array) took
+}
+
+// ...and the same for a 16 MB ArrayBuffer, copied, then transferred, and a SharedArrayBuffer
+const buffer = new ArrayBuffer(16_000_000);
+worker.postMessage(buffer);
+worker.postMessage(buffer, [buffer]);
+worker.postMessage(new SharedArrayBuffer(16_000_000));
+```
 
 ```text
 $ for i in 1 2 3; do node post-copy.mjs; done
@@ -200,7 +215,19 @@ SharedArrayBuffer of 16 MB, shared:     9 µs
 
 Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
 
-A slow worker falls behind the same way, too. Here's the slow consumer again, with the main thread posting 1,000 messages a second to a worker that works on each one for 2 ms ([slow-worker.mjs](slow-worker.mjs)):
+A slow worker falls behind the same way, too. Here's the slow consumer again, with the main thread posting 1,000 messages a second to a worker that works on each one for 2 ms ([slow-worker.mjs](slow-worker.mjs)). The waiting works the same way as in the BEAM: the worker posts `"done"` back when it's asked to, and the main thread waits for it:
+
+```javascript
+// The main thread, for each message that's due
+worker.postMessage({ reply: mode === "call", payload });
+if (mode === "call") await done(); // waits for the worker's "done"
+
+// The worker
+parentPort.on("message", ({ reply }) => {
+  busy(2);
+  if (reply) parentPort.postMessage("done");
+});
+```
 
 ```text
 $ node slow-worker.mjs send; node slow-worker.mjs call
