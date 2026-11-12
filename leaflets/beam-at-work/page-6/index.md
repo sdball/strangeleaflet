@@ -375,11 +375,79 @@ Elixir's docs warn about exactly this: putting code behind "a single process tha
 
 ## Watch it happen
 
-<!-- TODO: the widget. One server, several clients; a call step by step (reference, monitor, request in the mailbox, handle_call, tagged reply, the caller's receive). Kill the server mid-call, make handle_call slow (timeouts, late replies dropped at the alias), add clients until the mailbox backs up. -->
+The thing that surprises most people about a GenServer is where the state is. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback returns the next one as part of its answer, `{:reply, reply, new_state}`, or `{:noreply, new_state}` for a cast. The loop goes round again with whatever came back. Even a call that changes nothing, like asking how many tickets are left, returns the state, the same one it was given.
+
+Here's the ticket server again, with a call that buys `n` tickets, a call that asks how many are left, and a cast that adds `n`:
+
+```elixir
+defmodule Tickets do
+  use GenServer
+
+  def init(left) do
+    {:ok, left}
+  end
+
+  def handle_call({:buy, n}, _from, left) when n <= left do
+    {:reply, :ok, left - n}
+  end
+
+  def handle_call({:buy, _n}, _from, left) do
+    {:reply, :sold_out, left}
+  end
+
+  def handle_call(:left, _from, left) do
+    {:reply, left, left}
+  end
+
+  def handle_cast({:add, n}, left) do
+    {:noreply, left + n}
+  end
+end
+```
+
+Elixir tries the clauses of a function in order and runs the first one whose pattern, and `when` guard if it has one, matches. So buying more tickets than are left falls through to the second clause.
+
+Below is a simulation of it, slowed down so you can follow a request through the loop. A real run of the same module with `:sys.trace` on prints the same states ([state.exs](state.exs)):
+
+```text
+$ elixir state.exs
+started, state 3
+*DBG* <0.108.0> got call {buy,2} from <0.101.0>
+*DBG* <0.108.0> sent ok to <0.101.0>, new state 1
+buy 2: :ok
+*DBG* <0.108.0> got call {buy,2} from <0.101.0>
+*DBG* <0.108.0> sent sold_out to <0.101.0>, new state 1
+buy 2: :sold_out
+*DBG* <0.108.0> got call left from <0.101.0>
+*DBG* <0.108.0> sent 1 to <0.101.0>, new state 1
+left: 1
+add 3: :ok
+*DBG* <0.108.0> got cast {add,3}
+*DBG* <0.108.0> new state 4
+*DBG* <0.108.0> got call {buy,2} from <0.101.0>
+*DBG* <0.108.0> sent ok to <0.101.0>, new state 2
+buy 2: :ok
+```
+
+Start the server, then send it requests. Watch the state, drawn in brass: it goes into each callback as the last argument and comes out in what the callback returns. Some things to try:
+
+1. Buy 2, then buy 2 again. The second time, the first clause's guard (`when n <= left`) is false, so the next clause answers `:sold_out` and returns the state it was given.
+2. Make a call and try to send something else before the reply comes. You can't: a caller waits in `receive` until its reply arrives.
+3. Cast `{:add, n}` several times quickly. Each cast returns `:ok` at once, the casts wait in the mailbox, and the server takes them one at a time, each starting from the state the one before it returned.
+
+<genserver-state>
+
+![The simulation part way through a call. The server's state is 4. You, the client, called {:buy, 2} and are waiting for the reply. The server's mailbox is empty, because the server has taken the message, {:"$gen_call", from, {:buy, 2}}. It matched the clause def handle_call({:buy, n}, _from, left) when n <= left do, with n = 2 and left = 4, and that clause returns {:reply, :ok, left - n}, which is {:reply, :ok, 2}. Next it will send :ok back and loop with 2 as its state. Every state so far: 3 from init, 1 from {:buy, 2}, and 4 from {:add, 3}.](genserver-state.webp)
+
+*The live version of this needs JavaScript. In it, you start the ticket server and send it calls and casts, and follow each one through the server's loop: the message in its mailbox, the callback called with the current state, the new state it returns, and the reply.*
+
+</genserver-state>
+
+<script type="module" src="genserver-state.js"></script>
 
 ## Sources
 
-- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - A tail-recursive call using no stack, so a loop can "run forever": the Erlang reference manual, [Tail recursion](https://www.erlang.org/doc/system/ref_man_functions.html#tail-recursion).
 - GenServer as "a process like any other Elixir process" with "a standard set of interface functions" and tracing: [GenServer](https://hexdocs.pm/elixir/1.19.5/GenServer.html). `GenServer.call` passing the request to `:gen.call` with the label `:"$gen_call"` and a default timeout of 5,000: [gen_server.ex at v1.19.5](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1108-L1146). `cast` returning `:ok` whether or not the server exists: [L1149–L1161](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1149-L1161). `handle_info` handling "all other messages": [L650–L656](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L650-L656). `code_change`: [L749–L760](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L749-L760). The bottleneck warning: [L380–L396](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L381-L396). `child_spec/1` and the `:sys` functions: [Debugging with the :sys module](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-debugging-with-the-sys-module) and [How to supervise](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-how-to-supervise).
 - The server loop taking the oldest message and dispatching `'$gen_call'` to `handle_call`: [gen_server.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2320-L2326) and [L2498–L2518](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2498-L2518). `do_call`: [gen.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L231-L281); the reply sent to the alias: [L549–L554](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L549-L554). Late replies not received: [`gen_server:call/3`](https://www.erlang.org/doc/apps/stdlib/gen_server.html#call/3).
