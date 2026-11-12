@@ -99,7 +99,7 @@ That holds even when handling a request means waiting. Suppose selling a ticket 
 def handle_call(:buy, _from, {0, payments}), do: {:reply, :sold_out, {0, payments}}
 
 def handle_call(:buy, _from, {left, payments}) do
-  :paid = Payments.charge(payments)
+  :paid = Payments.charge(payments) # takes 100 ms
   {:reply, :ok, {left - 1, payments}}
 end
 ```
@@ -363,7 +363,7 @@ class Tickets {
 
   async buy() {
     if (this.left === 0) return "sold out";
-    await charge();
+    await charge(); // takes 100 ms
     this.left -= 1;
     return "ok";
   }

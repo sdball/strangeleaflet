@@ -36,7 +36,7 @@ defmodule Tickets do
   def handle_call(:buy, _from, {0, payments}), do: {:reply, :sold_out, {0, payments}}
 
   def handle_call(:buy, _from, {left, payments}) do
-    :paid = Payments.charge(payments)
+    :paid = Payments.charge(payments) # takes 100 ms
     {:reply, :ok, {left - 1, payments}}
   end
 end

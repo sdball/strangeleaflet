@@ -16,7 +16,7 @@ class Tickets {
 
   async buy() {
     if (this.left === 0) return "sold out";
-    await charge();
+    await charge(); // takes 100 ms
     this.left -= 1;
     return "ok";
   }
