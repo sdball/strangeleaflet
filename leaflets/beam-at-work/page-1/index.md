@@ -249,7 +249,7 @@ C  172 323 474 625 777 927 1434 1585 1744 1895
 
 A and B both came due during the short busy loop. They both ran the moment it ended, Node counted each one's next tick from that same moment, and from then on they tick together. D wasn't due until just after, so it kept its own beat until the longer busy loop caught it too. C has a different period, so it can't lock on, but now it lands on the same millisecond as the others every so often (1434, 1744). The details shift from run to run; in another run the short busy loop lasted until 594 ms and caught D as well.
 
-Nothing ever spreads them back out. A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 comes back to this, and to the BEAM's side of it: it never skips a tick, so when there's more work than CPU, the work piles up instead.
+Nothing ever spreads them back out. A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 comes back to this. It also covers the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
 
 So why did the real Elixir run never fall behind, even on one scheduler? Scale. In the simulation a turn is long next to the time between ticks, so a few busy loops push ticks late. On my M1 a turn is about 10 microseconds and the ticks are 100 milliseconds apart: room for 10,000 turns between ticks. You'd need around ten thousand busy processes on one scheduler before a ticker waited a whole tick.
 
