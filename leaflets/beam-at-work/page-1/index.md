@@ -242,7 +242,36 @@ In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait
 
 In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, Node's ticks came at 1391, 1494, and 1594 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, and nine ticks behind the clock for good.
 
-That new beat has a side effect when there's more than one interval. Here are four: A, B, and D every 100 ms, C every 150 ms, with a short busy loop at 500 ms and a longer one at 1000 ms. ([intervals.mjs](intervals.mjs), same machine.)
+That new beat has a side effect when there's more than one interval. Here are four: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
+
+```javascript
+const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
+
+const start = performance.now();
+const now = () => Math.round(performance.now() - start);
+
+// A, B, and D tick every 100 ms, starting 0, 40, and 90 ms in.
+// C ticks every 150 ms, starting 20 ms in.
+const ticks = { A: [], B: [], D: [], C: [] };
+for (const [name, offset, every] of [["A", 0, 100], ["B", 40, 100], ["D", 90, 100], ["C", 20, 150]]) {
+  setTimeout(() => setInterval(() => ticks[name].push(now()), every), offset);
+}
+
+const busy = [];
+const busyLoop = (n) => {
+  const from = now();
+  fib(n);
+  busy.push(`${from}–${now()} ms`);
+};
+setTimeout(() => busyLoop(34), 500);
+setTimeout(() => busyLoop(38), 1000);
+
+setTimeout(() => {
+  console.log(`busy loops: ${busy.join(", ")}`);
+  for (const [name, times] of Object.entries(ticks)) console.log(`${name}  ${times.join(" ")}`);
+  process.exit();
+}, 2000);
+```
 
 ```text
 $ node intervals.mjs
