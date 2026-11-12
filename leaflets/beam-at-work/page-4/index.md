@@ -232,8 +232,8 @@ The number to watch is how long the oldest waiting message has waited. That's ab
 
 It waits at the start until you press Play. Then try this:
 
-1. Let it run. The producer sends twice as fast as the consumer can handle, so the oldest message's wait grows by half a second every second, and it doesn't stop: each message waits longer than the one before.
-2. Switch the producer to waiting for each reply. Its next message goes on the end of the queue like any other, so the reply only comes once everything ahead of it has been handled. The backlog still has to drain, and the wait keeps climbing until it does. After that the producer goes at the consumer's pace and nothing piles up.
+1. Let it run. The producer sends 1,000 a second and the consumer handles 500, so the oldest message's wait grows by half a second every second, and it doesn't stop: each message waits longer than the one before.
+2. Switch the producer to waiting for each reply. Its next message goes on the end of the queue like any other, so the reply only comes once everything ahead of it has been handled. The backlog still has to drain, and the wait keeps climbing until it does, while the producer's rate falls to nothing. After that the producer sends 500 a second, the consumer's pace, and nothing piles up. The consumer handles 500 a second the whole time. Waiting for replies doesn't get any more done; it stops the producer sending what can't be done.
 3. Press Reset, choose 250 sends a second, and play. The consumer is busy half the time and nothing waits. Backpressure only matters when the producer is faster than the consumer.
 4. Compare the two sides. They move together, message for message. What differs is where the waiting messages are (in the BEAM, in the consumer's own mailbox; in Node, in the worker's message queue) and what each one costs.
 

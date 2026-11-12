@@ -10,7 +10,10 @@
 // producer outpaces the consumer it grows without limit; when the producer
 // waits for each reply it stays near zero. The consumer shows how busy it's
 // been over the last moment rather than each message's progress, which
-// would flicker at these speeds.
+// would flicker at these speeds, and each end shows its rate: the producer
+// sends and the consumer handles so many a second, counted over the last
+// WINDOW of simulated time. Waiting for replies doesn't raise the
+// consumer's rate; it brings the producer's down to match.
 //
 // It's a simulation, not a replay, and both sides follow the same rules,
 // because in the runs on the page they behaved the same. What differs is
@@ -32,7 +35,7 @@ const WORKS = [1, 2, 4]; // ms the consumer spends on each message
 // Simulated milliseconds per real millisecond
 const SPEEDS = { "1/100": 0.01, "1/25": 0.04, "1/5": 0.2 };
 const STEP = 5; // simulated ms per press of Step
-const BUSY_WINDOW = 200; // simulated ms the consumer's busy figure averages over
+const WINDOW = 400; // simulated ms the rates and the busy figure are measured over
 // Measured memory per waiting message: queue-memory.exs (the consumer's
 // process memory) and queue-memory.mjs (the Node process's RSS, 770 to 918
 // bytes over five sizes and two runs)
@@ -207,10 +210,8 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     gap: .4rem;
   }
   beam-mailbox .end {
-    display: flex;
-    align-items: center;
-    gap: .2rem .6rem;
-    min-height: 2.2rem;
+    display: grid;
+    gap: .1rem;
     padding: .25rem .5rem;
     border: 1.5px solid var(--line);
     border-radius: 4px;
@@ -244,10 +245,12 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     color: var(--brass);
     font-weight: 700;
   }
+  beam-mailbox .end .top {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+  }
   beam-mailbox .end output {
-    display: inline-block;
-    min-width: 4ch;
-    text-align: right;
     font-variant-numeric: tabular-nums;
     color: var(--ink);
   }
@@ -279,7 +282,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     overflow: hidden;
   }
   beam-mailbox .more {
-    min-height: 2.6em; /* two lines, filled or not */
+    height: 2.8em; /* two lines, filled or not */
+    line-height: 1.4;
+    overflow: hidden;
     margin-top: .3rem;
     font-family: var(--type);
     font-size: .75rem;
@@ -377,6 +382,8 @@ class Pair {
     this.awaiting = false;
     this.busy = 0; // ms the consumer has spent working, in all
     this.history = [[0, 0]]; // [t, busy] at the end of each advance, recent ones
+    this.sends = []; // when each recent message was sent
+    this.handles = []; // when each recent message was handled
     this.rebase();
   }
 
@@ -403,10 +410,12 @@ class Pair {
         if (this.current.reply) this.awaiting = false;
         this.current = null;
         this.handled++;
+        this.handles.push(this.t);
       } else {
         const reply = mode === "call";
         this.queue.push({ at: this.t, reply });
         this.sent++;
+        this.sends.push(this.t);
         this.due++;
         if (reply) this.awaiting = true;
       }
@@ -422,7 +431,17 @@ class Pair {
     if (this.current) this.busy += to - this.t;
     this.t = to;
     this.history.push([to, this.busy]);
-    while (this.history.length > 2 && this.history[1][0] <= to - BUSY_WINDOW) this.history.shift();
+    while (this.history.length > 2 && this.history[1][0] <= to - WINDOW) this.history.shift();
+    for (const times of [this.sends, this.handles]) {
+      const old = times.findIndex((at) => at > to - WINDOW);
+      times.splice(0, old === -1 ? times.length : old);
+    }
+  }
+
+  // Messages a second over the last WINDOW, from the times in `times`
+  rate(times) {
+    const span = Math.min(WINDOW, this.t);
+    return span ? (times.length * 1000) / span : 0;
   }
 
   // How long the oldest waiting message has waited
@@ -457,8 +476,8 @@ customElements.define("beam-mailbox", class extends HTMLElement {
           <p class="side-note">${s.note}</p>
           <div class="flow" aria-hidden="true">
             <div class="end producer">
-              <span class="name">${s.producer}</span>
-              <span class="states"><span data-state="sending">sending</span><span data-state="waiting" class="alert">waiting for a reply</span></span>
+              <span class="top"><span class="name">${s.producer}</span><span class="states"><span data-state="sending"></span><span data-state="waiting" class="alert">waiting for a reply</span></span></span>
+              <span>sends <output class="sends"></output> a second</span>
             </div>
             <div class="queue">
               <span class="queue-name">${s.queue}</span>
@@ -466,8 +485,8 @@ customElements.define("beam-mailbox", class extends HTMLElement {
               <div class="more"></div>
             </div>
             <div class="end consumer">
-              <span class="name">${s.consumer}</span>
-              <span>busy <output class="busy"></output></span>
+              <span class="top"><span class="name">${s.consumer}</span></span>
+              <span>handles <output class="handles"></output> a second, busy <output class="busy"></output></span>
             </div>
           </div>
           <p class="age"><span>the oldest waiting message has waited</span><output class="oldest"></output></p>
@@ -619,6 +638,9 @@ customElements.define("beam-mailbox", class extends HTMLElement {
       set(".memory", size(pair.waiting * s.bytes));
       set(".oldest", pair.waiting ? duration(pair.oldestAge) : "none");
       set(".busy", `${Math.round(pair.busyShare * 100)}%`);
+      // To the nearest 10: a window can catch one message more or less
+      set(".sends", number(Math.round(pair.rate(pair.sends) / 10) * 10));
+      set(".handles", number(Math.round(pair.rate(pair.handles) / 10) * 10));
 
       const state = (end, name) => el.querySelectorAll(`.${end} [data-state]`).forEach((span) => span.classList.toggle("on", span.dataset.state === name));
       state("producer", pair.awaiting ? "waiting" : "sending");
