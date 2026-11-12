@@ -226,11 +226,41 @@ So messages work much the same in both. The difference is how much they're used.
 
 ## Watch it happen
 
-<!-- TODO: the widget. -->
+Here's the slow consumer again, in both runtimes side by side and slowed down. It's a simulation with the settings from the runs above: the producer sends 1,000 messages a second, and each one takes the consumer 2 ms. Both sides follow the same rules, because in the runs they behaved the same. You can change how fast messages come in and how long each one takes, and switch the producer between sending and moving on and waiting for each reply.
+
+Let a queue build up, then switch to waiting for each reply. The producer's next message goes on the end of the queue like any other, so its reply only comes once everything ahead of it has been handled. Waiting slows the producer down, but it doesn't clear a backlog that's already there.
+
+The memory figures come from sending the slow consumer's message to a process, or a worker, that never reads it, and measuring how much bigger that made things ([queue-memory.exs](queue-memory.exs), [queue-memory.mjs](queue-memory.mjs)):
+
+```text
+$ elixir queue-memory.exs
+  1000 waiting: consumer grew 1678 KB, 1718 bytes each
+  3000 waiting: consumer grew 5037 KB, 1719 bytes each
+ 10000 waiting: consumer grew 16795 KB, 1719 bytes each
+ 30000 waiting: consumer grew 50389 KB, 1719 bytes each
+$ node --expose-gc queue-memory.mjs
+  1000 waiting: rss grew 848 KB, 868 bytes each
+  3000 waiting: rss grew 2320 KB, 792 bytes each
+ 10000 waiting: rss grew 7904 KB, 809 bytes each
+ 30000 waiting: rss grew 26832 KB, 916 bytes each
+100000 waiting: rss grew 75152 KB, 770 bytes each
+```
+
+They're different measures. The BEAM's is the consumer process's own memory, and it's 1,719 bytes a message every time. Node's is the whole process as the operating system sees it, so it's rougher: in one run of seven, the last line came out at 96 bytes, because the process's memory had shrunk. The widget uses 800 bytes. Either way a waiting message isn't free, and a queue that grows without limit takes memory without limit.
+
+<beam-mailbox>
+
+![The simulation 601 ms in, with the producer sending and moving on, side by side. On the BEAM side the producer is sending, and the consumer's mailbox is full of waiting messages, four rows of them and 221 more. The consumer is partway through a message. Sent 602, handled 300, waiting 301, and 517 KB in the consumer's mailbox. The Node side shows the same: the main thread sending, the worker's message queue just as full, the worker partway through a message, the same counts, and 241 KB in the worker's queue.](beam-mailbox.webp)
+
+*The live version of this needs JavaScript. In it, you can watch a producer and a slow consumer in the BEAM and in Node side by side, and change how fast messages are sent, how long each takes, and whether the producer waits for each reply.*
+
+</beam-mailbox>
+
+<script type="module" src="beam-mailbox.js"></script>
 
 ## Sources
 
-- The scripts and their runs: [copy.exs](copy.exs), [selective.exs](selective.exs), [scan.exs](scan.exs), [slow-consumer.exs](slow-consumer.exs), [post-copy.mjs](post-copy.mjs), and [slow-worker.mjs](slow-worker.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [copy.exs](copy.exs), [selective.exs](selective.exs), [scan.exs](scan.exs), [slow-consumer.exs](slow-consumer.exs), [post-copy.mjs](post-copy.mjs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - Communication by asynchronous signals, messages added to the end of the message queue, and the one ordering guarantee ("if an entity sends multiple signals to the same destination entity, the order is preserved"): the Erlang reference manual, [Processes](https://www.erlang.org/doc/system/ref_man_processes.html): [Signals](https://www.erlang.org/doc/system/ref_man_processes.html#signals), [Adding Messages to the Message Queue](https://www.erlang.org/doc/system/ref_man_processes.html#message-queue-order), and [Delivery of Signals](https://www.erlang.org/doc/system/ref_man_processes.html#delivery-of-signals).
 - A send never failing for a pid, `receive` taking "The first message from the start of the message queue that matches", "All other messages in the message queue remain unchanged", its `O(N)` cost, and matching on a reference created close by: the Erlang reference manual, [Send](https://www.erlang.org/doc/system/expressions.html#send) and [Receive](https://www.erlang.org/doc/system/expressions.html#receive).
 - All message data copied except refc binaries and literals: the efficiency guide, [Sending Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#sending-messages) and [Literal Pool](https://www.erlang.org/doc/system/eff_guide_processes.html#literal-pool). Searching only the messages that arrived after the reference was made: [Fetching Received Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#fetching-received-messages). Binaries over 64 bytes kept off the heap: page 3's sources.
