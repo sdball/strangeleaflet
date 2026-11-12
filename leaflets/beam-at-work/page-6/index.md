@@ -121,26 +121,20 @@ And all three:
 
 So `{:reply, :ok, left - 1}` means reply `:ok`, and from now on there's one ticket fewer. It's the server by hand's last two lines, `send(from, {ref, reply})` and `loop(left)`, written as a value for GenServer to act on. And `{:reply, left, left}` replies with how many tickets are left and keeps the state as it was. A callback always returns the state, even when it hasn't changed.
 
-Here's the loop unrolled, one turn for each message. Send the server a few, and watch each callback start from the state the last one returned:
+Here's the ticket server's state going round the loop. Send it a few messages, and watch each one start from the state the last one left behind:
 
 <genserver-loop>
 
 ```text
-init(2)
-  returns {:ok, 2}                     the server is up
-  ↓ loop(2)
-handle_call(:buy, from, 2)
-  returns {:reply, :ok, 1}             the caller gets :ok
-  ↓ loop(1)
-handle_cast({:add, 2}, 1)
-  returns {:noreply, 3}                no reply: a cast doesn't wait for one
-  ↓ loop(3)
-handle_call(:left, from, 3)
-  returns {:reply, 3, 3}               the caller gets 3
-  ↓ loop(3)
+message          state      the callback, and what it returned
+(start)              2      init(2) returns {:ok, 2}
+buy a ticket     2 → 1      handle_call(:buy, from, 2) returns {:reply, :ok, 1}
+what's left?     1 → 1      handle_call(:left, from, 1) returns {:reply, 1, 1}
+add 2 tickets    1 → 3      handle_cast({:add, 2}, 1) returns {:noreply, 3}
+buy a ticket     3 → 2      handle_call(:buy, from, 3) returns {:reply, :ok, 2}
 ```
 
-*The live version of this needs JavaScript. In it, you send the server calls and casts and watch each turn of its loop: the callback called with the current state, the tuple it returns, and the new state carried on to the next turn.*
+*The live version of this needs JavaScript. In it, you send the server messages and watch its state go round the loop: each message takes the state down a step and it lands as the next one, changed or the same.*
 
 </genserver-loop>
 
@@ -587,7 +581,7 @@ What Elixir programs do instead depends on the state. Work that doesn't touch it
 
 ## Watch it happen
 
-The unrolled loop in "Where the state lives" showed the state going from one callback to the next. Here's the same thing inside a running server, with its mailbox and a client sending it requests.
+The widget in "Where the state lives" showed the state going from one message to the next. Here's the same thing inside a running server, with its mailbox and a client sending it requests.
 
 Here's the ticket server again, with a call that buys `n` tickets, a call that asks how many are left, and a cast that adds `n`:
 
