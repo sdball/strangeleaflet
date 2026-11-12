@@ -428,7 +428,7 @@ In Node, everything interleaves at an `await` unless you queue it. Getting it ri
 
 In a GenServer, nothing interleaves unless you arrange it. There's nothing to know or remember first: one request at a time is how the server runs. The cost is the one the times show, a sale at a time.
 
-Between threads, Node has messages, and a call to a worker thread is something you build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
+Between threads, Node has messages, and a call to a worker thread is something you have to build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
 
 ```js
 class Client {
@@ -486,7 +486,11 @@ a call after the worker is gone
   failed: oops
 ```
 
-It works, and at 41 lines it's about the size of `do_call`, whose three clauses come to 53. Neither is hard to write. What's different is that in the BEAM it's written once, in the standard library, and every server gets it, where in Node each program that needs it writes its own or finds one. And Node's is per worker, at megabytes a thread (page 2), where the BEAM's works with any process.
+It works, and at 41 lines it's about the size of `do_call`, whose three clauses come to 53. Neither is exactly hard to write. What's different is who wrote it, and how much it's been through. In Node, each program that needs a call like this writes its own or finds one. In the BEAM it's written once, in the standard library, and every server gets the same one, already written, already tested, and already tuned. The runtime has features built for it: the fast receive that kept a call at a microsecond with 100,000 messages waiting, and the aliases that drop late replies, which Erlang's docs describe as "useful in client/server scenarios".
+
+And it has been through a lot. `gen_server` is part of OTP, which Ericsson started in 1996 for the AXD301, a telecom switch built for "carrier-class" non-stop operation. In a 2001 snapshot of the AXD301's code, over a million lines of Erlang, 122 of its 191 standard OTP processes were gen_servers. Discord built its chat service on Elixir from its first prototype: when it wrote up how it reached nearly five million users connected at once, in 2017, each connected user had a session process, "a GenServer", and each Discord server was a GenServer too.
+
+And Node's is per worker, at megabytes a thread (page 2), where the BEAM's works with any process.
 
 ## Where it gives ground
 
@@ -599,5 +603,6 @@ Start the server, then send it requests. Watch the state, drawn in brass: it goe
 - Monitors, `'DOWN'` messages, and `noproc` for a process that didn't exist: [`erlang:monitor/2`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/2). The `{alias, demonitor}` option deactivating the alias "when the monitor is removed": [`erlang:monitor/3`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/3).
 - The fast receive for a reference made just before: page 4's sources.
 - `sys` and system messages: [sys](https://www.erlang.org/doc/apps/stdlib/sys.html).
+- OTP started in 1996 for the AXD301; the AXD301's "carrier-class" non-stop operation; the 2001 snapshot's size and its 191 behaviour instances, 122 of them `gen_server`: Joe Armstrong, [*Making reliable distributed systems in the presence of software errors*](https://erlang.org/download/armstrong_thesis_2003.pdf) (2003), pages 6, 171, and 174 (sections 1.1, 8.2, and 8.3). Aliases "useful in client/server scenarios": [`erlang:monitor/3`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/3). Discord's session and guild processes as GenServers, and nearly five million concurrent users: Stanislav Vishnevskiy, [How Discord Scaled Elixir to 5,000,000 Concurrent Users](https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users) (Discord, 2017).
 - `PartitionSupervisor`: [its docs](https://hexdocs.pm/elixir/1.19.5/PartitionSupervisor.html). ETS reads "from any processes but writes are still serialized through a single process": Elixir's guide, [Speeding up with ETS](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/pages/mix-and-otp/erlang-term-storage.md).
 - Node's `await` and the one thread: page 1's sources. Worker `'error'` and `'exit'` events: Node's [worker_threads docs](https://nodejs.org/api/worker_threads.html#event-error).
