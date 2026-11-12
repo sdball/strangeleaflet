@@ -43,7 +43,9 @@ The BEAM also ensures message delivery order. If a process sends two messages to
 
 ## The mailbox
 
-A process's mailbox is a queue. Messages go on the end as they arrive, and `receive` takes them out. But it doesn't have to take the oldest. It takes the first one that matches one of its patterns, and leaves the rest where they were ([selective.exs](selective.exs)):
+A process's mailbox is a queue. Messages go on the end as they arrive, and `receive` takes them out. But it doesn't have to take the oldest. It takes the first one that matches one of its patterns, and leaves the rest where they were.
+
+Here's a process that sends itself four messages, then receives twice: once with a pattern that only a reply matches, and once with one that matches anything. In between, `show` prints what's in its mailbox, using `Process.info`, which looks without taking anything out ([selective.exs](selective.exs)):
 
 ```elixir
 send(self(), {:log, "first"})
@@ -51,9 +53,21 @@ send(self(), {:log, "second"})
 send(self(), {:reply, 42})
 send(self(), {:log, "third"})
 
+show = fn label ->
+  {:messages, messages} = Process.info(self(), :messages)
+  IO.puts("#{label}: #{Enum.map_join(messages, " ", &inspect/1)}")
+end
+show.("mailbox")
+
 receive do
   {:reply, answer} -> IO.puts("received the reply: #{answer}")
 end
+show.("mailbox")
+
+receive do
+  message -> IO.puts("received the oldest: #{inspect(message)}")
+end
+show.("mailbox")
 ```
 
 ```text
@@ -85,7 +99,7 @@ $ for i in 1 2 3; do elixir scan.exs; done
 100000 other messages waiting: receive 379.2 µs, with a reference 0.2 µs
 ```
 
-About 4 ns a message, every time. For a process that's behind, that adds up: each receive looks again at everything it skipped last time.
+The time grows with the number of messages `receive` has to look past, at about 4 ns for each one it checks and skips: about 3.7 µs to get past 1,000, and 380 µs to get past 100,000. For a process that's behind, that adds up, because the next receive checks all the skipped messages again.
 
 The other column is the way around it. `make_ref()` makes a reference, a value that's new and unique, so no message that arrived before it was made can contain it. Make one, send it along with a request, and receive only replies that carry it, and the compiler spots it: it tells the BEAM to look only at messages that arrived after the reference was made.
 
