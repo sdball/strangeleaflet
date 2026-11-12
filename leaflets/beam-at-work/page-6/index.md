@@ -426,7 +426,7 @@ That matches the GenServer exactly, down to the times, and it's eight lines. So 
 
 In Node, everything interleaves at an `await` unless you queue it. Getting it right means knowing this failure can happen at all, spotting it in code that looks fine and works whenever requests come one at a time, knowing that a queue fixes it and how to write one, and then remembering to use it everywhere state is read before an `await` and changed after. Miss any one of those and the code still works, until two requests overlap.
 
-In a GenServer, nothing interleaves unless you arrange it. There's nothing to know or remember first: one request at a time is how the server runs. The cost is the one the times show, a sale at a time, and the end of this page comes back to it.
+In a GenServer, nothing interleaves unless you arrange it. There's nothing to know or remember first: one request at a time is how the server runs. The cost is the one the times show, a sale at a time.
 
 Between threads, Node has messages, and a call to a worker thread is something you build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
 
