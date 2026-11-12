@@ -229,7 +229,36 @@ Right after spawning, all sixteen were waiting in scheduler 1's queue, the paren
 
 ## Watch it happen
 
-<!-- The widget goes here: a spawn control, a memory figure from the measurements above, and the schedulers sharing processes out, with stealing and migration. -->
+Here's the same thing as a simulation, slowed way down. Each row is a scheduler: the process it's running, then its run queue.
+
+Press **Spawn 16 busy processes**. A parent process starts on one scheduler and spawns sixteen children onto that scheduler's queue. Watch the idle schedulers take processes from it, and then migration move a few more, until each scheduler has about the same amount of work. Press it again while the first sixteen are still running and see where the next batch goes.
+
+Then press **Spawn 1,000 waiting processes**. Each one runs just long enough to reach its `receive`, then waits for a message that never comes. A waiting process isn't in any run queue, so the rows barely change. That's most of what makes processes cheap: one that's waiting costs its memory and nothing else.
+
+<beam-spread>
+
+```text
+A moment from the simulation, just after the parent spawned sixteen busy processes
+
+scheduler 1   running: P8   queue: P9 P10 P11 P12 P13 P14 P15 P16
+scheduler 2   running: P1
+scheduler 3   running: P2
+scheduler 4   running: P3
+scheduler 5   running: P4
+scheduler 6   running: P5
+scheduler 7   running: P6
+scheduler 8   running: P7
+
+running or waiting:   9  1  1  1  1  1  1  1
+```
+
+*The live version of this needs JavaScript. In it, the idle schedulers take processes from scheduler 1's queue, and migration evens out the rest.*
+
+</beam-spread>
+
+<script type="module" src="beam-spread.js"></script>
+
+The simulation's migration is simpler than the real one. It checks the loads every three turns instead of every 2,000, and it doesn't keep track of how long each queue got in between, so it evens things out faster and more neatly than the BEAM does. The real run above ended half a second later with 4 on one scheduler and 1 on another.
 
 ## Sources
 

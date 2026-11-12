@@ -10,9 +10,18 @@
 // Beam: schedulers, each with its own run queue. A process runs until it
 // waits or uses up its budget of reductions (CONTEXT_REDS, 4000 in erts since
 // OTP 20), then goes to the back of its scheduler's queue. A scheduler with an
-// empty queue steals from another's. Simplified: one priority, and a new
-// process goes to the least busy scheduler (the real one starts on its
-// parent's and is balanced later).
+// empty queue steals from another's. A process spawned by another process goes
+// on its parent's scheduler's queue, as in erts (erl_create_process); one
+// spawned from outside any process, by a widget, goes to the least busy.
+// Migration, when it's on (balanceEvery), is simplified from the BEAM Book's
+// Migration section: every so often the schedulers compare their loads (the
+// process running plus the queue), and until the next comparison a scheduler
+// above the average hands a process that's going back in its queue to the
+// least loaded one below it. The real check runs every 2000 * CONTEXT_REDS
+// reductions, compares the longest each queue got over that time, fixes one
+// partner per scheduler, and also lets the short queue pull work; none of
+// that is modelled.
+// One priority only.
 //
 // EventLoop: Node's JavaScript thread. One call stack; a callback runs until
 // it returns; due timers, then other callbacks, wait in line behind it.
@@ -21,6 +30,7 @@
 //   { run: n }         n reductions of work
 //   { receive: true }  the oldest message, waiting for one if there are none
 //   { sleep: n }       nothing, for n units
+//   { spawn: { name, body, info } }  a new process; the yield returns its pid
 // A callback can only yield { run }: in Node, waiting means a new callback.
 
 export const CONTEXT_REDS = 4000;
@@ -46,9 +56,11 @@ class Clock {
 }
 
 export class Beam extends Clock {
-  constructor({ schedulers = 1, budget = CONTEXT_REDS } = {}) {
+  constructor({ schedulers = 1, budget = CONTEXT_REDS, balanceEvery = null } = {}) {
     super();
     this.budget = budget;
+    this.balanceEvery = balanceEvery;
+    this.plan = null; // the latest migration plan, see balance()
     this.nextPid = 1;
     this.processes = new Map();
     this.timers = [];
@@ -71,7 +83,8 @@ export class Beam extends Clock {
     }
   }
 
-  spawn(name, body, info = {}) {
+  // With a parent, the new process starts on the parent's scheduler
+  spawn(name, body, info = {}, parent = null) {
     const p = {
       ...info,
       pid: this.nextPid++,
@@ -81,12 +94,13 @@ export class Beam extends Clock {
       mailbox: [],
       waiting: null,
       cmd: null,
-      home: null,
+      home: parent?.home ?? null,
+      parent: parent?.pid ?? null,
     };
     p.gen = body(p);
     this.processes.set(p.pid, p);
-    this.enqueue(p);
-    this.emit({ type: "spawn", process: p });
+    this.enqueue(p, { migrate: false });
+    this.emit({ type: "spawn", process: p, parent });
     return p;
   }
 
@@ -104,8 +118,16 @@ export class Beam extends Clock {
 
   step() {
     this.time++;
+    if (this.balanceEvery && this.time % this.balanceEvery === 0) this.balance();
     this.fireTimers();
     for (const s of this.schedulers) this.work(s);
+  }
+
+  // Compare loads. The average holds until the next balance.
+  balance() {
+    const average = this.schedulers.reduce((sum, s) => sum + load(s), 0) / this.schedulers.length;
+    this.plan = { average };
+    this.emit({ type: "balance", average });
   }
 
   fireTimers() {
@@ -149,7 +171,7 @@ export class Beam extends Clock {
       // Out of reductions: to the back of the queue, whatever it was doing
       s.current = null;
       p.state = "runnable";
-      s.queue.push(p);
+      this.enqueue(p);
       this.emit({ type: "preempt", process: p, scheduler: s });
     }
   }
@@ -184,6 +206,11 @@ export class Beam extends Clock {
         }
         return this.wait(p, "message");
       }
+      if ("spawn" in cmd) {
+        const { name, body, info } = cmd.spawn;
+        value = this.spawn(name, body, info, p).pid;
+        continue;
+      }
       if ("sleep" in cmd) {
         this.timers.push({ at: this.time + cmd.sleep, pid: p.pid });
         return this.wait(p, "timer");
@@ -204,10 +231,24 @@ export class Beam extends Clock {
     this.enqueue(p);
   }
 
-  enqueue(p) {
+  enqueue(p, { migrate = true } = {}) {
     const home = this.schedulers.find((s) => s.id === p.home);
-    const s = home ?? this.schedulers.reduce((a, b) => (load(b) < load(a) ? b : a));
+    let s = home ?? this.schedulers.reduce((a, b) => (load(b) < load(a) ? b : a));
+    const to = migrate && home && this.migrationTarget(home);
+    if (to) {
+      this.emit({ type: "migrate", process: p, from: s, to });
+      s = to;
+      p.home = to.id;
+    }
     s.queue.push(p);
+  }
+
+  // Where a process going back in s's queue should go instead, if anywhere.
+  // The process isn't counted in any load yet, hence the + 1s.
+  migrationTarget(s) {
+    if (!this.plan || load(s) + 1 <= this.plan.average) return null;
+    const to = this.schedulers.reduce((a, b) => (load(b) < load(a) ? b : a));
+    return load(to) + 1 <= this.plan.average ? to : null;
   }
 
   exit(p) {
