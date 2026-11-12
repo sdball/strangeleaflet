@@ -265,6 +265,12 @@ They're different measures. The BEAM's is the consumer process's own memory, and
 
 <script type="module" src="beam-mailbox.js"></script>
 
+Whatever the settings, the consumer can only do so much. At 2 ms a message that's 500 a second, and it handled 500 a second whether the producer waited or not. When the producer is slower than that, as at 250 a second, nothing waits and it doesn't matter which way it sends. When it's faster, the difference has to go somewhere. Sending and moving on, it goes into the queue: 500 messages a second piling up, with every message waiting longer than the last and the memory growing, in both runtimes, until something gives. Waiting for each reply, it never gets sent. The producer slows to 500 a second, the queue stays empty, and every message is handled as soon as it arrives.
+
+That's what backpressure is for. The work done is the same; what changes is where the overload goes. Instead of a queue that grows until it runs out of memory, the producer finds out it's going too fast, and the whole flow settles at the pace of its slowest part, with short waits and flat memory. The producer then has to decide what to do about the extra, wait or drop it, but that's a decision it can make, where a queue that grows without limit decides for it.
+
+One message at a time is the simplest kind of backpressure. It also means the consumer has nothing to start on while each reply goes back and the next message comes in. Page 6 is about GenStage, which lets a consumer ask for many messages at once and still never get more than it asked for.
+
 ## Sources
 
 - The scripts and their runs: [copy.exs](copy.exs), [selective.exs](selective.exs), [scan.exs](scan.exs), [slow-consumer.exs](slow-consumer.exs), [post-copy.mjs](post-copy.mjs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
