@@ -495,7 +495,7 @@ customElements.define("beam-mailbox", class extends HTMLElement {
         <fieldset class="choices" data-setting="work"><legend>Each message takes</legend>${radios("work", WORKS.map(String), "2", (v) => `${v} ms`)}</fieldset>
         <fieldset class="choices" data-setting="speed"><legend>Speed</legend>${radios("speed", Object.keys(SPEEDS), "1/25")}</fieldset>
       </div>
-      <p class="note">A simulation of the runs above, slowed down to watch: at 1/25 a millisecond takes 25. Both sides follow the same rules. Watch how long the oldest waiting message has waited. That's about how long every message waits before the consumer gets to it. The memory figures use what one waiting message cost in each runtime (<a href="queue-memory.exs">queue-memory.exs</a>, <a href="queue-memory.mjs">queue-memory.mjs</a>).</p>
+      <p class="note">A simulation of the runs above, slowed down to watch: at 1/25 a millisecond takes 25. Both sides follow the same rules. Watch how long the oldest waiting message has waited: that's about how long every message waits before the consumer gets to it. Then switch the producer to waiting for each reply, or reset and try 250 a second. The memory figures use what one waiting message cost in each runtime (<a href="queue-memory.exs">queue-memory.exs</a>, <a href="queue-memory.mjs">queue-memory.mjs</a>).</p>
       <div class="sides">${side("beam")}${side("node")}</div>
       <p class="key" aria-hidden="true">
         <span style="--swatch: var(--code-string)">a message</span>

@@ -226,11 +226,16 @@ So messages work much the same in both. The difference is how much they're used.
 
 ## Watch it happen
 
-Here's the slow consumer again, in both runtimes side by side and slowed down. It's a simulation with the settings from the runs above: the producer sends 1,000 messages a second, and each one takes the consumer 2 ms. Both sides follow the same rules, because in the runs they behaved the same. It waits at the start until you press Play. You can change how fast messages come in and how long each one takes, and switch the producer between sending and moving on and waiting for each reply.
+This one is about backpressure more than about either runtime. It's the slow consumer again, in the BEAM and in Node side by side and slowed down: a simulation with the settings from the runs above, a producer sending 1,000 messages a second to a consumer that takes 2 ms over each one. Both sides follow the same rules, because in the runs they behaved the same. Neither one slows a sender down on its own.
 
-The number to watch is how long the oldest waiting message has waited, because that's about how long every message waits before the consumer gets to it. With the producer sending 1,000 a second and moving on, that wait grows by half a second every second, for as long as it keeps up: each message waits longer than the one before. Have the producer wait for each reply, or send 250 a second, and it stays at nothing.
+The number to watch is how long the oldest waiting message has waited. That's about how long every message waits before the consumer gets to it: the delay someone at the other end of a request would feel.
 
-Let a queue build up, then switch to waiting for each reply. The producer's next message goes on the end of the queue like any other, so its reply only comes once everything ahead of it has been handled. Waiting slows the producer down, but it doesn't clear a backlog that's already there, and the oldest message's wait keeps climbing until the backlog is gone.
+It waits at the start until you press Play. Then try this:
+
+1. Let it run. The producer sends twice as fast as the consumer can handle, so the oldest message's wait grows by half a second every second, and it doesn't stop: each message waits longer than the one before.
+2. Switch the producer to waiting for each reply. Its next message goes on the end of the queue like any other, so the reply only comes once everything ahead of it has been handled. The backlog still has to drain, and the wait keeps climbing until it does. After that the producer goes at the consumer's pace and nothing piles up.
+3. Press Reset, choose 250 sends a second, and play. The consumer is busy half the time and nothing waits. Backpressure only matters when the producer is faster than the consumer.
+4. Compare the two sides. They move together, message for message. What differs is where the waiting messages are (in the BEAM, in the consumer's own mailbox; in Node, in the worker's message queue) and what each one costs.
 
 The memory figures come from sending the slow consumer's message to a process, or a worker, that never reads it, and measuring how much bigger that made things ([queue-memory.exs](queue-memory.exs), [queue-memory.mjs](queue-memory.mjs)):
 
