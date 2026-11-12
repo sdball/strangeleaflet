@@ -130,7 +130,7 @@ mode: send
 
 The mailbox grows by 500 messages a second, and it would go on growing until the machine ran out of memory. The consumer grows with it, because messages waiting in a mailbox are the consumer's data. They sit on its heap, and its collector copies them along with everything else, since as far as the collector can tell they're all still in use. *The BEAM Book*: "If the receiver is backed up and is receiving more messages than it has time to handle, it might actually start using more memory". For a process that may pile up messages, the docs recommend setting its `message_queue_data` flag to `off_heap`, which keeps them out of its heap and out of its collections.
 
-That's the most common way an Elixir system gets into trouble. Page 1's BEAM never skipped a tick: under load, work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
+That's a common way for an Elixir system to get into trouble. Page 1's BEAM never skipped a tick: under load, work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
 
 The fix is for the producer to wait. `send` never waits, so the waiting is built from a second message going the other way. The producer puts its own address, `self()`, in each message and goes straight into a `receive`. The consumer sends `:done` back to that address when it's finished. Until `:done` arrives, the producer's `receive` has nothing to match, so it waits:
 
