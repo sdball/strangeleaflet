@@ -506,7 +506,26 @@ That's a monitor: one way, a notification, and the main thread carries on. There
 
 ## Watch it happen
 
-<!-- TODO: <beam-links> widget. A handful of processes with links and monitors drawn between them; crash one (or kill it, or let it finish normally) and watch exit signals travel along links, stop at a process trapping exits (an {:EXIT, ...} message in its mailbox), and monitors deliver :DOWN messages. Toggle trap_exit per process. -->
+Here are the processes from this page, together: the restarter, trapping exits and linked to a worker; the worker, linked to two helpers it started; a watcher, monitoring the worker; and a counter, linked to nothing. The restarter behaves like restart.exs's, restarting the worker up to three times. It's a simulation that follows the rules above, slowed down so you can follow each signal.
+
+Pick a process, then try this:
+
+1. Crash helper 1. Its exit signal kills the worker, the worker's kills helper 2, and the restarter, trapping exits, gets a message and starts a new worker and new helpers. The watcher gets a `:DOWN`, and the counter never notices.
+2. Crash the new worker. The watcher hears nothing this time: its monitor went with the old worker. Pick the watcher and have it monitor the worker again.
+3. Let the worker finish. Its helpers drop the `:normal` signal and carry on, linked to nothing now, and the restarter doesn't restart anything.
+4. Reset, turn off the restarter's trapping, and crash a helper. Nothing stops the crash this time, and it takes everything but the watcher and the counter with it.
+5. Reset, have the worker trap exits, and crash a helper. The worker gets a message and carries on without it.
+6. Kill the restarter while it traps exits. Trapping doesn't help against `:kill`, and its `:killed` takes the worker and helpers with it.
+
+<beam-links>
+
+![The simulation a few seconds after helper 1 crashed. On top, the watcher, the restarter, and the counter; the restarter is outlined in brass because it traps exits, and it shows 1 of 3 restarts. Below it is a new worker, #PID<0.116.0>, linked to the restarter and to two new helpers, #PID<0.117.0> and #PID<0.118.0>. There's no monitor line from the watcher: its monitor went with the old worker. The counter, linked to nothing, has counted to 5. The log underneath says helper 2 got an exit signal from the worker and exited with the same error, the watcher received a :DOWN message for the old worker, #PID<0.113.0>, and the restarter started a new worker, which started two new helpers](beam-links.webp)
+
+*The live version of this needs JavaScript. In it, you can crash, finish, or kill any of these processes, switch trapping exits on and off, and watch exit signals travel along the links and `:DOWN` messages along the monitor.*
+
+</beam-links>
+
+<script type="module" src="beam-links.js"></script>
 
 ## Where it gives ground
 
