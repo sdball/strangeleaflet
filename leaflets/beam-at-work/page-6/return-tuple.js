@@ -9,9 +9,9 @@
 // scales with the element's width so the tuple fits on a phone.
 
 const PARTS = [
-  { code: ":reply", cls: "a", label: "what to do: send a reply" },
-  { code: "reply", cls: "", label: "sent back to the caller" },
-  { code: "new_state", cls: "sv", label: "the state the loop carries on with" },
+  { code: ":reply", cls: "a", label: "send a reply" },
+  { code: "reply", cls: "", label: "what to send back to the caller" },
+  { code: "new_state", cls: "sv", label: "the new state for the GenServer" },
 ];
 
 document.head.insertAdjacentHTML("beforeend", `<style>

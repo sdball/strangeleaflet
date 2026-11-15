@@ -6,13 +6,20 @@ meta_description: GenServer, where most Elixir programs keep their state, isn't 
 
 Page 4 ended with two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
 
-GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then opens up the part that does the most work, `GenServer.call`.
+GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
 
-(If you haven't met GenServer before, page 6 of the [About Elixir leaflet](/leaflets/about-elixir/page-6/) introduces it.)
+(If you haven't met GenServer before, page 6 of the [About Elixir leaflet](/leaflets/about-elixir/page-6/) also talks about them.)
 
 ## A server by hand
 
-A server is a process that holds some state and answers requests about it. Here's one that sells tickets. It's a function that waits for a message, works out a reply and the new state, sends the reply, and calls itself with the new state to wait for the next message ([by-hand.exs](by-hand.exs)):
+A server is a process that holds some state and answers requests about it. Here's one that sells tickets and tracks the number of tickets remaining. It's essentially a function that
+
+1. Waits for a message
+2. When it receives a message it works out a reply and a new state
+3. Sends the reply
+4. Calls itself with the new state to wait for the next message
+
+[by-hand.exs](by-hand.exs):
 
 ```elixir
 defmodule Tickets do
@@ -51,11 +58,15 @@ buyer 2: :ok
 buyer 3: :sold_out
 ```
 
-That loop is how a process keeps state. Nothing in Elixir changes in place, so the number of tickets left is an argument, and each turn of the loop gets the new number. The loop can go on forever because calling itself is the last thing `loop` does: the Erlang docs say a call in that position uses no stack, so "an infinite loop using tail-recursive calls will not exhaust the call stack". `buy` is page 4's trick: make a reference, send it with the request, and receive only the reply that carries it.
+That loop is how a process keeps state. Nothing in Elixir changes in place, so the number of tickets left is an argument, and each new call of the loop gets the new number. The loop can go on forever because calling itself is the last thing it does. The Erlang docs say a call in that position uses no stack, so "an infinite loop using tail-recursive calls will not exhaust the call stack".
+
+The `Tickets.buy/1` function uses the approach we saw in page 4: make a reference, send it with the request, and receive only the reply that carries it.
 
 ## The same server as a GenServer
 
 ```elixir
+# The same server as a GenServer.
+
 defmodule Tickets do
   use GenServer
 
@@ -69,6 +80,12 @@ defmodule Tickets do
   def handle_call(:buy, _from, 0), do: {:reply, :sold_out, 0}
   def handle_call(:buy, _from, left), do: {:reply, :ok, left - 1}
 end
+
+{:ok, server} = Tickets.start(2)
+
+for buyer <- 1..3 do
+  IO.puts("buyer #{buyer}: #{inspect(Tickets.buy(server))}")
+end
 ```
 
 ```text
@@ -78,27 +95,36 @@ buyer 2: :ok
 buyer 3: :sold_out
 ```
 
-The loop is gone, because GenServer has one, in Erlang's `gen_server`, and it's the same loop: a `receive` that takes the oldest message, whatever it is, hands it to the module's callback, and calls itself with the state the callback returns. `handle_call` gets the request, who it's from, and the state, and returns the reply and the new state. GenServer sends the reply.
+A GenServer is a codified way to have a process that holds state and can deal with messages about that state in a reliable and consistent way.
 
-GenServer gives a client two ways to send a server a request, page 4's two ways to send:
+A GenServer essentially needs a name and an initial state. Our `Tickets.start/1` function handles that setup. `__MODULE__` is an easy way to say "use the name of the module" (`Tickets` in this case) and we pass the `left` argument as the initial state.
+
+Declaring `use GenServer` means we are asserting that the module (`Tickets`) meets the contract requirements of the GenServer API. Those `@impl true` calls are helper declarations to say that the following functions meet contract requirements.
+
+- We have the required `init` function that returns a value saying that the GenServer is ready to start `:ok` and its initial state `left`.
+- We have some `handle_call` functions that will handle synchronous messages, determine a response, determine a new state, and return both.
+
+The explicit loop function is gone because GenServer has its own in Erlang's `gen_server`. Conceptually it's the same approach: a `receive` that takes the oldest message, whatever it is, hands it to the module's callback, and calls itself with the state the callback returns. `handle_call` gets the request, who it's from, and the state, and returns the reply and the new state. GenServer sends the reply.
+
+GenServer gives a client two ways to send a server a request:
 
 - `GenServer.call(server, request)` is synchronous. It sends the request, waits for the server's reply, and returns it, so `buy` returns `:ok` or `:sold_out`. The server handles a call in `handle_call`, which returns a reply along with the new state.
 - `GenServer.cast(server, request)` is asynchronous. It sends the request and returns `:ok` straight away, without waiting for the server to do anything with it. The server handles a cast in `handle_cast`, which returns only the new state, since nobody is waiting for a reply.
 
-Buying a ticket is a call, because a buyer needs to know whether they got one.
+Buying a ticket is a call (synchronous), because a buyer needs a response to know whether they got a ticket or not.
 
 ## Where the state lives
 
-The thing that surprises most people about a GenServer is where the state is. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback hands back the next one as part of what it returns.
+A potentially surprising point about GenServer is where the state lives. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback hands back the next state as part of what it returns.
 
-Here are two more callbacks for the ticket server, a call that asks how many tickets are left and a cast that adds some:
+Here are two more callback examples for the ticket server, a call that asks how many tickets are left (needs a response) and a cast that adds some (we'll say this doesn't need a response). Cast messages are asynchronous: sent by the caller without waiting for a response.
 
 ```elixir
 def handle_call(:left, _from, left), do: {:reply, left, left}
 def handle_cast({:add, n}, left), do: {:noreply, left + n}
 ```
 
-Every callback returns a tuple, and GenServer reads it to know what to do next. Here's what `handle_call` returns:
+Every callback returns a tuple, and the GenServer behavior reads it to know what to do next. Here's what `handle_call` returns:
 
 <return-tuple>
 
@@ -115,11 +141,11 @@ Every callback returns a tuple, and GenServer reads it to know what to do next. 
 
 And all three:
 
+- `{:ok, state}` from `init`: the server has started, and `state` is its first state.
 - `{:reply, reply, new_state}` from `handle_call`: send `reply` back to the caller, and carry on with `new_state`.
 - `{:noreply, new_state}` from `handle_cast`: there's nobody waiting for a reply, so just carry on with `new_state`.
-- `{:ok, state}` from `init`: the server has started, and `state` is its first state.
 
-So `{:reply, :ok, left - 1}` means reply `:ok`, and from now on there's one ticket fewer. It's the server by hand's last two lines, `send(from, {ref, reply})` and `loop(left)`, written as a value for GenServer to act on. And `{:reply, left, left}` replies with how many tickets are left and keeps the state as it was. A callback always returns the state, even when it hasn't changed.
+So `{:reply, :ok, left - 1}` means reply `:ok`, and the new state is `left` decremented. `{:reply, left, left}` replies with how many tickets are left and keeps the state as it was. `left` is both the reply and the new state. A GenServer callback always returns the state, even when it hasn't changed.
 
 Here's the ticket server's state going round the loop. Send it a few messages, and watch each one start from the state the last one left behind:
 
@@ -140,8 +166,6 @@ buy a ticket     3 → 2      handle_call(:buy, from, 3) returns {:reply, :ok, 2
 
 <script type="module" src="genserver-loop.js"></script>
 
-So what does that get you over twenty lines you could write yourself? Most of the answer is in `call`. First, though, something the two versions share.
-
 ## One message at a time
 
 A server handles one message, start to finish, before it looks at the next. Each `handle_call` returns before the loop's next `receive`. So the state never needs a lock: only the server can touch it, and it only works on one request at a time.
@@ -160,10 +184,26 @@ end
 `Payments.charge` is a call written by hand, like `buy` in the server by hand. The payment process replies 100 ms later:
 
 ```elixir
-def charge(payments) do
-  ref = make_ref()
-  send(payments, {:charge, self(), ref})
-  receive do: ({^ref, reply} -> reply)
+defmodule Payments do
+  def start, do: spawn(fn -> loop() end)
+
+  def charge(payments) do
+    ref = make_ref()
+    send(payments, {:charge, self(), ref})
+    receive do: ({^ref, reply} -> reply)
+  end
+
+  defp loop do
+    receive do
+      {:charge, from, ref} ->
+        spawn(fn ->
+          Process.sleep(100)
+          send(from, {ref, :paid})
+        end)
+
+        loop()
+    end
+  end
 end
 ```
 
@@ -183,15 +223,15 @@ tickets left: 0
 tickets left: 0
 ```
 
-Two tickets, two sales, and the third buyer hears they're sold out. While the server waits for the payment, it's in a `receive` that only the payment's reply matches (page 4's reference trick again), and the other buyers' requests wait in its mailbox. Nothing looks at them until the sale before them is done.
+Two tickets, two sales, and the third buyer hears they're sold out. While the server waits for the payment, it's in a `receive` that only the payment's reply matches, and the other buyers' requests wait in its mailbox. Nothing looks at them until the sale before them is done.
 
-The times show what that costs. The second buyer waited for the first sale, and the third for both. The server does one thing at a time, waiting included. That comes back at the end of the page.
+The times show what that costs. The second buyer waited for the first sale, and the third for both. The server does one thing at a time by design.
 
 ## What `call` does
 
-A call is synchronous: the caller sends its request and then does nothing else until the reply comes back. The waiting is the hard part. What if the reply never comes, because the server has died, or is stuck, or is just slow?
+A call is synchronous: the caller sends its request and then does nothing else until the reply comes back. But what if the reply never comes? Networks are going to network, or maybe the server died, or is stuck, or is just slow.
 
-`GenServer.call` hands the work to Erlang's `gen:call`, and the part that does it is a function called `do_call` in `gen.erl`. Here's the clause for a call with a timeout:
+`GenServer.call` handles bad outcomes. By deferring the work to Erlang's `gen:call`, and here's the Erlang function called `do_call` in `gen.erl` that's handling the edges.
 
 ```erlang
 do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
@@ -218,14 +258,16 @@ do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
     end.
 ```
 
-It's Erlang, not Elixir, but it's page 4's shapes: a send, then a receive with patterns. The pieces:
+It's Erlang, not Elixir, but it's page 4's shapes: a send, then a receive with patterns.
+
+The pieces:
 
 - `erlang:monitor` asks the BEAM to watch the server and send the caller a `'DOWN'` message if it dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets page 4's fast receive, which looks only at messages that arrived after the reference was made.
 - `{alias,demonitor}` makes that reference an *alias* as well: an address the reply can be sent to, which reaches the caller only until the monitor is removed.
 - The request goes to the server as `{:"$gen_call", {caller, tag}, request}`. The server's loop knows `:"$gen_call"` means a call, passes `{caller, tag}` to `handle_call` as `from`, and sends the reply to the alias.
-- Then the caller waits for one of three things: the reply, a `'DOWN'`, or the timeout, 5,000 ms unless you give another.
+- Then the caller waits for one of three things: the reply, a `'DOWN'`, or the timeout which defaults to 5,000 ms.
 
-The fast receive works here too, with the reference inside `[alias | Mref]`. Here's a call from a process with a mailbox full of messages it doesn't want, as page 4 timed a plain receive ([call-scan.exs](call-scan.exs)):
+The fast receive works here too, with the reference inside `[alias | Mref]`. Here's a call from a process with a mailbox full of messages it's not looking to receive, as page 4 timed a plain receive ([call-scan.exs](call-scan.exs)):
 
 ```text
 $ elixir call-scan.exs
@@ -289,7 +331,7 @@ caller's mailbox: []
 still waiting after 5 seconds
 ```
 
-The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails (page 4), so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
+The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
 
 When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and pages 5 and 7 are about what happens then.
 
@@ -313,7 +355,7 @@ show_mailbox = fn ->
 end
 
 try do
-  GenServer.call(server, :work, 100)
+  GenServer.call(server, :work, 100) # only wait 100ms for a response
 catch
   :exit, {reason, _where} -> IO.puts("caller exited: #{inspect(reason)}")
 end
@@ -345,19 +387,27 @@ gave up
 500 ms later, the caller's mailbox: [{#Reference<0.3433416021.1507852296.193126>, :done}]
 ```
 
-Giving up doesn't stop the server. It still did the work and sent the reply 200 ms later. With the call by hand, that late reply landed in the caller's mailbox, where nothing will ever receive it: page 4's stray message, taking memory and slowing every receive that has to look past it. With `GenServer.call` it never arrived. On a timeout, `do_call` removes the monitor, and with it the alias, so the late reply goes nowhere. (The second, `after 0` receive is for a reply that made it in before the alias was turned off. Then the call takes it after all.)
+Giving up doesn't stop the server. It still did the work and dutifully sent the reply 200 ms later. With the call by hand, that late reply landed in the caller's mailbox even though the caller had already moved on.
+
+With `GenServer.call` it never arrived. On a timeout, `do_call` removes the monitor, and with it the alias, so the late reply goes nowhere.
 
 ### The server is too slow
 
-The third thing `call` gives you is page 4's backpressure. The caller waits for each reply, so it can't send faster than the server answers.
+The third thing `call` gives you is backpressure. The caller waits for each reply, so it can't send faster than the server answers.
 
 ## Casts and other messages
 
-A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's page 4's send-and-move-on: no monitor, no timeout, no backpressure, and a mailbox that can grow. Every other message, a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, goes to `handle_info`. They all share one mailbox and the same loop, one at a time, oldest first.
+A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's the send-and-move-on approach we saw in page 4: no monitor, no timeout, no backpressure, and a mailbox that can grow.
 
-## What every GenServer comes with
+Every other message sent to a GenServer: a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, etc. goes to `handle_info`.
 
-Because every GenServer runs the same loop, tools can work with any of them. The loop understands a few *system messages* besides yours, and Erlang's `:sys` module sends them. Here's the ticket server again, with nothing added to it ([sys.exs](sys.exs)):
+- `handle_call`: synchronous requests
+- `handle_cast`: asynchronous requests
+- `handle_info`: non-GenServer messages
+
+## GenServer tooling
+
+Because every GenServer runs the same loop, tools can work with any of them. The loop understands a few *system messages* besides yours, and Erlang's `:sys` module sends them. Here's the ticket server again, with nothing added to it but with a peek into what the GenServer tooling can observe ([sys.exs](sys.exs)):
 
 ```elixir
 {:ok, server} = Tickets.start(2)
@@ -575,9 +625,9 @@ Through the server it's about 1,000 a second however many callers there are. Wit
 
 Elixir's docs warn about exactly this: putting code behind "a single process that will potentially become a bottleneck in your system", and "If you don't need a process, then you don't need a process."
 
-It happens in big systems too. Discord's write-up of reaching five million users at once is largely about single processes that couldn't keep up. Each Discord server is a guild process that sends everything posted in it on to the session of every member who's connected, and at peak hours the guild processes fell behind their mailboxes.
+Discord's write-up of reaching five million users at once is largely about single processes that couldn't keep up. Each Discord server is a guild process that sends everything posted in it on to the session of every member who's connected, and at peak hours the guild processes fell behind their mailboxes.
 
-What Elixir programs do instead depends on the state. Work that doesn't touch it shouldn't go through a server at all, as in the second column. State that splits by key can live in several servers, one per part: the docs for `PartitionSupervisor`, which starts them, open with "Certain processes may become bottlenecks in large systems." And state that's read far more than it's written can go in an ETS table, a store built into the BEAM that, in the words of Elixir's guide, any process can read from, "but writes are still serialized through a single process." Page 11 has more about what the BEAM is slow at.
+What Elixir programs do instead depends on the state. Work that doesn't need to query or update server state shouldn't go through a server at all, as in the second column. State that splits by key can live in several servers, one per part. State that's read far more than it's written can go in an ETS table, a data store built into the BEAM that any process can read from.
 
 ## Watch it happen
 
