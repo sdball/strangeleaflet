@@ -4,7 +4,7 @@ publish: false
 meta_description: GenServer, where most Elixir programs keep their state, isn't part of the BEAM. It's a small library built from sends, receives, references, and monitors, and every piece of it is there because of something that can go wrong.
 ---
 
-Page 4 ended with two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
+Page 4 showed two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
 
 GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
 
@@ -262,7 +262,7 @@ It's Erlang, not Elixir, but it's page 4's shapes: a send, then a receive with p
 
 The pieces:
 
-- `erlang:monitor` asks the BEAM to watch the server and send the caller a `'DOWN'` message if it dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets page 4's fast receive, which looks only at messages that arrived after the reference was made.
+- `erlang:monitor` is page 5's monitor: the caller gets a `'DOWN'` message if the server dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets page 4's fast receive, which looks only at messages that arrived after the reference was made.
 - `{alias,demonitor}` makes that reference an *alias* as well: an address the reply can be sent to, which reaches the caller only until the monitor is removed.
 - The request goes to the server as `{:"$gen_call", {caller, tag}, request}`. The server's loop knows `:"$gen_call"` means a call, passes `{caller, tag}` to `handle_call` as `from`, and sends the reply to the alias.
 - Then the caller waits for one of three things: the reply, a `'DOWN'`, or the timeout which defaults to 5,000 ms.
@@ -333,7 +333,7 @@ still waiting after 5 seconds
 
 The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
 
-When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and pages 5 and 7 are about what happens then.
+When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and page 5 showed what happens then: anything linked to the caller dies too, unless it traps exits. Page 7 is about the processes that do.
 
 ### The caller gives up
 
