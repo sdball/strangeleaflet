@@ -508,14 +508,14 @@ That's a monitor: one way, a notification, and the main thread carries on. There
 
 Here are the processes from this page, together: the restarter, trapping exits and linked to a worker; the worker, linked to two helpers it started; a watcher, monitoring the worker; and a counter, linked to nothing. The restarter behaves like restart.exs's, restarting the worker up to three times. It's a simulation that follows the rules above, slowed down so you can follow each signal.
 
-Pick a process, then try this:
+Click a process to pick it. The buttons under the boxes act on whichever one is picked. Try these:
 
-1. Crash helper 1. Its exit signal kills the worker, the worker's kills helper 2, and the restarter, trapping exits, gets a message and starts a new worker and new helpers. The watcher gets a `:DOWN`, and the counter never notices.
-2. Crash the new worker. The watcher hears nothing this time: its monitor went with the old worker. Pick the watcher and have it monitor the worker again.
-3. Let the worker finish. Its helpers drop the `:normal` signal and carry on, linked to nothing now, and the restarter doesn't restart anything.
-4. Reset, turn off the restarter's trapping, and crash a helper. Nothing stops the crash this time, and it takes everything but the watcher and the counter with it.
-5. Reset, have the worker trap exits, and crash a helper. The worker gets a message and carries on without it.
-6. Kill the restarter while it traps exits. Trapping doesn't help against `:kill`, and its `:killed` takes the worker and helpers with it.
+1. Pick helper 1 and crash it. Its exit signal kills the worker, the worker's kills helper 2, and the restarter, trapping exits, gets a message and starts a new worker and new helpers. The watcher gets a `:DOWN`, and the counter never notices.
+2. Pick the new worker and crash it. The watcher hears nothing this time: its monitor went with the old worker. Pick the watcher and have it monitor the worker again.
+3. Pick the worker and let it finish. Its helpers drop the `:normal` signal and carry on, linked to nothing now, and the restarter doesn't restart anything.
+4. Reset, pick the restarter, and turn off its trapping. Then pick a helper and crash it. Nothing stops the crash this time, and it takes everything but the watcher and the counter with it.
+5. Reset, pick the worker, and turn on its trapping. Then pick a helper and crash it. The worker gets a message and carries on without it.
+6. Pick the restarter, leave it trapping exits, and kill it. Trapping doesn't help against `:kill`, and its `:killed` takes the worker and helpers with it.
 
 <beam-links>
 
