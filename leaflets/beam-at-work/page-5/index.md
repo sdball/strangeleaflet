@@ -57,7 +57,7 @@ a alive? true, b alive? false, c alive? true
 
 `b` died, the error was logged, and `a` and `c` carried on counting. Nothing of `b`'s was shared with them, so nothing of theirs could be left half-changed by its crash. Its heap, its stack, and its mailbox went with it.
 
-That's the isolation Armstrong was after. But it's also a problem: nobody else noticed. If `a` and `c` had been waiting for `b` to send them something, they'd wait forever (page 6 shows exactly that, with a call written by hand). A process that dies needs a way to tell the processes that depend on it.
+That's the isolation Armstrong was after. But it's also a problem: nobody else noticed. If `a` and `c` had been waiting for `b` to send them something, they'd wait forever. A process that dies needs a way to tell the processes that depend on it.
 
 ## Links: die together
 
