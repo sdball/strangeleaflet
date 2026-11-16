@@ -4,11 +4,11 @@ publish: false
 meta_description: A BEAM process that crashes takes nothing else down with it, unless it was told to. Links, trapping exits, and monitors, and the restarter they add up to.
 ---
 
-Pages 2 to 4 kept coming back to one rule: no process can get at another's memory. That's why each process can collect its own garbage, and why processes talk by sending copies of their data. This page is about the reason the rule is there in the first place: what happens when a process crashes.
+We've repeatedly seen the same rule: no process can access another's memory. That's why each process can collect its own garbage, and why processes must talk by sending messages that include copies of their data. This page is about the reason that rule is there in the first place: what happens when a process crashes.
 
-Joe Armstrong, one of Erlang's creators, wrote that processes "should share no data, and only communicate by message passing. This is to limit the consequences of a software error." And he went on: "the only realistic way to build large reliable systems is by partitioning the system into independent parallel processes, and by providing mechanisms for monitoring and restarting these processes."
+Joe Armstrong, one of Erlang's creators, wrote that processes "should share no data, and only communicate by message passing. This is to limit the consequences of a software error." And went on: "the only realistic way to build large reliable systems is by partitioning the system into independent parallel processes, and by providing mechanisms for monitoring and restarting these processes."
 
-This page is about the first half of the mechanisms he's talking about: the ways a process finds out that another one died. The BEAM has two, links and monitors, and they're both built into the BEAM itself.
+This page is about the first half of the mechanisms he's talking about: the ways a process finds out that another one died. The BEAM has two, links and monitors, and they're built right into the BEAM itself.
 
 ## A crash stays in its process
 
