@@ -207,7 +207,7 @@ In the chain, `b` trapping exits stopped the crash from spreading. It got a mess
 
 A link is for processes that live and die together. Sometimes a process just needs to know when another one dies, without dying with it, and without the other one having any say. That's a monitor.
 
-`Process.monitor(pid)` returns a reference, and when that process exits, for any reason, the BEAM sends the monitoring process a message: `{:DOWN, ref, :process, pid, reason}`. It's always a message, never an exit signal, so nothing dies of it, and nobody has to trap anything ([monitor.exs](monitor.exs)):
+`Process.monitor(pid)` returns a reference, and when that process exits, for any reason, the BEAM sends any monitoring process a message: `{:DOWN, ref, :process, pid, reason}`. It's always a message, never an exit signal. ([monitor.exs](monitor.exs)):
 
 ```elixir
 IO.puts("## Monitoring a process that crashes")
@@ -389,7 +389,7 @@ The worker has no error handling at all. It does its job, and when something goe
 
 That's what makes giving up necessary. A worker that fails because of something passing, like a dropped connection, will probably work the second time. One that fails because of a bug will fail every time, and restarting it forever only hides that. So the restarter stops after a few tries and exits, and since it's an ordinary process, something linked to it can find out and decide what to do next.
 
-This is a small, hand-written version of a supervisor, which is page 7. A real one handles more: several workers, what to do with the rest when one dies, how many restarts in how long count as too many. But it's built from these same pieces. A supervisor is a process that traps exits, links to the processes it starts, and restarts them when their `{:EXIT, ...}` messages arrive. It's written as a GenServer, which is why GenServer comes first, on page 6.
+This is a small, hand-written version of a supervisor, which we'll see for real on page 7. A real supervisor handles more: several workers, what to do with the rest when one dies, how many restarts in how long count as too many. But it's built from these same pieces. A supervisor is a process that traps exits, links to the processes it starts, and restarts them when their `{:EXIT, ...}` messages arrive. It's written as a GenServer which we'll see next on page 6.
 
 ## And in Node?
 
@@ -426,7 +426,7 @@ setTimeout(() => {
 }, 550);
 ```
 
-It's run three ways: as it is, with `b` failing in an `await` instead of a `throw`, and with an `'uncaughtException'` handler. The first two also print `b`'s stack trace, which goes to the terminal's error output, left out here:
+It's run three ways: throwing an error, with `b` failing in an `await` instead of a `throw`, and with an `'uncaughtException'` handler. The first two also print `b`'s stack trace, which goes to the terminal's error output, omitted here:
 
 ```text
 $ node uncaught.mjs 2>/dev/null; node uncaught.mjs async 2>/dev/null; node uncaught.mjs handler
@@ -466,13 +466,13 @@ still running at 550 ms
 process exiting, code 0
 ```
 
-By default, one counter's error ended all three, and the whole program with them. The Node docs: "By default, Node.js handles such exceptions by printing the stack trace to `stderr` and exiting with code 1". A rejected promise that nothing handles goes the same way, and has since Node 15.
+By default, one counter's error ended all three, and the whole program dies with them. The Node docs: "By default, Node.js handles such exceptions by printing the stack trace to `stderr` and exiting with code 1". A rejected promise that nothing handles goes the same way, and has since Node 15.
 
-With a handler, the other two carried on. But the docs are blunt about that: "Unhandled exceptions inherently mean that an application is in an undefined state," and "**It is not safe to resume normal operation after `'uncaughtException'`.**" That's Armstrong's point from the other side. Everything in a Node process shares one heap, so a callback that throws halfway through changing something leaves it half-changed, and the rest of the program can't know what it touched. The BEAM can carry on after a crash because what the process was changing died with it.
+With a handler, the other two carried on. But the docs are blunt about that: "Unhandled exceptions inherently mean that an application is in an undefined state," and "**It is not safe to resume normal operation after `'uncaughtException'`.**" That's Armstrong's point from the other side. Everything in a Node process shares one heap, so a callback that throws halfway through changing something leaves it half-changed, and the rest of the program can't know what's still safe to depend on. The BEAM can carry on safely after a crash because whatever the process was changing when it crashed dies with it.
 
-So what the Node docs recommend instead is the BEAM's idea at a bigger size: "To restart a crashed application in a more reliable way, whether `'uncaughtException'` is emitted or not, an external monitor should be employed in a separate process to detect application failures and recover or restart as needed." Let it crash, and have something else restart it, where the thing that crashes is a whole operating system process (page 2's 830 KB and 1.4 ms to start), with every connection and every piece of work it had going down together.
+What the Node docs recommend instead is the BEAM's idea but external to the language or application: "To restart a crashed application in a more reliable way, whether `'uncaughtException'` is emitted or not, an external monitor should be employed in a separate process to detect application failures and recover or restart as needed." Let it crash, and have something else restart it, where the thing that crashes is an entire operating system process, with every connection and every piece of work it had going down entirely.
 
-Inside a process, worker threads are the closest thing to BEAM processes. A worker that throws ends only itself, and the main thread hears about it through the worker's `'error'` and `'exit'` events ([worker-exit.mjs](worker-exit.mjs)):
+Inside a NodeJS process, worker threads are the closest thing to BEAM processes. A worker that throws ends only itself, and the main thread hears about it through the worker's `'error'` and `'exit'` events ([worker-exit.mjs](worker-exit.mjs)):
 
 ```javascript
 const worker = new Worker(
@@ -502,7 +502,7 @@ main: 4
 main: 5
 ```
 
-That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you write the code that terminates one when the other exits. And workers cost what page 2 measured, about 9 MB each, so they're for a few big jobs, not for every request.
+That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost what we measured on page 2, about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
 
 ## Watch it happen
 
@@ -529,11 +529,11 @@ Click a process to pick it. The buttons under the boxes act on whichever one is 
 
 ## Where it gives ground
 
-A crash in the BEAM is contained to its process, and that's only as good as the way the processes are split up. A process holding something important, like a cache it took minutes to fill, loses all of it when it crashes, and its restart starts from empty. Anything that has to survive a crash has to live somewhere else: another process, a database, a disk.
+A crash in the BEAM is contained to its process, and that's only as good as the way the processes are split up. A process holding something important, like a cache that took minutes to fill, loses all of it when it crashes, and its restart starts from empty. Anything that has to survive a crash has to live somewhere durable: another process, a database, a disk.
 
-Links spread failures on purpose, which means a careless link spreads them by accident. Link a short-lived helper to a long-lived process that isn't trapping exits, and the helper's crash takes the long-lived process with it.
+Links spread failures intentionally, which means a careless link spreads them by accident. Link a short-lived helper to a long-lived process that isn't trapping exits, and the helper's crash takes the long-lived process with it.
 
-And the BEAM itself is one operating system process. Everything on this page happens inside it. If the whole thing goes down, which is what page 4's mailbox that grows without limit does in the end when it runs the machine out of memory, every process goes with it, and something outside has to restart it, just as with Node. Page 9's distribution, more than one BEAM on more than one machine, is the BEAM's answer to that: Armstrong's thesis puts workers and supervisors "on different physical machines".
+The BEAM itself is one operating system process. Everything on this page happens inside it. If the whole thing goes down then something external has to restart it, just as with Node. Page 9's distribution, more than one BEAM on more than one machine, is the BEAM's answer to that: Armstrong's thesis puts workers and supervisors "on different physical machines".
 
 ## Sources
 
