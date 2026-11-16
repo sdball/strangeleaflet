@@ -470,7 +470,27 @@ That's about twenty lines, and it works. It's also one strategy for one child. T
 
 ## Watch it happen
 
-<!-- TODO: widget. A supervision tree (the top supervisor with a worker and a sub-supervisor of two or three workers); choose each supervisor's strategy; crash any process; watch stops in reverse order and starts in order; restarts counted against 3 in 5 seconds; a supervisor that gives up escalates to its parent. -->
+Here's tree.exs's tree, with a third worker under `Pair` so there's a child on each side of the middle one. Each worker counts once a second, and that count is its state. It's a simulation that follows the rules above, slowed down so you can follow each signal, except that restarts are counted in real seconds.
+
+Click a process to pick it. The controls under the boxes act on whichever one is picked. Try these:
+
+1. Pick `x` and crash it. `Pair` gets the `{:EXIT, ...}` message and starts a new `x`, counting from 0. `y` and `z` carry on.
+2. Pick `Pair`, set its strategy to `:one_for_all`, then pick `y` and crash it. `Pair` stops `z`, then `x`, and starts `x`, `y`, and `z` again, in that order.
+3. Set `Pair`'s strategy to `:rest_for_one` and crash `y` again. This time `x` keeps counting.
+4. Reset, pick `x`, and crash it four times, quickly. On the fourth, `Pair` gives up, stops its other children, and exits, and the top supervisor starts a new `Pair`.
+5. Pick `z`, set its restart to `:transient`, and let it finish. It isn't restarted. Set it back to `:permanent` and let it finish: a permanent child is restarted even when it finishes normally.
+6. Pick `Pair` and kill it. Its children are linked to it and don't trap exits, so they die with it, and the top supervisor starts the whole branch again.
+7. Reset, pick `counter`, and crash it four times, quickly. Now the top supervisor gives up. It stops `Pair`, which stops its own children first, and the application stops.
+
+<supervision-tree>
+
+![The simulation just after a restart. The top supervisor, with the strategy :one_for_one and 0 of 3 restarts in 5 seconds, is linked to counter, which has counted to 11, and to Pair. Pair's strategy is :one_for_all, and it has had 1 of 3 restarts. Its three children, x, y, and z, have new pids, #PID<0.116.0> to #PID<0.118.0>, and have just started counting again from 0. The log underneath says Pair received y's {:EXIT, ...} message, stopped z and then x with :shutdown, and started x, y, and z again, in order](supervision-tree.webp)
+
+*The live version of this needs JavaScript. In it, you can crash, finish, or kill any process in the tree, choose each supervisor's strategy and each worker's restart value, and watch the supervisors stop and restart their children.*
+
+</supervision-tree>
+
+<script type="module" src="supervision-tree.js"></script>
 
 ## Where it gives ground
 
