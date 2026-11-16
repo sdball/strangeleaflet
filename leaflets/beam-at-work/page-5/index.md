@@ -515,7 +515,7 @@ Click a process to pick it. The buttons under the boxes act on whichever one is 
 3. Pick the worker and let it finish. Its helpers drop the `:normal` signal and carry on, linked to nothing now, and the restarter doesn't restart anything.
 4. Reset, pick the restarter, and turn off its trapping. Then pick a helper and crash it. Nothing stops the crash this time, and it takes everything but the watcher and the counter with it.
 5. Reset, pick the worker, and turn on its trapping. Then pick a helper and crash it. The worker gets a message and carries on without it.
-6. Pick the restarter, leave it trapping exits, and kill it. Trapping doesn't help against `:kill`, and its `:killed` takes the worker and helpers with it.
+6. Reset, pick the restarter, leave it trapping exits, and kill it. Trapping doesn't help against `:kill`, and its `:killed` takes the worker and helpers with it.
 
 <beam-links>
 
