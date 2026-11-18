@@ -285,7 +285,26 @@ What neither can do is the hard part. A Node process whose socket goes quiet is 
 
 ## Watch it happen
 
-<!-- TODO: the widget. Nodes a and b, a counter on b, messages and ticks crossing between them. Close the connection, pause b, halt b; a's monitor, its net tick time, and b's view of the same moment. -->
+Here's down.exs as a simulation. Node `a` has a monitor on a counter on node `b`, and the two nodes send each other ticks whenever they have nothing else to send. You can send to the counter, close the connection, pause `b`, or halt it, and see what `a`'s mailbox gets. Under that it shows something `a` can't see: how many messages were lost on the way.
+
+It waits at the start until you press Play. Then try these:
+
+1. Watch the ticks cross, one each way every second, a quarter of the net tick time. Send `{:add, 1}` a few times, then `{:get, self()}`. A node that has just sent something doesn't need to send a tick as well.
+2. Close the connection. `a` gets `:nodedown` and `:DOWN`, and `b`, still running, takes `a` to be down too. Send `{:get, self()}`: `a` connects again by itself, and the counter answers with the count it had.
+3. Press `Process.monitor` to watch the counter again, then pause `b` and send `{:add, 1}` twice. Each second `a` checks the connection and finds nothing new from `b`, and at the fourth check in a row it gives up on `b`. Then let `b` carry on: it reads both messages, and `{:get, self()}` shows them counted.
+4. Pause `b` again, wait for `a` to give up, and send `{:add, 1}`. `a` tries to connect, and gives up on that after 7 seconds. If `b` carries on before then, the message arrives. If not, it's lost, and nothing tells `a`.
+5. Halt `b`. `a` hears about it at once. Send `{:get, self()}`, and nothing comes back.
+6. Reset, set the net tick time to 60 s and the speed to 15×, and pause `b`. With the default net tick time, `a` takes about a minute to give up on it.
+
+<beam-nodes>
+
+![The simulation 6.9 seconds in. Node b is paused, with two messages unread, and its counter is at 3. Node a takes b to be down: a's mailbox shows the counter's reply of 3, then an error that b isn't responding, a nodedown message, and a DOWN message with the reason noconnection. The connection is down, and nothing has been lost on the way yet](beam-nodes.webp)
+
+*The live version of this needs JavaScript. In it, you can send messages from node a to a counter on node b, close the connection between them, pause b, or halt it, and watch what a's mailbox gets.*
+
+</beam-nodes>
+
+<script type="module" src="beam-nodes.js"></script>
 
 ## Where it gives ground
 
@@ -304,7 +323,7 @@ And the BEAM's part ends where the hard part of a distributed system begins. It 
 - Nodes, node names, links and monitors being "transparent when pids are used", registered names being local, connections made "the first time the name of another node is used" and "by default transitive", `-connect_all false`, epmd, hidden nodes, cookies (the `.erlang.cookie` file, "does *not* mean cryptographically secure", clear text), and the warning about starting a node without TLS: the Erlang reference manual, [Distributed Erlang](https://www.erlang.org/doc/system/distributed.html). epmd's port, 4369, and messages between nodes sent "using the external term format": [Distribution Protocol](https://www.erlang.org/doc/apps/erts/erl_dist_protocol.html). TLS for distribution: [Using TLS for Erlang Distribution](https://www.erlang.org/doc/apps/ssl/ssl_distribution.html).
 - Signals that "can be lost if the distribution channel goes down", the one ordering guarantee, and senders suspended at the distribution buffer busy limit: the reference manual, [Processes: Delivery of Signals](https://www.erlang.org/doc/system/ref_man_processes.html#delivery-of-signals) and [Blocking Signaling Over Distribution](https://www.erlang.org/doc/system/ref_man_processes.html#blocking-signaling-over-distribution). The limit's default of 1024 kilobytes: [`erl +zdbbl`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+zdbbl).
 - `noconnection` in a `'DOWN'` message, a monitor being "triggered only once", and "If the connection to it is lost, we do not know if it still exists": [`erlang:monitor/2`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/2). Exit signals with reason `noconnection` from links: [`erlang:link/1`](https://www.erlang.org/doc/apps/erts/erlang.html#link/1). A new process getting "the same group leader as the spawning process": [`erlang:group_leader/0`](https://www.erlang.org/doc/apps/erts/erlang.html#group_leader/0).
-- The net tick time, ticks, its default of 60 seconds, detection between 45 and 75 seconds, and a terminating node "detected immediately by the transport protocol"; and nodes connecting automatically "when a message is to be sent to that node": Kernel's [`net_ticktime`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#net_ticktime) and [`dist_auto_connect`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#dist_auto_connect). [`net_kernel:monitor_nodes/1`](https://www.erlang.org/doc/apps/kernel/net_kernel.html#monitor_nodes/1).
+- The net tick time, ticks, its default of 60 seconds, detection between 45 and 75 seconds, and a terminating node "detected immediately by the transport protocol"; and nodes connecting automatically "when a message is to be sent to that node": Kernel's [`net_ticktime`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#net_ticktime) and [`dist_auto_connect`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#dist_auto_connect). The 7 seconds allowed for each step of setting up a connection: [`net_setuptime`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#net_setuptime). [`net_kernel:monitor_nodes/1`](https://www.erlang.org/doc/apps/kernel/net_kernel.html#monitor_nodes/1).
 - [`peer`](https://www.erlang.org/doc/apps/stdlib/peer.html), [`erpc`](https://www.erlang.org/doc/apps/kernel/erpc.html), and [`code:load_binary/3`](https://www.erlang.org/doc/apps/kernel/code.html#load_binary/3). `defmodule` returning the module's binary: [`Kernel.defmodule/2`](https://hexdocs.pm/elixir/1.19.5/Kernel.html#defmodule/2). [`Node`](https://hexdocs.pm/elixir/1.19.5/Node.html).
 - Location transparency, a module defined on one node not being available on another, and the trade-offs of distributed systems and databases: Elixir's guide, [Configuration and distribution](https://hexdocs.pm/elixir/1.19.5/config-and-distribution.html).
 - "By default `net.Socket` do not have a timeout" and the `'timeout'` event that doesn't sever the connection: Node's [`socket.setTimeout()`](https://nodejs.org/api/net.html#socketsettimeouttimeout-callback).
