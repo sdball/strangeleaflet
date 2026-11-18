@@ -2,8 +2,8 @@
 # producer 1,000 a second; each consumer works on each one for 2 ms, so
 # it can handle 500 a second. Every second, report how many events have
 # arrived, how many are handled, how many are in flight (sent to a
-# consumer, not handled yet), how many wait in the producer's buffer, and
-# how many the producer has dropped. The argument is how many consumers.
+# consumer, not handled yet; the lowest and highest over the second), how
+# many wait in the producer's buffer, and how many the producer has dropped. The argument is how many consumers.
 Mix.install([{:gen_stage, "1.3.2"}])
 
 consumers = String.to_integer(List.first(System.argv(), "1"))
@@ -56,27 +56,42 @@ start = System.monotonic_time(:millisecond)
 elapsed = fn -> System.monotonic_time(:millisecond) - start end
 pad = fn n -> String.pad_leading("#{n}", 4) end
 
-report = fn at, sent ->
-  handled = :counters.get(counts, 1)
-  dropped = :counters.get(counts, 2)
-  buffered = GenStage.estimate_buffered_count(producer)
-  in_flight = sent - handled - buffered - dropped
+in_flight = fn sent ->
+  sent - :counters.get(counts, 1) - GenStage.estimate_buffered_count(producer) - :counters.get(counts, 2)
+end
+
+# In flight goes up and down as batches are handled, so it's sampled every
+# millisecond and reported as the lowest and highest over the second
+report = fn at, sent, samples ->
+  {low, high} = Enum.min_max(samples)
   IO.puts(
-    "#{pad.(at)} ms: arrived #{pad.(sent)}, handled #{pad.(handled)}, in flight #{pad.(in_flight)}," <>
-      " buffered #{pad.(buffered)}, dropped #{pad.(dropped)}"
+    "#{pad.(at)} ms: arrived #{pad.(sent)}, handled #{pad.(:counters.get(counts, 1))}," <>
+      " in flight #{String.pad_leading("#{low}-#{high}", 5)}," <>
+      " buffered #{pad.(GenStage.estimate_buffered_count(producer))}, dropped #{pad.(:counters.get(counts, 2))}"
   )
 end
 
 # One event is due every millisecond since the start. Send whatever's
 # due, then sleep until the next one.
-produce = fn produce, sent, report_at ->
+produce = fn produce, sent, report_at, samples ->
   cond do
-    report_at > 8000 -> :ok
-    elapsed.() >= report_at -> report.(report_at, sent); produce.(produce, sent, report_at + 1000)
-    sent < elapsed.() -> send(producer, {:event, sent + 1}); produce.(produce, sent + 1, report_at)
-    true -> Process.sleep(1); produce.(produce, sent, report_at)
+    report_at > 8000 ->
+      :ok
+
+    elapsed.() >= report_at ->
+      report.(report_at, sent, samples)
+      produce.(produce, sent, report_at + 1000, [])
+
+    sent < elapsed.() ->
+      send(producer, {:event, sent + 1})
+      produce.(produce, sent + 1, report_at, samples)
+
+    true ->
+      samples = [in_flight.(sent) | samples]
+      Process.sleep(1)
+      produce.(produce, sent, report_at, samples)
   end
 end
 
 IO.puts("consumers: #{consumers}")
-produce.(produce, 0, 1000)
+produce.(produce, 0, 1000, [])

@@ -50,17 +50,21 @@ const elapsed = () => performance.now() - start;
 const pad = (x) => String(x).padStart(4);
 
 // One event is due every millisecond since the start. Send whatever's
-// due, then sleep until the next one.
+// due, then sleep until the next one. In flight goes up and down, so it's
+// sampled each time round and reported as the lowest and highest.
 console.log(`node ${process.version}, mode: ${mode}`);
 let sent = 0;
+let samples = [];
 for (let reportAt = 1000; reportAt <= 8000; ) {
+  samples.push(sent - handled - waiting.length - dropped);
   if (elapsed() >= reportAt) {
-    const inFlight = sent - handled - waiting.length - dropped;
+    const range = `${Math.min(...samples)}-${Math.max(...samples)}`;
     console.log(
-      `${pad(reportAt)} ms: arrived ${pad(sent)}, handled ${pad(handled)}, in flight ${pad(inFlight)},` +
+      `${pad(reportAt)} ms: arrived ${pad(sent)}, handled ${pad(handled)}, in flight ${range.padStart(5)},` +
         ` buffered ${pad(waiting.length)}, dropped ${pad(dropped)}`,
     );
     reportAt += 1000;
+    samples = [];
   } else if (sent < Math.floor(elapsed())) {
     arrive(++sent);
   } else {
