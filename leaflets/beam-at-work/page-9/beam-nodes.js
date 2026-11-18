@@ -429,10 +429,29 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     font-size: .8rem;
     color: var(--muted);
   }
+  /* One lane each way, with an arrowhead at the receiving end */
+  beam-nodes .lane {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto 5.5rem;
+    align-items: center;
+    gap: .5rem;
+  }
+  beam-nodes .lane .end {
+    font-family: var(--code);
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  beam-nodes .lane .count {
+    white-space: nowrap;
+  }
+  beam-nodes .lane .count output {
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
   beam-nodes .track {
     position: relative;
-    height: 22px;
-    margin: 0 .6rem;
+    height: 24px;
   }
   beam-nodes .track::before {
     content: "";
@@ -440,41 +459,66 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     left: 0;
     right: 0;
     top: 50%;
+    margin-top: -1px;
     border-top: 2px solid var(--line);
   }
-  beam-nodes .track.down::before {
+  beam-nodes .track::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    margin-top: -6px;
+    border: 6px solid transparent;
+  }
+  beam-nodes .ab .track::after {
+    right: -4px;
+    border-left: 10px solid var(--muted);
+    border-right-width: 0;
+  }
+  beam-nodes .ba .track::after {
+    left: -4px;
+    border-right: 10px solid var(--muted);
+    border-left-width: 0;
+  }
+  beam-nodes .lanes.down .track::before {
     border-top-style: dotted;
     opacity: .5;
   }
-  beam-nodes .track.connecting::before {
+  beam-nodes .lanes.down .track::after {
+    opacity: .5;
+  }
+  beam-nodes .lanes.connecting .track::before {
     border-top-style: dashed;
   }
+  beam-nodes .lanes {
+    display: grid;
+    gap: .15rem;
+  }
+  /* A message is an arrow pointing the way it's going; a tick is a ring */
   beam-nodes .dot {
     position: absolute;
     top: 50%;
-    width: 12px;
-    height: 12px;
-    margin: -6px 0 0 -6px;
-    border-radius: 50%;
+    width: 18px;
+    height: 16px;
+    margin: -8px 0 0 -9px;
     background: var(--ink);
+    clip-path: polygon(0 0, 100% 50%, 0 100%, 30% 50%);
+  }
+  beam-nodes .ba .dot {
+    clip-path: polygon(100% 0, 0 50%, 100% 100%, 70% 50%);
   }
   beam-nodes .dot.tick {
-    width: 8px;
-    height: 8px;
-    margin: -4px 0 0 -4px;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    clip-path: none;
+    border-radius: 50%;
     background: var(--bg);
-    border: 1.5px solid var(--muted);
+    border: 2px solid var(--muted);
   }
   beam-nodes .dot.add { background: var(--brass); }
   beam-nodes .dot.get,
   beam-nodes .dot.monitor { background: var(--link); }
   beam-nodes .dot.reply { background: var(--code-string); }
-  beam-nodes .track-line {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: .2rem .8rem;
-  }
   beam-nodes .connection .status output {
     color: var(--ink);
     font-weight: 700;
@@ -556,11 +600,11 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     position: static;
     display: inline-block;
     margin: 0 .35rem 0 0;
-    vertical-align: -.05rem;
+    vertical-align: -.1rem;
   }
   beam-nodes .key .dot.tick {
     margin: 0 .35rem 0 0;
-    vertical-align: 0;
+    vertical-align: -.05rem;
   }
   beam-nodes .sr {
     position: absolute;
@@ -634,11 +678,11 @@ customElements.define("beam-nodes", class extends HTMLElement {
           </div>
         </div>
         <div class="connection">
-          <div class="track" aria-hidden="true"></div>
-          <span class="track-line">
-            <span class="status">connection: <output class="conn"></output></span>
-            <span>crossing: <output class="crossing"></output></span>
-          </span>
+          <span class="status">connection: <output class="conn"></output></span>
+          <div class="lanes">
+            <div class="lane ab"><span class="end">a</span><div class="track" aria-hidden="true"></div><span class="end">b</span><span class="count">to b: <output></output></span></div>
+            <div class="lane ba"><span class="end">a</span><div class="track" aria-hidden="true"></div><span class="end">b</span><span class="count">to a: <output></output></span></div>
+          </div>
           <button type="button" data-do="disconnect"><code>Node.disconnect(b)</code></button>
         </div>
       </div>
@@ -648,7 +692,7 @@ customElements.define("beam-nodes", class extends HTMLElement {
       <p class="key" aria-hidden="true">
         <span><span class="dot add"></span><code>{:add, 1}</code></span>
         <span><span class="dot get"></span><code>{:get, self()}</code> or a monitor</span>
-        <span><span class="dot reply"></span>the counter's reply</span>
+        <span class="ba"><span class="dot reply"></span>the counter's reply</span>
         <span><span class="dot tick"></span>a tick</span>
       </p>`;
 
@@ -763,24 +807,27 @@ customElements.define("beam-nodes", class extends HTMLElement {
     this.$('[data-do="halt"]').disabled = c.b === "halted";
 
     // The connection
-    const track = this.$(".track");
-    track.classList.toggle("down", c.conn === "down");
-    track.classList.toggle("connecting", c.conn === "connecting");
+    const lanes = this.$(".lanes");
+    lanes.classList.toggle("down", c.conn === "down");
+    lanes.classList.toggle("connecting", c.conn === "connecting");
     let status = c.conn === "up" ? "up" : c.conn === "down" ? "none" : "connecting";
     if (c.conn === "connecting" && c.b === "paused") status += `, gives up in ${seconds(c.setupUntil - c.t)}`;
     set(this.$(".conn"), status);
-    const ab = c.wire.filter((m) => m.dir === "ab").length;
-    set(this.$(".crossing"), `${ab} to b, ${c.wire.length - ab} to a`);
     this.$('[data-do="disconnect"]').disabled = c.conn !== "up";
-    const dots = track.children;
-    while (dots.length < c.wire.length) track.append(document.createElement("span"));
-    for (let i = 0; i < dots.length; i++) {
-      const m = c.wire[i];
-      dots[i].hidden = !m;
-      if (!m) continue;
-      const share = Math.min(1, Math.max(0, (c.t - m.sent) / (m.arrive - m.sent)));
-      dots[i].className = `dot ${m.kind}`;
-      dots[i].style.left = `${(m.dir === "ab" ? share : 1 - share) * 100}%`;
+    for (const dir of ["ab", "ba"]) {
+      const wire = c.wire.filter((m) => m.dir === dir);
+      set(this.$(`.${dir} .count output`), String(wire.length));
+      const track = this.$(`.${dir} .track`);
+      const dots = track.children;
+      while (dots.length < wire.length) track.append(document.createElement("span"));
+      for (let i = 0; i < dots.length; i++) {
+        const m = wire[i];
+        dots[i].hidden = !m;
+        if (!m) continue;
+        const share = Math.min(1, Math.max(0, (c.t - m.sent) / (m.arrive - m.sent)));
+        dots[i].className = `dot ${m.kind}`;
+        dots[i].style.left = `${(dir === "ab" ? share : 1 - share) * 100}%`;
+      }
     }
 
     // a's mailbox, newest last
