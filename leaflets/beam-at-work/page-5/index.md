@@ -6,6 +6,20 @@ meta_description: A BEAM process that crashes takes nothing else down with it, u
 
 We've repeatedly seen the same rule: no process can access another's memory. That's why each process can collect its own garbage, and why processes must talk by sending messages that include copies of their data. This page is about the reason that rule is there in the first place: what happens when a process crashes.
 
+Here's a server with twelve connections, once in the BEAM and once in Node. Send it a message that hits a bug.
+
+<one-bad-message>
+
+![The simulation just after #6's message hit a bug, side by side. On the BEAM side, where each connection is a process, 11 of 12 are still connected: #6's tile is outlined in red and its count has stopped, and the other eleven are still counting. Under them: #6's process crashed, and nothing noticed. The rest carry on. On the Node side, where every connection is in one process, 0 of 12 are still connected, in red: every tile is outlined in red with its count stopped, and under them: The process exited, and everyone went with it, not just #6.](one-bad-message.webp)
+
+*The live version of this needs JavaScript. In it, you can send the server a message that hits a bug, in the BEAM and in Node side by side, and restart Node's server afterwards.*
+
+</one-bad-message>
+
+<script type="module" src="one-bad-message.js"></script>
+
+In Node, one bad message ended every connection. An error that nothing catches ends the whole process by default, and everything the process held goes with it. Restart it and everyone is back, every count at 0. In the BEAM it ended one connection, and the other eleven carried on. But nothing noticed that one go, either, and nothing started it again.
+
 Joe Armstrong, one of Erlang's creators, wrote that processes "should share no data, and only communicate by message passing. This is to limit the consequences of a software error." And went on: "the only realistic way to build large reliable systems is by partitioning the system into independent parallel processes, and by providing mechanisms for monitoring and restarting these processes."
 
 This page is about the first half of the mechanisms he's talking about: the ways a process finds out that another one died. The BEAM has two, links and monitors, and they're built right into the BEAM itself.
@@ -55,7 +69,7 @@ a: 5
 a alive? true, b alive? false, c alive? true
 ```
 
-`b` died, the error was logged, and `a` and `c` carried on counting. Nothing of `b`'s was shared with them, so nothing of theirs could be left half-changed by its crash. Its heap, its stack, and its mailbox went with it.
+`b` died, the error was logged, and `a` and `c` carried on counting. Nothing of `b`'s was shared with them, so nothing of theirs could be left half-changed by its crash. Its heap, its stack, and its mailbox went with it. (The same three counters in Node, further down, end together.)
 
 That's the isolation Armstrong was after. But it's also a problem: nobody else noticed. If `a` and `c` had been waiting for `b` to send them something, they'd wait forever. A process that dies needs a way to tell the processes that depend on it.
 
@@ -504,7 +518,7 @@ main: 5
 
 That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost what we measured on page 2, about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
 
-## Watch it happen
+## Links and monitors together
 
 Here are the processes from this page, together: the restarter, trapping exits and linked to a worker; the worker, linked to two helpers it started; a watcher, monitoring the worker; and a counter, linked to nothing. The restarter behaves like restart.exs's, restarting the worker up to three times. It's a simulation that follows the rules above, slowed down so you can follow each signal.
 
