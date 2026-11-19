@@ -1,4 +1,4 @@
-// <beam-mailbox>: page 4's widget. The slow consumer from slow-consumer.exs
+// <beam-mailbox>: page 8's widget. The slow consumer from slow-consumer.exs
 // and slow-worker.mjs, side by side and slowed down: a producer sends
 // messages at a steady rate to a consumer that works on each one for a few
 // milliseconds. With "sends and moves on", whatever the consumer can't keep

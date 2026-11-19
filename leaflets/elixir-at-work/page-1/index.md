@@ -170,7 +170,7 @@ buy a ticket     3 → 2      handle_call(:buy, from, 3) returns {:reply, :ok, 2
 
 A server handles one message, start to finish, before it looks at the next. Each `handle_call` returns before the loop's next `receive`. So the state never needs a lock: only the server can touch it, and it only works on one request at a time.
 
-That holds even when handling a request means waiting. Suppose selling a ticket means charging a card, and the payment takes 100 ms. Here three buyers ask at the same moment for the last two tickets, and `handle_call` waits on a payment process in the middle of each sale ([wait-inside.exs](wait-inside.exs)):
+That holds even when handling a request means waiting. Here's the ticket sale from [page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/), with the seller as a GenServer: three buyers ask at the same moment for the last two tickets, and `handle_call` waits 100 ms on a payment process in the middle of each sale ([wait-inside.exs](wait-inside.exs)):
 
 ```elixir
 def handle_call(:buy, _from, {0, payments}), do: {:reply, :sold_out, {0, payments}}
@@ -397,7 +397,7 @@ The third thing `call` gives you is backpressure. The caller waits for each repl
 
 ## Casts and other messages
 
-A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's the send-and-move-on approach from The BEAM at Work's page 4: no monitor, no timeout, no backpressure, and a mailbox that can grow.
+A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's a plain `send`, as on The BEAM at Work's page 4: no monitor, no timeout, no backpressure, and a mailbox that can grow, as its page 8 shows.
 
 Every other message sent to a GenServer: a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, etc. goes to `handle_info`.
 
@@ -456,80 +456,7 @@ Two more things come with it that later pages need. `use GenServer` writes a `ch
 
 ## And in Node?
 
-Inside one Node thread, the fair equivalent of the ticket server is an object with methods. It's just as safe for code that doesn't wait: one callback runs at a time (The BEAM at Work's page 1), so a method with no `await` in it runs to completion before anything else can touch the object. The difference shows when there's waiting in the middle. Here's the same sale with the same 100 ms payment, and three buyers at once for the last two tickets ([wait-inside.mjs](wait-inside.mjs)):
-
-```js
-const charge = async () => {
-  await sleep(100);
-  return "paid";
-};
-
-class Tickets {
-  constructor(left) {
-    this.left = left;
-  }
-
-  async buy() {
-    if (this.left === 0) return "sold out";
-    await charge(); // takes 100 ms
-    this.left -= 1;
-    return "ok";
-  }
-}
-
-const tickets = new Tickets(2);
-const start = performance.now();
-
-await Promise.all(
-  [1, 2, 3].map(async (buyer) => {
-    const reply = await tickets.buy();
-    console.log(`${Math.round(performance.now() - start)} ms: buyer ${buyer}: ${reply}`);
-  }),
-);
-console.log(`tickets left: ${tickets.left}`);
-```
-
-```text
-$ node wait-inside.mjs
-node v25.9.0
-106 ms: buyer 1: ok
-106 ms: buyer 2: ok
-106 ms: buyer 3: ok
-tickets left: -1
-```
-
-Three tickets sold out of two. `await` hands the thread back while the payment is out, so the other two buyers ran their checks before the first sale took its ticket. All three saw one left.
-
-The fix is a queue that makes each sale wait for the one before it. Here's the same script with the buyers using this instead of `Tickets` ([wait-inside-queue.mjs](wait-inside-queue.mjs)):
-
-```js
-class QueuedTickets extends Tickets {
-  queue = Promise.resolve();
-
-  buy() {
-    const result = this.queue.then(() => super.buy());
-    this.queue = result.catch(() => {});
-    return result;
-  }
-}
-
-const tickets = new QueuedTickets(2);
-```
-
-```text
-$ node wait-inside-queue.mjs
-node v25.9.0
-103 ms: buyer 1: ok
-204 ms: buyer 2: ok
-204 ms: buyer 3: sold out
-tickets left: 0
-```
-
-That matches the GenServer exactly, down to the times, and it's eight lines. So Node can do it. The difference is which way the default goes, and what that asks of the programmer.
-
-In Node, everything interleaves at an `await` unless you queue it. Getting it right means knowing this failure can happen at all, spotting it in code that looks fine and works whenever requests come one at a time, knowing that a queue fixes it and how to write one, and then remembering to use it everywhere state is read before an `await` and changed after. Miss any one of those and the code still works, until two requests overlap.
-
-In a GenServer, nothing interleaves unless you arrange it. There's nothing to know or remember first: one request at a time is how the server runs. The cost is the one the times show, a sale at a time.
+[Page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/) has this sale in Node, with the tickets as an object and an async `buy()`. All three buyers got a ticket, because `await` handed the thread back while each payment was out and the other buyers checked in the meantime, until a queue made each sale wait for the one before it. A GenServer, like any process, takes one request at a time without being asked.
 
 Between threads, Node has messages, and a call to a worker thread is something you have to build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
 
@@ -703,7 +630,7 @@ Start the server, then send it requests. Watch the state, drawn in brass: it goe
 
 ## Sources
 
-- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), [wait-inside-queue.mjs](wait-inside-queue.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - A tail-recursive call using no stack, so a loop can "run forever": the Erlang reference manual, [Tail recursion](https://www.erlang.org/doc/system/ref_man_functions.html#tail-recursion).
 - GenServer as "a process like any other Elixir process" with "a standard set of interface functions" and tracing: [GenServer](https://hexdocs.pm/elixir/1.19.5/GenServer.html). `GenServer.call` passing the request to `:gen.call` with the label `:"$gen_call"` and a default timeout of 5,000: [gen_server.ex at v1.19.5](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1108-L1146). `cast` returning `:ok` whether or not the server exists: [L1149–L1161](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1149-L1161). `handle_info` handling "all other messages": [L650–L656](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L650-L656). `code_change`: [L749–L760](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L749-L760). The bottleneck warning: [L380–L396](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L381-L396). `child_spec/1` and the `:sys` functions: [Debugging with the :sys module](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-debugging-with-the-sys-module) and [How to supervise](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-how-to-supervise).
 - The server loop taking the oldest message and dispatching `'$gen_call'` to `handle_call`: [gen_server.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2320-L2326) and [L2498–L2518](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2498-L2518). `do_call`: [gen.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L231-L281); the reply sent to the alias: [L549–L554](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L549-L554). Late replies not received: [`gen_server:call/3`](https://www.erlang.org/doc/apps/stdlib/gen_server.html#call/3).

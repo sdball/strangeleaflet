@@ -1,12 +1,232 @@
 ---
 tags: elixir, beam, nodejs
 publish: false
-meta_description: BEAM processes share nothing, so they talk by sending messages. What a send costs, how receive picks a message, and what happens when one process can't keep up.
+meta_description: A BEAM process's data is its own, and the only way in is a message, read one at a time. So a process can stop and wait in the middle of a job, and nothing else gets in. What a send costs, and how receive picks a message.
 ---
 
-Pages 2 and 3 kept coming back to one rule: no process access another's memory. That's what lets each one collect its own garbage independently. But processes have to work together somehow, and if they can't share data, they have to send it.
+Pages 2 and 3 kept coming back to one rule: no process can get at another's memory. That's what lets each one collect its own garbage on its own. But processes have to work together somehow, and if they can't share data, they have to send it. This page is about what that buys you, starting with a ticket sale.
 
-Sending messages is how BEAM processes talk to each other. One sends a message and it lands in the other's mailbox. This page is about what a send costs, how a process picks what to read from its mailbox, and what happens when messages come in faster than a process can read them.
+<ticket-race>
+
+![The sale just after it ends, side by side. On the BEAM side the seller is a process, and 0 tickets are left. Buyer 1 saw 2 left and got a ticket at 100 ms, buyer 2 saw 1 left and got a ticket at 200 ms, and buyer 3 saw 0 left and was told they're sold out at 200 ms: 2 tickets sold, and one buyer was told they're sold out. On the Node side the seller is an object with an async buy(), and the tickets left are -1, in red. All three buyers saw 2 left and got a ticket at 100 ms: 3 tickets sold, and there were only 2.](ticket-race.webp)
+
+*The live version of this needs JavaScript. In it, you can run the sale in the BEAM and in Node side by side, slowed down, and try Node again with a queue.*
+
+</ticket-race>
+
+<script type="module" src="ticket-race.js"></script>
+
+In Node all three buyers got a ticket, and there were only two. Look at what each one saw: all three checked while two were still left, because none of the payments had come back yet. In the BEAM each buyer saw what the sale before had left: two, then one, then none. Press **Node with a queue** and Node sells them one at a time too. The rest of this page is about why the BEAM does that without being asked, and what it costs.
+
+## Three buyers, two tickets
+
+Here's the sale for real, in Node first. The tickets are an object with an async `buy()` method that checks what's left, waits 100 ms for the payment, and then takes a ticket ([wait-inside.mjs](wait-inside.mjs)):
+
+```js
+const charge = async () => {
+  await sleep(100);
+  return "paid";
+};
+
+class Tickets {
+  constructor(left) {
+    this.left = left;
+  }
+
+  async buy() {
+    if (this.left === 0) return "sold out";
+    await charge(); // takes 100 ms
+    this.left -= 1;
+    return "ok";
+  }
+}
+
+const tickets = new Tickets(2);
+const start = performance.now();
+
+await Promise.all(
+  [1, 2, 3].map(async (buyer) => {
+    const reply = await tickets.buy();
+    console.log(`${Math.round(performance.now() - start)} ms: buyer ${buyer}: ${reply}`);
+  }),
+);
+console.log(`tickets left: ${tickets.left}`);
+```
+
+```text
+$ for i in 1 2 3; do node wait-inside.mjs; done
+node v25.9.0
+106 ms: buyer 1: ok
+106 ms: buyer 2: ok
+106 ms: buyer 3: ok
+tickets left: -1
+node v25.9.0
+102 ms: buyer 1: ok
+102 ms: buyer 2: ok
+102 ms: buyer 3: ok
+tickets left: -1
+node v25.9.0
+102 ms: buyer 1: ok
+102 ms: buyer 2: ok
+102 ms: buyer 3: ok
+tickets left: -1
+```
+
+Three tickets sold out of two, every time. `await` hands the thread back while the payment is out, so the second buyer's `buy()` ran its check right then, and so did the third's, before the first sale had taken its ticket.
+
+That isn't a bug in Node. Without the `await`, the same class would be fine: one callback runs at a time (page 1), so a method that doesn't wait runs to the end before anything else can touch the object. The trouble is the waiting in the middle.
+
+Here's the same sale in Elixir, with the seller as a process ([wait-inside.exs](wait-inside.exs)). It's a loop: receive a request, check what's left, charge the card, reply, and call itself with what's left now. Nothing in Elixir changes in place, so the number of tickets left is the loop's argument, and each pass gets the new number. `buy` and `left` send the seller a request with a fresh reference and wait for the reply that carries it:
+
+```elixir
+defmodule Tickets do
+  def start(left, payments), do: spawn(fn -> loop(left, payments) end)
+
+  def buy(seller), do: ask(seller, :buy)
+  def left(seller), do: ask(seller, :left)
+
+  defp ask(seller, request) do
+    ref = make_ref()
+    send(seller, {request, self(), ref})
+    receive do: ({^ref, reply} -> reply)
+  end
+
+  defp loop(left, payments) do
+    receive do
+      {:buy, from, ref} ->
+        if left == 0 do
+          send(from, {ref, :sold_out})
+          loop(left, payments)
+        else
+          :paid = Payments.charge(payments) # takes 100 ms
+          send(from, {ref, :ok})
+          loop(left - 1, payments)
+        end
+
+      {:left, from, ref} ->
+        send(from, {ref, left})
+        loop(left, payments)
+    end
+  end
+end
+```
+
+`Payments.charge` asks the same way. The payment process replies 100 ms later:
+
+```elixir
+defmodule Payments do
+  def start, do: spawn(fn -> loop() end)
+
+  # Send a charge with a fresh reference, and wait for the reply carrying it
+  def charge(payments) do
+    ref = make_ref()
+    send(payments, {:charge, self(), ref})
+    receive do: ({^ref, reply} -> reply)
+  end
+
+  defp loop do
+    receive do
+      {:charge, from, ref} ->
+        spawn(fn ->
+          Process.sleep(100)
+          send(from, {ref, :paid})
+        end)
+
+        loop()
+    end
+  end
+end
+```
+
+Three buyers ask at once, each from its own process, as in the Node script:
+
+```elixir
+seller = Tickets.start(2, Payments.start())
+start = System.monotonic_time(:millisecond)
+me = self()
+
+for buyer <- 1..3 do
+  spawn(fn ->
+    reply = Tickets.buy(seller)
+    ms = System.monotonic_time(:millisecond) - start
+    send(me, {:done, "#{ms} ms: buyer #{buyer}: #{inspect(reply)}"})
+  end)
+end
+
+for _ <- 1..3, do: receive(do: ({:done, line} -> IO.puts(line)))
+IO.puts("tickets left: #{Tickets.left(seller)}")
+```
+
+```text
+$ for i in 1 2 3; do elixir wait-inside.exs; done
+101 ms: buyer 1: :ok
+202 ms: buyer 2: :ok
+202 ms: buyer 3: :sold_out
+tickets left: 0
+101 ms: buyer 1: :ok
+202 ms: buyer 2: :ok
+202 ms: buyer 3: :sold_out
+tickets left: 0
+101 ms: buyer 1: :ok
+202 ms: buyer 2: :ok
+202 ms: buyer 3: :sold_out
+tickets left: 0
+```
+
+Two tickets, two sales, and the third buyer hears they're sold out. The times show how: the second buyer waited for the first sale, and the third for both.
+
+## Why the BEAM sold two
+
+Nothing told the seller to take one request at a time. It's how a process works.
+
+The number of tickets left is the seller's own data. No other process can read it or change it, so the only way to ask about it is to send the seller a message. Messages wait in its mailbox until it receives them, and it receives one at a time: each pass of the loop handles one request, start to finish, before the next `receive`.
+
+While it waits for a payment, the seller is inside `Payments.charge`, in a `receive` that only the payment's reply matches. The buyers' requests are in its mailbox too, and they stay there until the sale in progress is done. (The mailbox section below shows how a `receive` picks one message and leaves the rest.)
+
+And the seller can afford to wait, because waiting only stops the seller. A process waiting in a `receive` isn't holding a thread. It's out of the run queue (page 1) and costs only its memory (page 2), while the buyers, the payment process, and everything else carry on. Node can't let a function wait like that, because its one thread would wait with it, so it hands the thread back at `await`, and that's where the other buyers got in.
+
+## Node with a queue
+
+Node can sell one at a time too. The fix is a queue that makes each sale wait for the one before it. Here's the Node script again, with the buyers using this instead of `Tickets` ([wait-inside-queue.mjs](wait-inside-queue.mjs)):
+
+```js
+class QueuedTickets extends Tickets {
+  queue = Promise.resolve();
+
+  buy() {
+    const result = this.queue.then(() => super.buy());
+    this.queue = result.catch(() => {});
+    return result;
+  }
+}
+
+const tickets = new QueuedTickets(2);
+```
+
+```text
+$ for i in 1 2 3; do node wait-inside-queue.mjs; done
+node v25.9.0
+102 ms: buyer 1: ok
+204 ms: buyer 2: ok
+204 ms: buyer 3: sold out
+tickets left: 0
+node v25.9.0
+102 ms: buyer 1: ok
+204 ms: buyer 2: ok
+204 ms: buyer 3: sold out
+tickets left: 0
+node v25.9.0
+102 ms: buyer 1: ok
+203 ms: buyer 2: ok
+204 ms: buyer 3: sold out
+tickets left: 0
+```
+
+That matches the BEAM exactly, down to the times, and it's eight lines. So Node can do it. The difference is which way the default goes, and what that asks of the programmer.
+
+In Node, everything interleaves at an `await` unless you queue it. Getting it right means knowing this failure can happen at all, spotting it in code that looks fine and works whenever requests come one at a time, knowing that a queue fixes it and how to write one, and then remembering to use it everywhere state is read before an `await` and changed after. Miss any one of those and the code still works, until two requests overlap.
+
+In a BEAM process, nothing interleaves unless you arrange it. There's nothing to know or remember first: one message at a time is how a process runs. The cost is the one the times show, a sale at a time.
 
 ## A send is a copy
 
@@ -79,7 +299,7 @@ received the oldest: {:log, "first"}
 mailbox: {:log, "second"} {:log, "third"}
 ```
 
-That's how a process waits for one particular answer in the middle of everything else it's being sent. It asks another process something, then receives only the reply, and the other messages wait their turn.
+That's how a process waits for one particular answer in the middle of everything else it's being sent. It asks another process something, then receives only the reply, and the other messages wait their turn. That's what the ticket seller did while it waited for each payment: `Payments.charge` receives only the reply that carries its reference, and the buyers' requests waited behind it.
 
 It isn't free. To find a match, `receive` looks at the messages from the oldest on, and the docs warn that it's "`O(N)` where `N` corresponds to the number of messages" ahead of the one that matches. Here's a process with a mailbox full of messages it doesn't want, timing a receive for one that's at the end ([scan.exs](scan.exs)):
 
@@ -113,60 +333,9 @@ end
 
 0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it. Elixir at Work, the leaflet after this one, starts with GenServer.
 
-## When messages come in faster than they go out
-
-Nothing limits how many messages a mailbox can hold, and nothing slows a sender down when the receiver falls behind. Here's a producer sending 1,000 messages a second to a consumer that works on each one for 2 ms, so it can only handle 500 a second. Every second the producer reports how many it's sent, how many the consumer has handled, how many are waiting in the consumer's mailbox, and the consumer's size ([slow-consumer.exs](slow-consumer.exs)):
-
-```text
-$ elixir slow-consumer.exs send
-mode: send
-1000 ms: sent  998, handled  498, waiting  500, consumer 1089 KB
-2000 ms: sent 1999, handled  998, waiting 1001, consumer 2656 KB
-3000 ms: sent 2999, handled 1498, waiting 1501, consumer 3857 KB
-4000 ms: sent 3999, handled 1998, waiting 2001, consumer 6713 KB
-5000 ms: sent 4999, handled 2498, waiting 2501, consumer 6778 KB
-6000 ms: sent 5999, handled 2998, waiting 3001, consumer 6923 KB
-```
-
-The mailbox grows by 500 messages a second, and it would go on growing until the machine ran out of memory. The consumer grows with it, because messages waiting in a mailbox are the consumer's data. They sit on its heap, and its collector copies them along with everything else, since as far as the collector can tell they're all still in use. *The BEAM Book*: "If the receiver is backed up and is receiving more messages than it has time to handle, it might actually start using more memory". For a process that may pile up messages, the docs recommend setting its `message_queue_data` flag to `off_heap`, which keeps them out of its heap and out of its collections.
-
-That's a common way for an Elixir system to get into trouble. Page 1's BEAM never skipped a tick: under load, work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
-
-The fix is for the producer to wait. `send` never waits, so the waiting is built from a second message going the other way. The producer puts its own address, `self()`, in each message and goes straight into a `receive`. The consumer sends `:done` back to that address when it's finished. Until `:done` arrives, the producer's `receive` has nothing to match, so it waits:
-
-```elixir
-# The producer
-send(consumer, {:work, self(), payload})
-receive do: (:done -> :ok)
-
-# The consumer
-receive do
-  {:work, from, _payload} ->
-    Work.busy(2)
-    if from, do: send(from, :done)
-end
-```
-
-(In the first run the producer sent `nil` in place of its address, so the consumer didn't reply.)
-
-Here's the same script run that way:
-
-```text
-$ elixir slow-consumer.exs call
-mode: call
-1000 ms: sent  499, handled  499, waiting    0, consumer 33 KB
-2000 ms: sent  998, handled  998, waiting    0, consumer 25 KB
-3000 ms: sent 1498, handled 1498, waiting    0, consumer 33 KB
-4000 ms: sent 1997, handled 1997, waiting    0, consumer 33 KB
-5000 ms: sent 2497, handled 2497, waiting    0, consumer 25 KB
-6000 ms: sent 2997, handled 2997, waiting    0, consumer 20 KB
-```
-
-The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't. Elixir at Work comes back to both.
-
 ## And in Node?
 
-Inside one Node thread there's nothing to send. Pass an object to a function, or to an event listener, and the other end gets the same object, not a copy. That's fast, it's free, and it's safe only because of page 1: one callback runs at a time, so nobody else can be changing the object while you use it. Even an `EventEmitter`, the closest thing in plain Node to a message, isn't a mailbox. `emit` calls every listener right away, "synchronously," before it returns.
+Inside one Node thread there's nothing to send. Pass an object to a function, or to an event listener, and the other end gets the same object, not a copy. That's fast and it's free, and it's safe for as long as nobody waits halfway through using it, as the tickets showed. Even an `EventEmitter`, the closest thing in plain Node to a message, isn't a mailbox. `emit` calls every listener right away, "synchronously," before it returns.
 
 Node does have messages, between threads. A worker thread (page 2's 9 MB thread) and the main thread talk with `postMessage`, and like a BEAM send, it copies: the value is cloned "in a way which is compatible with the HTML structured clone algorithm," and "The message object is cloned immediately, and can be modified after posting without having side effects." Here's what that costs, measured the way copy.exs did, with a worker that never reads its messages ([post-copy.mjs](post-copy.mjs)):
 
@@ -215,96 +384,21 @@ SharedArrayBuffer of 16 MB, shared:     9 µs
 
 Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
 
-A slow worker falls behind the same way, too. Here's the slow consumer again, with the main thread posting 1,000 messages a second to a worker that works on each one for 2 ms ([slow-worker.mjs](slow-worker.mjs)). The waiting works the same way as in the BEAM: the worker posts `"done"` back when it's asked to, and the main thread waits for it:
-
-```javascript
-// The main thread, for each message that's due
-worker.postMessage({ reply: mode === "call", payload });
-if (mode === "call") await done(); // waits for the worker's "done"
-
-// The worker
-parentPort.on("message", ({ reply }) => {
-  busy(2);
-  if (reply) parentPort.postMessage("done");
-});
-```
-
-```text
-$ node slow-worker.mjs send; node slow-worker.mjs call
-node v25.9.0, mode: send
-1000 ms: sent  999, handled  482, waiting  517
-2000 ms: sent 1998, handled  981, waiting 1017
-3000 ms: sent 2999, handled 1480, waiting 1519
-4000 ms: sent 3999, handled 1979, waiting 2020
-5000 ms: sent 4999, handled 2478, waiting 2521
-6000 ms: sent 5999, handled 2978, waiting 3021
-node v25.9.0, mode: call
-1000 ms: sent  489, handled  489, waiting    0
-2000 ms: sent  983, handled  983, waiting    0
-3000 ms: sent 1478, handled 1478, waiting    0
-4000 ms: sent 1971, handled 1971, waiting    0
-5000 ms: sent 2466, handled 2466, waiting    0
-6000 ms: sent 2960, handled 2960, waiting    0
-```
-
-The queue grows without limit, and waiting for a reply fixes it, exactly as in the BEAM. Where Node is ahead is streams: a writable stream's `write()` returns `false` once its buffer passes a threshold, and well-behaved code waits for the `'drain'` event before writing more. That's backpressure built into the API, though nothing forces you to respect it: "Node.js will buffer all written chunks until maximum memory usage occurs".
-
 So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 5's monitors, which report a crash with a message.
 
-## Watch it happen
+## Where it gives ground
 
-This one is about backpressure more than about either runtime. It's the slow consumer again, in the BEAM and in Node side by side and slowed down: a simulation with the settings from the runs above, a producer sending 1,000 messages a second to a consumer that takes 2 ms over each one. Both sides follow the same rules, because in the runs they behaved the same. Neither one slows a sender down on its own.
+One at a time is also a queue, and a busy process is a bottleneck. The third buyer waited 200 ms to hear the tickets were gone. With a thousand tickets and a thousand buyers at once, the last buyer would wait for the 999 payments ahead of theirs, a hundred seconds. Elixir at Work comes back to what Elixir programs do about that.
 
-The number to watch is how long the oldest waiting message has waited. That's about how long every message waits before the consumer gets to it: the delay someone at the other end of a request would feel.
-
-It waits at the start until you press Play. Then try this:
-
-1. Let it run. The producer sends 1,000 a second and the consumer handles 500, so the oldest message's wait grows by half a second every second, and it doesn't stop: each message waits longer than the one before.
-2. Switch the producer to waiting for each reply. Its next message goes on the end of the queue like any other, so the reply only comes once everything ahead of it has been handled. The backlog still has to drain, and the wait keeps climbing until it does, while the producer's rate falls to nothing. After that the producer sends 500 a second, the consumer's pace, and nothing piles up. The consumer handles 500 a second the whole time. Waiting for replies doesn't get any more done; it stops the producer sending what can't be done.
-3. Press Reset, choose 250 sends a second, and play. The consumer is busy half the time and nothing waits. Backpressure only matters when the producer is faster than the consumer.
-4. Compare the two sides. They move together, message for message. What differs is where the waiting messages are (in the BEAM, in the consumer's own mailbox; in Node, in the worker's message queue) and what each one costs.
-
-The memory figures come from sending the slow consumer's message to a process, or a worker, that never reads it, and measuring how much bigger that made things ([queue-memory.exs](queue-memory.exs), [queue-memory.mjs](queue-memory.mjs)):
-
-```text
-$ elixir queue-memory.exs
-  1000 waiting: consumer grew 1678 KB, 1718 bytes each
-  3000 waiting: consumer grew 5037 KB, 1719 bytes each
- 10000 waiting: consumer grew 16795 KB, 1719 bytes each
- 30000 waiting: consumer grew 50389 KB, 1719 bytes each
-$ node --expose-gc queue-memory.mjs
-  1000 waiting: rss grew 848 KB, 868 bytes each
-  3000 waiting: rss grew 2320 KB, 792 bytes each
- 10000 waiting: rss grew 7904 KB, 809 bytes each
- 30000 waiting: rss grew 26832 KB, 916 bytes each
-100000 waiting: rss grew 75152 KB, 770 bytes each
-```
-
-They're different measures. The BEAM's is the consumer process's own memory, and it's 1,719 bytes a message every time. Node's is the whole process as the operating system sees it, so it's rougher: in one run of seven, the last line came out at 96 bytes, because the process's memory had shrunk. The widget uses 800 bytes. Either way a waiting message isn't free, and a queue that grows without limit takes memory without limit.
-
-<beam-mailbox>
-
-![The simulation 601 ms in, with the producer sending and moving on, side by side. On the BEAM side the producer is sending 1,000 a second, and the consumer's mailbox is full of waiting messages, four rows of them and 221 more. The consumer is handling 500 a second and is busy 100% of the time, and the oldest waiting message has waited 300 ms. Sent 602, handled 300, waiting 301, and 517 KB in the consumer's mailbox. The Node side shows the same: the main thread sending 1,000 a second, the worker's message queue just as full, the worker handling 500 a second and busy 100%, the oldest message 300 ms old, the same counts, and 241 KB in the worker's queue.](beam-mailbox.webp)
-
-*The live version of this needs JavaScript. In it, you can watch a producer and a slow consumer in the BEAM and in Node side by side, and change how fast messages are sent, how long each takes, and whether the producer waits for each reply.*
-
-</beam-mailbox>
-
-<script type="module" src="beam-mailbox.js"></script>
-
-Whatever the settings, the consumer can only do so much. At 2 ms a message that's 500 a second, and it handled 500 a second whether the producer waited or not. When the producer is slower than that, as at 250 a second, nothing waits and it doesn't matter which way it sends. When it's faster, the difference has to go somewhere. Sending and moving on, it goes into the queue: 500 messages a second piling up, with every message waiting longer than the last and the memory growing, in both runtimes, until something gives. Waiting for each reply, it never gets sent. The producer slows to 500 a second, the queue stays empty, and every message is handled as soon as it arrives.
-
-That's what backpressure is for. The work done is the same; what changes is where the overload goes. Instead of a queue that grows until it runs out of memory, the producer finds out it's going too fast, and the whole flow settles at the pace of its slowest part, with short waits and flat memory. The producer then has to decide what to do about the extra, wait or drop it, but that's a decision it can make, where a queue that grows without limit decides for it.
-
-One message at a time is the simplest kind of backpressure. It also means the consumer has nothing to start on while each reply goes back and the next message comes in. GenStage, a library, lets a consumer ask for many messages at once and still never get more than it asked for. It's for a later leaflet.
+And nothing limits a mailbox. A send never waits, so a process that gets messages faster than it can handle them just falls further behind, holding on to every one. Page 8 is about that.
 
 ## Sources
 
-- The scripts and their runs: [copy.exs](copy.exs), [selective.exs](selective.exs), [scan.exs](scan.exs), [slow-consumer.exs](slow-consumer.exs), [post-copy.mjs](post-copy.mjs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [wait-inside.mjs](wait-inside.mjs), [wait-inside.exs](wait-inside.exs), and [wait-inside-queue.mjs](wait-inside-queue.mjs), run 2026-11-19, and [copy.exs](copy.exs), [selective.exs](selective.exs), [scan.exs](scan.exs), and [post-copy.mjs](post-copy.mjs), run 2026-11-12, all on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- `await` pausing its async function while "Control exits the function and returns to the caller", and never blocking the main thread: MDN, [await](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await#control_flow_effects_of_await) and its [Description](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/await#description). Node's one thread and one callback at a time, and a process waiting in `receive` leaving the run queue: page 1's sources.
 - Communication by asynchronous signals, messages added to the end of the message queue, and the one ordering guarantee ("if an entity sends multiple signals to the same destination entity, the order is preserved"): the Erlang reference manual, [Processes](https://www.erlang.org/doc/system/ref_man_processes.html): [Signals](https://www.erlang.org/doc/system/ref_man_processes.html#signals), [Adding Messages to the Message Queue](https://www.erlang.org/doc/system/ref_man_processes.html#message-queue-order), and [Delivery of Signals](https://www.erlang.org/doc/system/ref_man_processes.html#delivery-of-signals).
 - A send never failing for a pid, `receive` taking "The first message from the start of the message queue that matches", "All other messages in the message queue remain unchanged", its `O(N)` cost, and matching on a reference created close by: the Erlang reference manual, [Send](https://www.erlang.org/doc/system/expressions.html#send) and [Receive](https://www.erlang.org/doc/system/expressions.html#receive).
 - All message data copied except refc binaries and literals: the efficiency guide, [Sending Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#sending-messages) and [Literal Pool](https://www.erlang.org/doc/system/eff_guide_processes.html#literal-pool). Searching only the messages that arrived after the reference was made: [Fetching Received Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#fetching-received-messages). Binaries over 64 bytes kept off the heap: page 3's sources.
-- The steps of a send (size, space on or off the receiver's heap, copy, link into the queue), heap fragments, messages waiting counted as live by the collector, and a backed-up receiver using more memory: *The BEAM Book*, [Mailboxes and Message Passing](https://blog.stenmans.org/theBeamBook/#_mailboxes_and_message_passing), [Lock Free Message Passing](https://blog.stenmans.org/theBeamBook/#_lock_free_message_passing), [The Process of Sending a Message to a Process](https://blog.stenmans.org/theBeamBook/#_the_process_of_sending_a_message_to_a_process), and [Tuning Message Passing](https://blog.stenmans.org/theBeamBook/#_tuning_message_passing).
-- `message_queue_data`, `off_heap` keeping messages out of collections, and the recommendation for processes that may pile up messages: [`process_flag/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_flag_message_queue_data). `message_queue_len`: [`process_info/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_info/2).
+- The steps of a send (size, space on or off the receiver's heap, copy, link into the queue) and heap fragments: *The BEAM Book*, [Mailboxes and Message Passing](https://blog.stenmans.org/theBeamBook/#_mailboxes_and_message_passing), [Lock Free Message Passing](https://blog.stenmans.org/theBeamBook/#_lock_free_message_passing), [The Process of Sending a Message to a Process](https://blog.stenmans.org/theBeamBook/#_the_process_of_sending_a_message_to_a_process), and [Tuning Message Passing](https://blog.stenmans.org/theBeamBook/#_tuning_message_passing).
 - `GenServer.call` monitoring the server and waiting for a reply tagged with that reference: Elixir's [gen_server.ex at v1.19.5](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1139) calls `:gen.call`, whose `do_call` is in [gen.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L251-L281). `GenServer.cast` not waiting: [GenServer.cast/2](https://hexdocs.pm/elixir/1.19.5/GenServer.html#cast/2).
-- `postMessage` cloning with the structured clone algorithm, transferring an `ArrayBuffer`, and `SharedArrayBuffer` being "accessible from either thread": Node's [worker_threads docs, `port.postMessage`](https://nodejs.org/api/worker_threads.html#portpostmessagevalue-transferlist). `emit` calling listeners synchronously: [events, `emitter.emit`](https://nodejs.org/api/events.html#emitteremiteventname-args). `write()` returning `false` past `highWaterMark`, `'drain'`, and buffering until memory runs out: [stream, `writable.write`](https://nodejs.org/api/stream.html#writablewritechunk-encoding-callback).
+- `postMessage` cloning with the structured clone algorithm, transferring an `ArrayBuffer`, and `SharedArrayBuffer` being "accessible from either thread": Node's [worker_threads docs, `port.postMessage`](https://nodejs.org/api/worker_threads.html#portpostmessagevalue-transferlist). `emit` calling listeners synchronously: [events, `emitter.emit`](https://nodejs.org/api/events.html#emitteremiteventname-args).
