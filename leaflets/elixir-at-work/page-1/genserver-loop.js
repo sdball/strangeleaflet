@@ -1,4 +1,4 @@
-// <genserver-loop>: page 6's first widget. A GenServer's state going round
+// <genserver-loop>: Elixir at Work page 1's first widget. A GenServer's state going round
 // its loop, one message at a time. On the left, the reader sends the ticket
 // server messages (buy a ticket, what's left?, add 2 tickets: the callbacks
 // on the page just above) and sees the last turn's callback and what it

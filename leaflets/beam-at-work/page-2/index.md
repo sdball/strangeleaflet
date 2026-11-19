@@ -64,7 +64,7 @@ A hundred thousand new processes, and the operating system saw nothing new. Same
 
 The 59 processes before we started are the BEAM's own, and Elixir's: the code server, the logger, the processes that read your keyboard and write to your terminal. They're ordinary BEAM processes too. (`Process.registered()` lists the ones with names, like `:code_server`, `:logger`, and `:user_drv_reader`.)
 
-The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. Page 11 comes back to them. And the one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
+The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. Page 8 comes back to them. And the one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
 
 So there are two layers of scheduling. The operating system decides which cores the BEAM's scheduler threads run on, and each scheduler decides which BEAM process runs on it. The operating system only ever sees the threads.
 
@@ -139,7 +139,7 @@ Here's what 2.6 KB looks like next to an operating system process. The top bar i
 
 What's the closest thing in Node? It depends which part of a BEAM process you want.
 
-If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 12 uses them to fix page 1's ticker. They're not cheap. Here's a script that starts 8 idle ones and waits until each is up ([worker-cost.mjs](worker-cost.mjs)):
+If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 8 uses them to fix page 1's ticker. They're not cheap. Here's a script that starts 8 idle ones and waits until each is up ([worker-cost.mjs](worker-cost.mjs)):
 
 ```javascript
 // What does an idle worker thread cost? Start N, wait until each is up, measure.

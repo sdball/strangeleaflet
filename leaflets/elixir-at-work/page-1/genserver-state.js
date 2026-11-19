@@ -1,4 +1,4 @@
-// <genserver-state>: page 6's widget. The ticket server from state.exs,
+// <genserver-state>: Elixir at Work page 1's widget. The ticket server from state.exs,
 // started and sent requests by the reader, one step at a time, to show where
 // a GenServer's state lives: nowhere but in the loop. init returns the first
 // state; each callback gets the current state as its last argument and

@@ -1,716 +1,329 @@
 ---
 tags: elixir, beam, nodejs
 publish: false
-meta_description: GenServer, where most Elixir programs keep their state, isn't part of the BEAM. It's a small library built from sends, receives, references, and monitors, and every piece of it is there because of something that can go wrong.
+meta_description: A BEAM can connect to other BEAMs, and a send to a process on another machine looks just like a local one. What changes is what can go wrong, and what a monitor can and can't tell you when it does.
 ---
 
-Page 4 showed two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
+Everything on the pages so far happened inside one BEAM, and one BEAM is one operating system process on one machine. Page 5 ended there: if that process goes down, everything in it goes with it, and something outside has to start it again. Joe Armstrong's thesis on Erlang puts it plainly: "When we make a fault-tolerant system we need at least two physically separated computers. Using a single computer will not work, if it crashes, all is lost."
 
-GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
+So a BEAM can connect to other BEAMs, on the same machine or on others, and processes on one can send messages to processes on another. Erlang's docs: "Message passing between processes at different nodes, as well as links and monitors, are transparent when pids are used." The `send`, `receive`, links, and monitors from pages 4 and 5 work across machines the way they work inside one.
 
-(If you haven't met GenServer before, page 6 of the [About Elixir leaflet](/leaflets/about-elixir/page-6/) also talks about them.)
+## Nodes
 
-## A server by hand
+A BEAM that can connect to others is a *node*: a running BEAM that has been given a name, like `a@MacBookAir`, a name and the machine it's on. `elixir --sname a script.exs` runs a script on a node named `a`.
 
-A server is a process that holds some state and answers requests about it. Here's one that sells tickets and tracks the number of tickets remaining. It's essentially a function that
+Two things on each machine make the connection work. A small program called epmd, the Erlang Port Mapper Daemon, which every node starts if it isn't already running, keeps track of which port each node on that machine is listening on, so `b@MacBookAir` can be found by name. And each node has a *cookie*, a shared secret. Two nodes connect only if their cookies match. Unless you set one, a node reads its cookie from a file in your home directory, and makes the file if it isn't there, so nodes started by the same user on the same machine can always connect.
 
-1. Waits for a message
-2. When it receives a message it works out a reply and a new state
-3. Sends the reply
-4. Calls itself with the new state to wait for the next message
-
-[by-hand.exs](by-hand.exs):
+This script runs as node `a`, and starts two more nodes, `b` and `c`, with `:peer`, a module in Erlang's standard library for starting nodes and controlling them. Each node is a separate operating system process. It starts a counter on `a` and one on `b`, and talks to both the same way ([nodes.exs](nodes.exs)):
 
 ```elixir
-defmodule Tickets do
-  def start(left), do: spawn(fn -> loop(left) end)
+{:module, Counter, beam, _} =
+  defmodule Counter do
+    def loop(n) do
+      receive do
+        {:add, k} ->
+          loop(n + k)
 
-  def buy(server) do
-    ref = make_ref()
-    send(server, {:buy, self(), ref})
-
-    receive do
-      {^ref, reply} -> reply
+        {:get, from} ->
+          send(from, {:count, n})
+          loop(n)
+      end
     end
+
+    def hello, do: IO.puts("hello from a process on #{node()}")
   end
 
-  defp loop(left) do
-    receive do
-      {:buy, from, ref} ->
-        {reply, left} = if left > 0, do: {:ok, left - 1}, else: {:sold_out, left}
-        send(from, {ref, reply})
-        loop(left)
-    end
+# Start another node on this machine with :peer, give it the same code
+# paths (for Elixir), and load Counter on it.
+start_node = fn name ->
+  paths = Enum.flat_map(:code.get_path(), &[~c"-pa", &1])
+  {:ok, _peer, node} = :peer.start(%{name: name, args: paths})
+  {:module, Counter} = :erpc.call(node, :code, :load_binary, [Counter, ~c"nodes.exs", beam])
+  node
+end
+
+get = fn counter ->
+  send(counter, {:get, self()})
+
+  receive do
+    {:count, n} -> n
   end
 end
 
-server = Tickets.start(2)
+IO.puts("this is #{node()}, connected to #{inspect(Node.list())}")
+b = start_node.(:b)
+IO.puts("started #{b}, now connected to #{inspect(Node.list())}")
+IO.puts("")
 
-for buyer <- 1..3 do
-  IO.puts("buyer #{buyer}: #{inspect(Tickets.buy(server))}")
-end
-```
+here = spawn(Counter, :loop, [0])
+there = Node.spawn(b, Counter, :loop, [0])
 
-```text
-$ elixir by-hand.exs
-buyer 1: :ok
-buyer 2: :ok
-buyer 3: :sold_out
-```
-
-That loop is how a process keeps state. Nothing in Elixir changes in place, so the number of tickets left is an argument, and each new call of the loop gets the new number. The loop can go on forever because calling itself is the last thing it does. The Erlang docs say a call in that position uses no stack, so "an infinite loop using tail-recursive calls will not exhaust the call stack".
-
-The `Tickets.buy/1` function uses the approach we saw in page 4: make a reference, send it with the request, and receive only the reply that carries it.
-
-## The same server as a GenServer
-
-```elixir
-# The same server as a GenServer.
-
-defmodule Tickets do
-  use GenServer
-
-  def start(left), do: GenServer.start(__MODULE__, left)
-  def buy(server), do: GenServer.call(server, :buy)
-
-  @impl true
-  def init(left), do: {:ok, left}
-
-  @impl true
-  def handle_call(:buy, _from, 0), do: {:reply, :sold_out, 0}
-  def handle_call(:buy, _from, left), do: {:reply, :ok, left - 1}
+for counter <- [here, there] do
+  send(counter, {:add, 5})
+  send(counter, {:add, 2})
+  IO.puts("#{inspect(counter)} is on #{node(counter)} and has counted to #{get.(counter)}")
 end
 
-{:ok, server} = Tickets.start(2)
-
-for buyer <- 1..3 do
-  IO.puts("buyer #{buyer}: #{inspect(Tickets.buy(server))}")
-end
-```
-
-```text
-$ elixir genserver.exs
-buyer 1: :ok
-buyer 2: :ok
-buyer 3: :sold_out
-```
-
-A GenServer is a codified way to have a process that holds state and can deal with messages about that state in a reliable and consistent way.
-
-A GenServer essentially needs a name and an initial state. Our `Tickets.start/1` function handles that setup. `__MODULE__` is an easy way to say "use the name of the module" (`Tickets` in this case) and we pass the `left` argument as the initial state.
-
-Declaring `use GenServer` means we are asserting that the module (`Tickets`) meets the contract requirements of the GenServer API. Those `@impl true` calls are helper declarations to say that the following functions meet contract requirements.
-
-- We have the required `init` function that returns a value saying that the GenServer is ready to start `:ok` and its initial state `left`.
-- We have some `handle_call` functions that will handle synchronous messages, determine a response, determine a new state, and return both.
-
-The explicit loop function is gone because GenServer has its own in Erlang's `gen_server`. Conceptually it's the same approach: a `receive` that takes the oldest message, whatever it is, hands it to the module's callback, and calls itself with the state the callback returns. `handle_call` gets the request, who it's from, and the state, and returns the reply and the new state. GenServer sends the reply.
-
-GenServer gives a client two ways to send a server a request:
-
-- `GenServer.call(server, request)` is synchronous. It sends the request, waits for the server's reply, and returns it, so `buy` returns `:ok` or `:sold_out`. The server handles a call in `handle_call`, which returns a reply along with the new state.
-- `GenServer.cast(server, request)` is asynchronous. It sends the request and returns `:ok` straight away, without waiting for the server to do anything with it. The server handles a cast in `handle_cast`, which returns only the new state, since nobody is waiting for a reply.
-
-Buying a ticket is a call (synchronous), because a buyer needs a response to know whether they got a ticket or not.
-
-## Where the state lives
-
-A potentially surprising point about GenServer is where the state lives. There's no field on an object that `handle_call` changes. The state is an argument: the loop passes it to each callback, and each callback hands back the next state as part of what it returns.
-
-Here are two more callback examples for the ticket server, a call that asks how many tickets are left (needs a response) and a cast that adds some (we'll say this doesn't need a response). Cast messages are asynchronous: sent by the caller without waiting for a response.
-
-```elixir
-def handle_call(:left, _from, left), do: {:reply, left, left}
-def handle_cast({:add, n}, left), do: {:noreply, left + n}
-```
-
-Every callback returns a tuple, and the GenServer behavior reads it to know what to do next. Here's what `handle_call` returns:
-
-<return-tuple>
-
-```text
-{  :reply,          reply,           new_state  }
-   ───────          ──────           ─────────
-   what to do:      sent back to     the state the loop
-   send a reply     the caller       carries on with
-```
-
-</return-tuple>
-
-<script type="module" src="return-tuple.js"></script>
-
-And all three:
-
-- `{:ok, state}` from `init`: the server has started, and `state` is its first state.
-- `{:reply, reply, new_state}` from `handle_call`: send `reply` back to the caller, and carry on with `new_state`.
-- `{:noreply, new_state}` from `handle_cast`: there's nobody waiting for a reply, so just carry on with `new_state`.
-
-So `{:reply, :ok, left - 1}` means reply `:ok`, and the new state is `left` decremented. `{:reply, left, left}` replies with how many tickets are left and keeps the state as it was. `left` is both the reply and the new state. A GenServer callback always returns the state, even when it hasn't changed.
-
-Here's the ticket server's state going round the loop. Send it a few messages, and watch each one start from the state the last one left behind:
-
-<genserver-loop>
-
-```text
-message          state      the callback, and what it returned
-(start)              2      init(2) returns {:ok, 2}
-buy a ticket     2 → 1      handle_call(:buy, from, 2) returns {:reply, :ok, 1}
-what's left?     1 → 1      handle_call(:left, from, 1) returns {:reply, 1, 1}
-add 2 tickets    1 → 3      handle_cast({:add, 2}, 1) returns {:noreply, 3}
-buy a ticket     3 → 2      handle_call(:buy, from, 3) returns {:reply, :ok, 2}
-```
-
-*The live version of this needs JavaScript. In it, you send the server messages and watch its state go round the loop: each message takes the state down a step and it lands as the next one, changed or the same.*
-
-</genserver-loop>
-
-<script type="module" src="genserver-loop.js"></script>
-
-## One message at a time
-
-A server handles one message, start to finish, before it looks at the next. Each `handle_call` returns before the loop's next `receive`. So the state never needs a lock: only the server can touch it, and it only works on one request at a time.
-
-That holds even when handling a request means waiting. Suppose selling a ticket means charging a card, and the payment takes 100 ms. Here three buyers ask at the same moment for the last two tickets, and `handle_call` waits on a payment process in the middle of each sale ([wait-inside.exs](wait-inside.exs)):
-
-```elixir
-def handle_call(:buy, _from, {0, payments}), do: {:reply, :sold_out, {0, payments}}
-
-def handle_call(:buy, _from, {left, payments}) do
-  :paid = Payments.charge(payments) # takes 100 ms
-  {:reply, :ok, {left - 1, payments}}
-end
-```
-
-`Payments.charge` is a call written by hand, like `buy` in the server by hand. The payment process replies 100 ms later:
-
-```elixir
-defmodule Payments do
-  def start, do: spawn(fn -> loop() end)
-
-  def charge(payments) do
-    ref = make_ref()
-    send(payments, {:charge, self(), ref})
-    receive do: ({^ref, reply} -> reply)
-  end
-
-  defp loop do
-    receive do
-      {:charge, from, ref} ->
-        spawn(fn ->
-          Process.sleep(100)
-          send(from, {ref, :paid})
-        end)
-
-        loop()
-    end
-  end
-end
-```
-
-```text
-$ for i in 1 2 3; do elixir wait-inside.exs; done
-103 ms: buyer 1: :ok
-204 ms: buyer 2: :ok
-204 ms: buyer 3: :sold_out
-tickets left: 0
-102 ms: buyer 1: :ok
-203 ms: buyer 2: :ok
-203 ms: buyer 3: :sold_out
-tickets left: 0
-101 ms: buyer 1: :ok
-202 ms: buyer 2: :ok
-202 ms: buyer 3: :sold_out
-tickets left: 0
-```
-
-Two tickets, two sales, and the third buyer hears they're sold out. While the server waits for the payment, it's in a `receive` that only the payment's reply matches, and the other buyers' requests wait in its mailbox. Nothing looks at them until the sale before them is done.
-
-The times show what that costs. The second buyer waited for the first sale, and the third for both. The server does one thing at a time by design.
-
-## What `call` does
-
-A call is synchronous: the caller sends its request and then does nothing else until the reply comes back. But what if the reply never comes? Networks are going to network, or maybe the server died, or is stuck, or is just slow.
-
-`GenServer.call` handles bad outcomes. By deferring the work to Erlang's `gen:call`, and here's the Erlang function called `do_call` in `gen.erl` that's handling the edges.
-
-```erlang
-do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
-    Mref = erlang:monitor(process, Process, [{alias,demonitor}]),
-    Tag = [alias | Mref],
-    erlang:send(Process, {Label, {self(), Tag}, Request}, [noconnect]),
-    receive
-        {[alias | Mref], Reply} ->
-            erlang:demonitor(Mref, [flush]),
-            {ok, Reply};
-        {'DOWN', Mref, _, _, noconnection} ->
-            Node = get_node(Process),
-            exit({nodedown, Node});
-        {'DOWN', Mref, _, _, Reason} ->
-            exit(Reason)
-    after Timeout ->
-            erlang:demonitor(Mref, [flush]),
-            receive
-                {[alias | Mref], Reply} ->
-                    {ok, Reply}
-            after 0 ->
-                    exit(timeout)
-            end
-    end.
-```
-
-It's Erlang, not Elixir, but it's page 4's shapes: a send, then a receive with patterns.
-
-The pieces:
-
-- `erlang:monitor` is page 5's monitor: the caller gets a `'DOWN'` message if the server dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets page 4's fast receive, which looks only at messages that arrived after the reference was made.
-- `{alias,demonitor}` makes that reference an *alias* as well: an address the reply can be sent to, which reaches the caller only until the monitor is removed.
-- The request goes to the server as `{:"$gen_call", {caller, tag}, request}`. The server's loop knows `:"$gen_call"` means a call, passes `{caller, tag}` to `handle_call` as `from`, and sends the reply to the alias.
-- Then the caller waits for one of three things: the reply, a `'DOWN'`, or the timeout which defaults to 5,000 ms.
-
-The fast receive works here too, with the reference inside `[alias | Mref]`. Here's a call from a process with a mailbox full of messages it's not looking to receive, as page 4 timed a plain receive ([call-scan.exs](call-scan.exs)):
-
-```text
-$ elixir call-scan.exs
-     0 other messages waiting: call 1.0 µs
-  1000 other messages waiting: call 1.0 µs
- 10000 other messages waiting: call 1.0 µs
-100000 other messages waiting: call 1.0 µs
-```
-
-The whole round trip, server included, takes a microsecond however many messages are waiting.
-
-Each of those is there because of a way a call can go wrong. Here are two of them, each with the same call written by hand beside it. The call by hand sends the server the same message `GenServer.call` does, so the server can't tell them apart, but it waits the way `buy` did in the server by hand: a reference and a receive, with no monitor and no alias.
-
-### The server dies
-
-Here the server crashes in the middle of a call, and then gets called again after it's gone ([call-dies.exs](call-dies.exs)). The server:
-
-```elixir
-def handle_call(:crash, _from, _state) do
-  Process.sleep(100)
-  raise "oops"
-end
-```
-
-The caller, with `GenServer.call`, run twice:
-
-```elixir
-try do
-  GenServer.call(server, :crash)
-catch
-  :exit, {{%RuntimeError{} = e, _stacktrace}, _where} ->
-    IO.puts("caller exited: the server raised #{inspect(e)}")
-
-  :exit, {reason, _where} ->
-    IO.puts("caller exited: #{inspect(reason)}")
-end
-```
-
-And by hand:
-
-```elixir
-ref = make_ref()
-send(server, {:"$gen_call", {self(), ref}, :crash})
-
-receive do
-  {^ref, reply} -> IO.puts("reply: #{inspect(reply)}")
-after
-  5_000 -> IO.puts("still waiting after 5 seconds")
-end
-```
-
-```text
-$ elixir call-dies.exs
-## GenServer.call
-caller exited: the server raised %RuntimeError{message: "oops"}
-server alive? false
-caller exited: :noproc
-caller's mailbox: []
-
-## By hand, with no monitor
-still waiting after 5 seconds
-```
-
-The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
-
-When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and page 5 showed what happens then: anything linked to the caller dies too, unless it traps exits. Page 7 is about the processes that do.
-
-### The caller gives up
-
-Here the server takes 300 ms over a request, and the caller only waits 100 ([call-timeout.exs](call-timeout.exs)). The server:
-
-```elixir
-def handle_call(:work, _from, state) do
-  Process.sleep(300)
-  {:reply, :done, state}
-end
-```
-
-The caller, with `GenServer.call` and then by hand, looking in its own mailbox half a second after each one gives up:
-
-```elixir
-show_mailbox = fn ->
-  {:messages, messages} = Process.info(self(), :messages)
-  IO.puts("500 ms later, the caller's mailbox: #{inspect(messages)}")
-end
-
-try do
-  GenServer.call(server, :work, 100) # only wait 100ms for a response
-catch
-  :exit, {reason, _where} -> IO.puts("caller exited: #{inspect(reason)}")
-end
-
+IO.puts("")
+:erpc.call(b, Process, :register, [there, :counter])
+send({:counter, b}, {:add, 10})
+IO.puts("sent to {:counter, #{inspect(b)}}, and #{inspect(there)} has counted to #{get.(there)}")
+
+Node.spawn(b, Counter, :hello, [])
+Process.sleep(100)
+IO.puts("")
+
+c = start_node.(:c)
 Process.sleep(500)
-show_mailbox.()
+IO.puts("started #{c}, now connected to #{inspect(Node.list())}")
+IO.puts("#{c} is connected to #{inspect(:erpc.call(c, Node, :list, []))}")
+IO.puts("")
 
-ref = make_ref()
-send(server, {:"$gen_call", {self(), ref}, :work})
-
-receive do
-  {^ref, reply} -> IO.puts("reply: #{inspect(reply)}")
-after
-  100 -> IO.puts("gave up")
+for counter <- [here, there] do
+  {us, _} = :timer.tc(fn -> for _ <- 1..10_000, do: get.(counter) end)
+  IO.puts("there and back to #{node(counter)}: #{Float.round(us / 10_000, 1)} µs on average")
 end
-
-Process.sleep(500)
-show_mailbox.()
 ```
+
+Nodes send each other data, not code. `Counter` is defined in this script, so only node `a` has it, and a process started on `b` to run `Counter.loop` would fail there. `defmodule` returns the compiled module, and `start_node` loads it on each new node with `:erpc.call`, which runs a function on another node and returns its result. In Elixir's guide each node is started from the same project, so they all have the code already.
 
 ```text
-$ elixir call-timeout.exs
-## GenServer.call, giving up after 100 ms
-caller exited: :timeout
-500 ms later, the caller's mailbox: []
+$ elixir --sname a nodes.exs
+this is a@MacBookAir, connected to []
+started b@MacBookAir, now connected to [:b@MacBookAir]
 
-## By hand, giving up after 100 ms
-gave up
-500 ms later, the caller's mailbox: [{#Reference<0.3433416021.1507852296.193126>, :done}]
+#PID<0.118.0> is on a@MacBookAir and has counted to 7
+#PID<19950.101.0> is on b@MacBookAir and has counted to 7
+
+sent to {:counter, :b@MacBookAir}, and #PID<19950.101.0> has counted to 17
+hello from a process on b@MacBookAir
+
+started c@MacBookAir, now connected to [:b@MacBookAir, :c@MacBookAir]
+c@MacBookAir is connected to [:a@MacBookAir, :b@MacBookAir]
+
+there and back to a@MacBookAir: 2.1 µs on average
+there and back to b@MacBookAir: 26.9 µs on average
 ```
 
-Giving up doesn't stop the server. It still did the work and dutifully sent the reply 200 ms later. With the call by hand, that late reply landed in the caller's mailbox even though the caller had already moved on.
+## A pid that's somewhere else
 
-With `GenServer.call` it never arrived. On a timeout, `do_call` removes the monitor, and with it the alias, so the late reply goes nowhere.
+`Node.spawn(b, Counter, :loop, [0])` is `spawn` with a node in front, and it returns a pid like any other. The only sign that it's somewhere else is the first number: `0` for a process on this node, something else for a process on another. Everything after that is the same code. The `for` loop sends to both counters and gets the same answers back, without knowing or caring which one is on `b`.
 
-### The server is too slow
+Registered names are the exception. The script registers the counter on `b` as `:counter`, so it can be sent to by that name instead of its pid, but a name is only known on the node it was registered on, so to send to a name on another node you send to the name and the node together, as `{:counter, b}`.
 
-The third thing `call` gives you is backpressure. The caller waits for each reply, so it can't send faster than the server answers.
+The `hello` line was printed by a process running on `b`, but it came out here, in `a`'s terminal. A process sends its output to its *group leader*, and "When a new process is spawned, it gets the same group leader as the spawning process." A process spawned from `a` onto `b` keeps `a`'s, so its output comes home.
 
-## Casts and other messages
+When `c` started, it connected to `a`, and then to `b` by itself. Erlang's docs: "Connections are by default transitive. If a node A connects to node B, and node B has a connection to node C, then node A also tries to connect to node C." Every node ends up connected to every other one.
 
-A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's the send-and-move-on approach we saw in page 4: no monitor, no timeout, no backpressure, and a mailbox that can grow.
+The last two lines are where the transparency stops. A message to a process on the same node is copied from one process's memory to the other's, as page 4 showed. A message to a process on another node is encoded into bytes, sent over a TCP connection, and decoded on the other side, and the reply goes back the same way. There and back took 2 µs on one node, and 27 µs between two nodes on the same machine. Between two machines the network adds its own time on top.
 
-Every other message sent to a GenServer: a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, etc. goes to `handle_info`.
+## When a node goes away
 
-- `handle_call`: synchronous requests
-- `handle_cast`: asynchronous requests
-- `handle_info`: non-GenServer messages
+Inside one BEAM, page 5's monitors only ever tell you one thing: the process has stopped, and here's why. Across nodes there's another reason a `:DOWN` message can carry. The docs list it with the others: "`noconnection` (no connection to the node where the monitored process resides)." Links get it too. A link to a process on another node sends an exit signal with the reason `:noconnection` if "the connection between linked processes on different nodes is lost or cannot be established".
 
-## GenServer tooling
-
-Because every GenServer runs the same loop, tools can work with any of them. The loop understands a few *system messages* besides yours, and Erlang's `:sys` module sends them. Here's the ticket server again, with nothing added to it but with a peek into what the GenServer tooling can observe ([sys.exs](sys.exs)):
+The connection can go in different ways, and this script tries three of them on a counter on node `b`. It watches the counter with a monitor, and watches node `b` itself with `:net_kernel.monitor_nodes(true)`, which sends a `{:nodedown, node}` message whenever a connection to a node is lost and a `{:nodeup, node}` message whenever one is made. `listen.(ms)` prints every message that arrives in the next `ms` milliseconds ([down.exs](down.exs)):
 
 ```elixir
-{:ok, server} = Tickets.start(2)
+b = start_node.(:b)
+counter = Node.spawn(b, Counter, :loop, [0])
+send(counter, {:add, 5})
+:net_kernel.monitor_nodes(true)
+log.("counter #{inspect(counter)} on #{b}, at 5")
 
-IO.puts("get_state: #{:sys.get_state(server)}")
+IO.puts("\nThe connection closes")
+Process.monitor(counter)
+Node.disconnect(b)
+listen.(1_000)
+send(counter, {:get, self()})
+listen.(1_000)
 
-:sys.trace(server, true)
-:sys.statistics(server, true)
-Tickets.buy(server)
-Tickets.buy(server)
-Tickets.buy(server)
-:sys.trace(server, false)
-{:ok, stats} = :sys.statistics(server, :get)
-IO.puts("statistics: #{inspect(Keyword.take(stats, [:messages_in, :messages_out]))}")
+IO.puts("\nb stops answering")
+Process.monitor(counter)
+os_pid = to_string(:erpc.call(b, :os, :getpid, []))
+System.cmd("kill", ["-STOP", os_pid])
+log.("stopped b's operating system process")
+send(counter, {:add, 1})
+send(counter, {:add, 1})
+log.("sent {:add, 1} twice")
+listen.(6_000)
+System.cmd("kill", ["-CONT", os_pid])
+log.("let b's operating system process continue")
+send(counter, {:get, self()})
+listen.(1_000)
 
-:sys.replace_state(server, fn _ -> 1 end)
-IO.puts("replace_state, then get_state: #{:sys.get_state(server)}")
-
-:sys.suspend(server)
-buyer = Task.async(fn -> Tickets.buy(server) end)
-Process.sleep(1_000)
-{:message_queue_len, waiting} = Process.info(server, :message_queue_len)
-IO.puts("suspended for 1 s: #{waiting} request waiting")
-:sys.resume(server)
-IO.puts("resumed: the buyer got #{inspect(Task.await(buyer))}")
+IO.puts("\nb halts")
+Process.monitor(counter)
+:erpc.cast(b, :erlang, :halt, [])
+listen.(1_000)
+send(counter, {:get, self()})
+listen.(3_000)
 ```
+
+`start_node` is the one from nodes.exs with one change: `:peer` controls `b` over a connection of its own, so `b` keeps running when `a` disconnects from it. `kill -STOP` pauses an operating system process where it is, without telling it, and `kill -CONT` lets it carry on. To a node on another machine, a paused process looks just like a machine that has hung, or a network cable that's been pulled: no messages, no errors, nothing. The script runs with the *net tick time* at 4 seconds instead of the default 60, for reasons the output will make clear:
 
 ```text
-$ elixir sys.exs
-get_state: 2
-*DBG* <0.108.0> got call buy from <0.101.0>
-*DBG* <0.108.0> sent ok to <0.101.0>, new state 1
-*DBG* <0.108.0> got call buy from <0.101.0>
-*DBG* <0.108.0> sent ok to <0.101.0>, new state 0
-*DBG* <0.108.0> got call buy from <0.101.0>
-*DBG* <0.108.0> sent sold_out to <0.101.0>, new state 0
-statistics: [messages_in: 3, messages_out: 3]
-replace_state, then get_state: 1
-suspended for 1 s: 1 request waiting
-resumed: the buyer got :ok
+$ elixir --sname a --erl "-kernel net_ticktime 4" down.exs
+  153 ms  counter #PID<19882.97.0> on b@MacBookAir, at 5
+
+The connection closes
+  156 ms  {:DOWN, #Reference<0.82351080.523239425.139972>, :process, #PID<19882.97.0>, :noconnection}
+  156 ms  {:nodedown, :b@MacBookAir}
+ 1155 ms  waited 1 s
+ 1161 ms  {:nodeup, :b@MacBookAir}
+ 1163 ms  {:count, 5}
+ 2156 ms  waited 1 s
+
+b stops answering
+ 2170 ms  stopped b's operating system process
+ 2170 ms  sent {:add, 1} twice
+ 6850 ms  {:DOWN, #Reference<0.82351080.523239425.140052>, :process, #PID<19882.97.0>, :noconnection}
+
+21:20:17.376 [error] ** Node :b@MacBookAir not responding **
+** Removing (timedout) connection **
+
+ 6850 ms  {:nodedown, :b@MacBookAir}
+ 8171 ms  waited 6 s
+ 8179 ms  let b's operating system process continue
+ 8194 ms  {:nodeup, :b@MacBookAir}
+ 8195 ms  {:count, 7}
+ 9180 ms  waited 1 s
+
+b halts
+ 9181 ms  {:DOWN, #Reference<0.82351080.523239425.140192>, :process, #PID<19882.97.0>, :noconnection}
+ 9181 ms  {:nodedown, :b@MacBookAir}
+10181 ms  waited 1 s
+13182 ms  waited 3 s
 ```
 
-`:sys.get_state` reads the server's state, `:sys.trace` prints every request, reply, and new state as they happen, `:sys.statistics` counts them, and `:sys.replace_state` sets the state from outside. `:sys.suspend` makes the server answer only system messages, so a buy waited in its mailbox until `:sys.resume`. (The buy runs in a separate process, started with `Task.async`, because a call would block the script until the reply came.) All of that works on a server while it runs, without changing or restarting it.
+**The connection closes.** The monitor said `:noconnection`, but nothing had happened to the counter. When the script sent it `{:get, self()}`, `a` connected to `b` again by itself (nodes connect "when a message is to be sent to that node"), and the counter answered: still running, still at 5. The monitor was gone, though: a monitor "is triggered only once, after that it is removed".
 
-Two more things come with it that later pages need. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server (page 7). And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded" (page 10).
+**`b` stops answering.** For 4.7 seconds, nothing. A paused process doesn't close its connections, so as far as `a` could see, `b` was just quiet. What ended it was the net tick time. Nodes send each other a small *tick* on any connection that has been quiet for a while, and a node that hasn't been heard from, with ticks or anything else, for about the net tick time is taken to be down: "the actual time `T` a node have been unresponsive when detected may vary" between three quarters and five quarters of it. 4 seconds here gave 4.7. The default of 60 seconds gives between 45 and 75. Then the monitor said `:noconnection` and `a` logged an error.
+
+But `b` wasn't down. Once it carried on, the counter answered with 7: both `{:add, 1}` messages, sent while `b` was paused, had arrived, after `a` had given up on it. They could just as easily have been lost. The docs: "When communicating over the distribution, signals can be lost if the distribution channel goes down." All `a` can know is that it doesn't know.
+
+**`b` halts.** This time the `:DOWN` message came at once. When a node's operating system process ends, the operating system closes its connections, and the other end sees that right away: "Normally, a terminating node is detected immediately by the transport protocol (like TCP/IP)." And the last `{:get, self()}` went nowhere, without an error. As page 4 said, sending to a pid never fails, even if there's nothing there to receive it.
+
+So across nodes, `:noconnection` doesn't mean the process has stopped. It means this node can't reach it. The docs for monitors: "If the connection to it is lost, we do not know if it still exists." The process may have stopped, or may be carrying on without us, and the messages sent around that time may or may not have got there. A process watching one on another node has to decide for itself what to do when it can't tell.
 
 ## And in Node?
 
-Inside one Node thread, the fair equivalent of the ticket server is an object with methods. It's just as safe for code that doesn't wait: one callback runs at a time (page 1), so a method with no `await` in it runs to completion before anything else can touch the object. The difference shows when there's waiting in the middle. Here's the same sale with the same 100 ms payment, and three buyers at once for the last two tickets ([wait-inside.mjs](wait-inside.mjs)):
+Node doesn't have nodes, or a way to send to an object in another Node process, so here's the counter as a separate Node process with a TCP server, talking in lines of JSON. Here's the counter's side ([remote.mjs](remote.mjs)):
 
 ```js
-const charge = async () => {
-  await sleep(100);
-  return "paid";
-};
-
-class Tickets {
-  constructor(left) {
-    this.left = left;
-  }
-
-  async buy() {
-    if (this.left === 0) return "sold out";
-    await charge(); // takes 100 ms
-    this.left -= 1;
-    return "ok";
-  }
-}
-
-const tickets = new Tickets(2);
-const start = performance.now();
-
-await Promise.all(
-  [1, 2, 3].map(async (buyer) => {
-    const reply = await tickets.buy();
-    console.log(`${Math.round(performance.now() - start)} ms: buyer ${buyer}: ${reply}`);
-  }),
-);
-console.log(`tickets left: ${tickets.left}`);
-```
-
-```text
-$ node wait-inside.mjs
-node v25.9.0
-106 ms: buyer 1: ok
-106 ms: buyer 2: ok
-106 ms: buyer 3: ok
-tickets left: -1
-```
-
-Three tickets sold out of two. `await` hands the thread back while the payment is out, so the other two buyers ran their checks before the first sale took its ticket. All three saw one left.
-
-The fix is a queue that makes each sale wait for the one before it. Here's the same script with the buyers using this instead of `Tickets` ([wait-inside-queue.mjs](wait-inside-queue.mjs)):
-
-```js
-class QueuedTickets extends Tickets {
-  queue = Promise.resolve();
-
-  buy() {
-    const result = this.queue.then(() => super.buy());
-    this.queue = result.catch(() => {});
-    return result;
-  }
-}
-
-const tickets = new QueuedTickets(2);
-```
-
-```text
-$ node wait-inside-queue.mjs
-node v25.9.0
-103 ms: buyer 1: ok
-204 ms: buyer 2: ok
-204 ms: buyer 3: sold out
-tickets left: 0
-```
-
-That matches the GenServer exactly, down to the times, and it's eight lines. So Node can do it. The difference is which way the default goes, and what that asks of the programmer.
-
-In Node, everything interleaves at an `await` unless you queue it. Getting it right means knowing this failure can happen at all, spotting it in code that looks fine and works whenever requests come one at a time, knowing that a queue fixes it and how to write one, and then remembering to use it everywhere state is read before an `await` and changed after. Miss any one of those and the code still works, until two requests overlap.
-
-In a GenServer, nothing interleaves unless you arrange it. There's nothing to know or remember first: one request at a time is how the server runs. The cost is the one the times show, a sale at a time.
-
-Between threads, Node has messages, and a call to a worker thread is something you have to build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
-
-```js
-class Client {
-  #worker;
-  #next = 0;
-  #pending = new Map();
-  #gone = null;
-
-  constructor(worker) {
-    this.#worker = worker;
-    worker.on("message", ({ id, reply }) => {
-      const call = this.#pending.get(id);
-      if (!call) return console.log(`  (dropped a late reply: ${reply})`);
-      this.#pending.delete(id);
-      clearTimeout(call.timer);
-      call.resolve(reply);
-    });
-    worker.on("error", (error) => this.#fail(error));
-    worker.on("exit", (code) => this.#fail(new Error(`worker exited, code ${code}`)));
-  }
-
-  call(request, timeout = 5000) {
-    if (this.#gone) return Promise.reject(this.#gone);
-    const id = this.#next++;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.#pending.delete(id);
-        reject(new Error("timeout"));
-      }, timeout);
-      this.#pending.set(id, { resolve, reject, timer });
-      this.#worker.postMessage({ id, request });
-    });
-  }
-
-  #fail(error) {
-    this.#gone ??= error;
-    for (const { reject, timer } of this.#pending.values()) {
-      clearTimeout(timer);
-      reject(error);
+let count = 0;
+const server = createServer((socket) => {
+  let text = "";
+  socket.on("data", (data) => {
+    text += data;
+    let end;
+    while ((end = text.indexOf("\n")) >= 0) {
+      const message = JSON.parse(text.slice(0, end));
+      text = text.slice(end + 1);
+      if (message.add) count += message.add;
+      if (message.get) socket.write(JSON.stringify({ count }) + "\n");
+      if (message.exit) process.exit();
     }
-    this.#pending.clear();
-  }
-}
+  });
+  socket.on("error", () => {});
+});
+server.listen(0, () => console.log(server.address().port));
 ```
+
+And here's how the first process connects to it, logging everything that happens to the connection:
+
+```js
+const open = async () => {
+  const socket = connect(port);
+  let text = "";
+  socket.on("data", (data) => {
+    text += data;
+    let end;
+    while ((end = text.indexOf("\n")) >= 0) {
+      log(`reply ${text.slice(0, end)}`);
+      text = text.slice(end + 1);
+    }
+  });
+  socket.on("error", (error) => log(`error ${error.code}`));
+  socket.on("close", () => log("close"));
+  await new Promise((resolve) => socket.once("connect", resolve));
+  return socket;
+};
+const send = (socket, message) => socket.write(JSON.stringify(message) + "\n");
+```
+
+The rest is down.exs again: close the connection and open another, pause the counter's process with `SIGSTOP` and send it `{ add: 1 }` twice, let it continue, and then tell it to exit:
 
 ```text
-$ node call-by-hand.mjs
-node v25.9.0
-a call that gives up after 100 ms
-  failed: timeout
-  (dropped a late reply: done)
-a call while the worker crashes
-  failed: oops
-a call after the worker is gone
-  failed: oops
+$ node remote.mjs
+   44 ms  counter in process 31350, at 5
+
+The connection closes
+   44 ms  close
+ 1046 ms  waited 1 s
+ 1048 ms  reply {"count":5}
+ 2048 ms  waited 1 s
+
+The counter's process stops answering
+ 2049 ms  stopped the counter's process
+ 2049 ms  sent { add: 1 } twice
+ 8051 ms  waited 6 s
+ 8052 ms  let the counter's process continue
+ 8052 ms  reply {"count":7}
+ 9053 ms  waited 1 s
+
+The counter's process exits
+ 9061 ms  close
+10055 ms  waited 1 s
+13057 ms  waited 3 s
 ```
 
-It works, and at 41 lines it's about the size of `do_call`, whose three clauses come to 53. Neither is exactly hard to write. What's different is who wrote it, and how much it's been through. In Node, each program that needs a call like this writes its own or finds one. In the BEAM it's written once, in the standard library, and every server gets the same one, already written, already tested, and already tuned. The runtime has features built for it: the fast receive that kept a call at a microsecond with 100,000 messages waiting, and the aliases that drop late replies, which Erlang's docs describe as "useful in client/server scenarios".
+When the connection closed, and when the other process exited, Node said so at once, with a `close` event, just as the BEAM did. When the other process stopped answering, Node said nothing at all, for all 6 seconds, and would have gone on saying nothing. Node's docs: "By default `net.Socket` do not have a timeout." `socket.setTimeout()` adds one, and then the socket gets a `'timeout'` event after a quiet spell "but the connection will not be severed". Deciding how long is too long, and what to do then, is the program's job. Here that's a request timeout or a heartbeat of your own, the job the BEAM's ticks do for every connection.
 
-And it has been through a lot. `gen_server` is part of OTP, which Ericsson started in 1996 for the AXD301, a telecom switch built for "carrier-class" non-stop operation. In a 2001 snapshot of the AXD301's code, over a million lines of Erlang, 122 of its 191 standard OTP processes were gen_servers. Discord built its chat service on Elixir from its first prototype: when it wrote up how it reached nearly five million users connected at once, in 2017, each connected user had a session process, "a GenServer", and each Discord server was a GenServer too.
+Everything else is the program's job too. The counter's address is a port, not a pid, and anything that wants to talk to it needs a connection, a way of splitting the stream into messages (lines, here), and a way of encoding them (JSON, which has no pids, no tuples, and no atoms). A request with a reply needs a way to match them up, as page 4's request did with a reference. A library can take care of that, but it's one the program has to choose and wire in. The BEAM has it built in, for every process.
 
-And Node's is per worker, at megabytes a thread (page 2), where the BEAM's works with any process.
-
-## Where it gives ground
-
-One GenServer is one process, so it works on one request at a time, on one scheduler. Here's a server that does about 1 ms of work for each call, with more and more callers, and then the same callers doing the work themselves, with no server ([bottleneck.exs](bottleneck.exs)):
-
-```text
-$ for i in 1 2 3; do elixir bottleneck.exs; done
-8 schedulers, 1 ms of work is counting down from 621195
- 1 caller:    986 a second through one server,  1004 doing the work themselves
- 2 callers:   993 a second through one server,  1952 doing the work themselves
- 4 callers:  1005 a second through one server,  3709 doing the work themselves
- 8 callers:   999 a second through one server,  4743 doing the work themselves
-16 callers:   999 a second through one server,  4738 doing the work themselves
-8 schedulers, 1 ms of work is counting down from 562492
- 1 caller:   1090 a second through one server,  1097 doing the work themselves
- 2 callers:  1098 a second through one server,  2154 doing the work themselves
- 4 callers:  1102 a second through one server,  4098 doing the work themselves
- 8 callers:  1099 a second through one server,  5184 doing the work themselves
-16 callers:  1105 a second through one server,  5330 doing the work themselves
-8 schedulers, 1 ms of work is counting down from 612182
- 1 caller:    998 a second through one server,   998 doing the work themselves
- 2 callers:   999 a second through one server,  1978 doing the work themselves
- 4 callers:  1011 a second through one server,  3764 doing the work themselves
- 8 callers:  1005 a second through one server,  4772 doing the work themselves
-16 callers:  1008 a second through one server,  4901 doing the work themselves
-```
-
-Through the server it's about 1,000 a second however many callers there are. Without it, the work spreads over the schedulers. (Not eight times as much with eight callers, because four of the M1's eight cores are slower efficiency cores.) The extra callers through the server just wait in its mailbox.
-
-Elixir's docs warn about exactly this: putting code behind "a single process that will potentially become a bottleneck in your system", and "If you don't need a process, then you don't need a process."
-
-Discord's write-up of reaching five million users at once is largely about single processes that couldn't keep up. Each Discord server is a guild process that sends everything posted in it on to the session of every member who's connected, and at peak hours the guild processes fell behind their mailboxes.
-
-What Elixir programs do instead depends on the state. Work that doesn't need to query or update server state shouldn't go through a server at all, as in the second column. State that splits by key can live in several servers, one per part. State that's read far more than it's written can go in an ETS table, a data store built into the BEAM that any process can read from.
+What neither can do is the hard part. A Node process whose socket goes quiet is in the same spot as a BEAM node that gets `:noconnection`: it can't tell a stopped process from a slow one, or know which of its last messages arrived.
 
 ## Watch it happen
 
-The widget in "Where the state lives" showed the state going from one message to the next. Here's the same thing inside a running server, with its mailbox and a client sending it requests.
+Here's down.exs as a simulation. Node `a` has a monitor on a counter on node `b`, and the two nodes send each other ticks whenever they have nothing else to send. You can send to the counter, close the connection, pause `b`, or halt it, and see what `a`'s mailbox gets. Under that it shows something `a` can't see: how many messages were lost on the way.
 
-Here's the ticket server again, with a call that buys `n` tickets, a call that asks how many are left, and a cast that adds `n`:
+It waits at the start until you press Play. Then try these:
 
-```elixir
-defmodule Tickets do
-  use GenServer
+1. Watch the ticks cross, one each way every second, a quarter of the net tick time. Send `{:add, 1}` a few times, then `{:get, self()}`. A node that has just sent something doesn't need to send a tick as well.
+2. Close the connection. `a` gets `:nodedown` and `:DOWN`, and `b`, still running, takes `a` to be down too. Send `{:get, self()}`: `a` connects again by itself, and the counter answers with the count it had.
+3. Press `Process.monitor` to watch the counter again, then pause `b` and send `{:add, 1}` twice. Each second `a` checks the connection and finds nothing new from `b`, and at the fourth check in a row it gives up on `b`. Then let `b` carry on: it reads both messages, and `{:get, self()}` shows them counted.
+4. Pause `b` again, wait for `a` to give up, and send `{:add, 1}`. `a` tries to connect, and gives up on that after 7 seconds. If `b` carries on before then, the message arrives. If not, it's lost, and nothing tells `a`.
+5. Halt `b`. `a` hears about it at once. Send `{:get, self()}`, and nothing comes back.
+6. Reset, set the net tick time to 60 s and the speed to 15×, and pause `b`. With the default net tick time, `a` takes about a minute to give up on it.
 
-  def init(left) do
-    {:ok, left}
-  end
+<beam-nodes>
 
-  def handle_call({:buy, n}, _from, left) when n <= left do
-    {:reply, :ok, left - n}
-  end
+![The simulation 6.9 seconds in. Node b is paused, with two messages unread, and its counter is at 3. Node a takes b to be down: a's mailbox shows the counter's reply of 3, then an error that b isn't responding, a nodedown message, and a DOWN message with the reason noconnection. The connection is down, and nothing has been lost on the way yet](beam-nodes.webp)
 
-  def handle_call({:buy, _n}, _from, left) do
-    {:reply, :sold_out, left}
-  end
+*The live version of this needs JavaScript. In it, you can send messages from node a to a counter on node b, close the connection between them, pause b, or halt it, and watch what a's mailbox gets.*
 
-  def handle_call(:left, _from, left) do
-    {:reply, left, left}
-  end
+</beam-nodes>
 
-  def handle_cast({:add, n}, left) do
-    {:noreply, left + n}
-  end
-end
-```
+<script type="module" src="beam-nodes.js"></script>
 
-Elixir tries the clauses of a function in order and runs the first one whose pattern, and `when` guard if it has one, matches. So buying more tickets than are left falls through to the second clause.
+## Where it gives ground
 
-Below is a simulation of it, slowed down so you can follow a request through the loop. A real run of the same module with `:sys.trace` on prints the same states ([state.exs](state.exs)):
+Distribution isn't secure out of the box. The cookie keeps nodes from connecting by mistake, not attackers out. Erlang's docs: "'Security' here does *not* mean cryptographically secure", and "the communication between nodes is per default in clear text." A node can call any function on the nodes it's connected to, which is what `:erpc.call` does, so the docs warn that a node started without TLS is exposed "to attacks that may give the attacker complete access to the node and in extension the cluster." Distribution can run over TLS, and otherwise belongs on a network nobody else can reach.
 
-```text
-$ elixir state.exs
-started, state 3
-*DBG* <0.108.0> got call {buy,2} from <0.101.0>
-*DBG* <0.108.0> sent ok to <0.101.0>, new state 1
-buy 2: :ok
-*DBG* <0.108.0> got call {buy,2} from <0.101.0>
-*DBG* <0.108.0> sent sold_out to <0.101.0>, new state 1
-buy 2: :sold_out
-*DBG* <0.108.0> got call left from <0.101.0>
-*DBG* <0.108.0> sent 1 to <0.101.0>, new state 1
-left: 1
-add 3: :ok
-*DBG* <0.108.0> got cast {add,3}
-*DBG* <0.108.0> new state 4
-*DBG* <0.108.0> got call {buy,2} from <0.101.0>
-*DBG* <0.108.0> sent ok to <0.101.0>, new state 2
-buy 2: :ok
-```
+Every node connects to every other node, so the number of connections grows with the square of the number of nodes: 10 nodes have 45 connections between them, and 100 have 4,950. Hidden nodes and the `-connect_all false` flag turn that off, at the cost of connecting nodes by hand.
 
-Start the server, then send it requests. Watch the state, drawn in brass: it goes into each callback as the last argument and comes out in what the callback returns. Some things to try:
+A send to another node can wait. Inside one node `send` never waits, but each connection has a buffer for messages on their way out, and "When the size of the output buffer for the channel reach the *distribution buffer busy limit*, processes sending on the channel will be suspended until the size of the buffer shrinks below the limit." That limit is 1 MB by default, and a lot of large messages to one node can reach it.
 
-1. Buy 2, then buy 2 again. The second time, the first clause's guard (`when n <= left`) is false, so the next clause answers `:sold_out` and returns the state it was given.
-2. Make a call and try to send something else before the reply comes. You can't: a caller waits in `receive` until its reply arrives.
-3. Cast `{:add, n}` several times quickly. Each cast returns `:ok` at once, the casts wait in the mailbox, and the server takes them one at a time, each starting from the state the one before it returned.
-
-<genserver-state>
-
-![The simulation part way through a call. The server's state is 4. You, the client, called {:buy, 2} and are waiting for the reply. The server's mailbox is empty, because the server has taken the message, {:"$gen_call", from, {:buy, 2}}. It matched the clause def handle_call({:buy, n}, _from, left) when n <= left do, with n = 2 and left = 4, and that clause returns {:reply, :ok, left - n}, which is {:reply, :ok, 2}. Next it will send :ok back and loop with 2 as its state. Every state so far: 3 from init, 1 from {:buy, 2}, and 4 from {:add, 3}.](genserver-state.webp)
-
-*The live version of this needs JavaScript. In it, you start the ticket server and send it calls and casts, and follow each one through the server's loop: the message in its mailbox, the callback called with the current state, the new state it returns, and the reply.*
-
-</genserver-state>
-
-<script type="module" src="genserver-state.js"></script>
+And the BEAM's part ends where the hard part of a distributed system begins. It tells you a node can't be reached, and leaves you to decide what that means. Elixir's guide: "every distributed system, be it a library or a full-blown database, is designed with a series of trade-offs in mind", and two nodes that can't reach each other can each carry on, each sure the other has gone. Whether that's fine depends on the work. It's why the guide adds that "it is still very common to use a database (or any storage system) when writing production applications in Elixir".
 
 ## Sources
 
-- The scripts and their runs: [by-hand.exs](by-hand.exs), [genserver.exs](genserver.exs), [wait-inside.exs](wait-inside.exs), [state.exs](state.exs), [call-dies.exs](call-dies.exs), [call-timeout.exs](call-timeout.exs), [call-scan.exs](call-scan.exs), [sys.exs](sys.exs), [bottleneck.exs](bottleneck.exs), [wait-inside.mjs](wait-inside.mjs), [wait-inside-queue.mjs](wait-inside-queue.mjs), and [call-by-hand.mjs](call-by-hand.mjs), run 2026-11-12 on an Apple M1 (8 cores: 4 performance, 4 efficiency) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
-- A tail-recursive call using no stack, so a loop can "run forever": the Erlang reference manual, [Tail recursion](https://www.erlang.org/doc/system/ref_man_functions.html#tail-recursion).
-- GenServer as "a process like any other Elixir process" with "a standard set of interface functions" and tracing: [GenServer](https://hexdocs.pm/elixir/1.19.5/GenServer.html). `GenServer.call` passing the request to `:gen.call` with the label `:"$gen_call"` and a default timeout of 5,000: [gen_server.ex at v1.19.5](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1108-L1146). `cast` returning `:ok` whether or not the server exists: [L1149–L1161](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L1149-L1161). `handle_info` handling "all other messages": [L650–L656](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L650-L656). `code_change`: [L749–L760](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L749-L760). The bottleneck warning: [L380–L396](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/lib/gen_server.ex#L381-L396). `child_spec/1` and the `:sys` functions: [Debugging with the :sys module](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-debugging-with-the-sys-module) and [How to supervise](https://hexdocs.pm/elixir/1.19.5/GenServer.html#module-how-to-supervise).
-- The server loop taking the oldest message and dispatching `'$gen_call'` to `handle_call`: [gen_server.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2320-L2326) and [L2498–L2518](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen_server.erl#L2498-L2518). `do_call`: [gen.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L231-L281); the reply sent to the alias: [L549–L554](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/gen.erl#L549-L554). Late replies not received: [`gen_server:call/3`](https://www.erlang.org/doc/apps/stdlib/gen_server.html#call/3).
-- Monitors, `'DOWN'` messages, and `noproc` for a process that didn't exist: [`erlang:monitor/2`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/2). The `{alias, demonitor}` option deactivating the alias "when the monitor is removed": [`erlang:monitor/3`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/3).
-- The fast receive for a reference made just before: page 4's sources.
-- `sys` and system messages: [sys](https://www.erlang.org/doc/apps/stdlib/sys.html).
-- OTP started in 1996 for the AXD301; the AXD301's "carrier-class" non-stop operation; the 2001 snapshot's size and its 191 behaviour instances, 122 of them `gen_server`: Joe Armstrong, [*Making reliable distributed systems in the presence of software errors*](https://erlang.org/download/armstrong_thesis_2003.pdf) (2003), pages 6, 171, and 174 (sections 1.1, 8.2, and 8.3). Aliases "useful in client/server scenarios": [`erlang:monitor/3`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/3). Discord's session and guild processes as GenServers, and nearly five million concurrent users: Stanislav Vishnevskiy, [How Discord Scaled Elixir to 5,000,000 Concurrent Users](https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users) (Discord, 2017).
-- Guild processes falling behind their message queues: the same Discord post, Message Fanout.
-- `PartitionSupervisor`: [its docs](https://hexdocs.pm/elixir/1.19.5/PartitionSupervisor.html). ETS reads "from any processes but writes are still serialized through a single process": Elixir's guide, [Speeding up with ETS](https://github.com/elixir-lang/elixir/blob/v1.19.5/lib/elixir/pages/mix-and-otp/erlang-term-storage.md).
-- Node's `await` and the one thread: page 1's sources. Worker `'error'` and `'exit'` events: Node's [worker_threads docs](https://nodejs.org/api/worker_threads.html#event-error).
+- The scripts and their runs: [nodes.exs](nodes.exs), [down.exs](down.exs), and [remote.mjs](remote.mjs), run 2026-11-17 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- "When we make a fault-tolerant system we need at least two physically separated computers": Joe Armstrong, [*Making reliable distributed systems in the presence of software errors*](https://erlang.org/download/armstrong_thesis_2003.pdf) (2003), pages 40–41 (section 3.1).
+- Nodes, node names, links and monitors being "transparent when pids are used", registered names being local, connections made "the first time the name of another node is used" and "by default transitive", `-connect_all false`, epmd, hidden nodes, cookies (the `.erlang.cookie` file, "does *not* mean cryptographically secure", clear text), and the warning about starting a node without TLS: the Erlang reference manual, [Distributed Erlang](https://www.erlang.org/doc/system/distributed.html). epmd's port, 4369, and messages between nodes sent "using the external term format": [Distribution Protocol](https://www.erlang.org/doc/apps/erts/erl_dist_protocol.html). TLS for distribution: [Using TLS for Erlang Distribution](https://www.erlang.org/doc/apps/ssl/ssl_distribution.html).
+- Signals that "can be lost if the distribution channel goes down", the one ordering guarantee, and senders suspended at the distribution buffer busy limit: the reference manual, [Processes: Delivery of Signals](https://www.erlang.org/doc/system/ref_man_processes.html#delivery-of-signals) and [Blocking Signaling Over Distribution](https://www.erlang.org/doc/system/ref_man_processes.html#blocking-signaling-over-distribution). The limit's default of 1024 kilobytes: [`erl +zdbbl`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+zdbbl).
+- `noconnection` in a `'DOWN'` message, a monitor being "triggered only once", and "If the connection to it is lost, we do not know if it still exists": [`erlang:monitor/2`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/2). Exit signals with reason `noconnection` from links: [`erlang:link/1`](https://www.erlang.org/doc/apps/erts/erlang.html#link/1). A new process getting "the same group leader as the spawning process": [`erlang:group_leader/0`](https://www.erlang.org/doc/apps/erts/erlang.html#group_leader/0).
+- The net tick time, ticks, its default of 60 seconds, detection between 45 and 75 seconds, and a terminating node "detected immediately by the transport protocol"; and nodes connecting automatically "when a message is to be sent to that node": Kernel's [`net_ticktime`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#net_ticktime) and [`dist_auto_connect`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#dist_auto_connect). The 7 seconds allowed for each step of setting up a connection: [`net_setuptime`](https://www.erlang.org/doc/apps/kernel/kernel_app.html#net_setuptime). [`net_kernel:monitor_nodes/1`](https://www.erlang.org/doc/apps/kernel/net_kernel.html#monitor_nodes/1).
+- [`peer`](https://www.erlang.org/doc/apps/stdlib/peer.html), [`erpc`](https://www.erlang.org/doc/apps/kernel/erpc.html), and [`code:load_binary/3`](https://www.erlang.org/doc/apps/kernel/code.html#load_binary/3). `defmodule` returning the module's binary: [`Kernel.defmodule/2`](https://hexdocs.pm/elixir/1.19.5/Kernel.html#defmodule/2). [`Node`](https://hexdocs.pm/elixir/1.19.5/Node.html).
+- Location transparency, a module defined on one node not being available on another, and the trade-offs of distributed systems and databases: Elixir's guide, [Configuration and distribution](https://hexdocs.pm/elixir/1.19.5/config-and-distribution.html).
+- "By default `net.Socket` do not have a timeout" and the `'timeout'` event that doesn't sever the connection: Node's [`socket.setTimeout()`](https://nodejs.org/api/net.html#socketsettimeouttimeout-callback).

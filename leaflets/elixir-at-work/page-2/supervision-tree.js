@@ -1,4 +1,4 @@
-// <supervision-tree>: page 7's widget. The tree from tree.exs: a top
+// <supervision-tree>: Elixir at Work page 2's widget. The tree from tree.exs: a top
 // supervisor with two children, a worker called counter and a second
 // supervisor, Pair, which has three workers of its own, x, y, and z. The
 // reader picks a process and crashes it, lets it finish, or (for a

@@ -1,4 +1,4 @@
-// <beam-demand>: page 8's widget. pipeline.exs slowed down: events arrive
+// <beam-demand>: the GenStage page's widget. pipeline.exs slowed down: events arrive
 // at a producer at a steady rate, and one to three consumers, each taking
 // 2 ms over an event, ask the producer for them. The producer sends a
 // consumer no more than it has asked for; events nobody has asked for wait

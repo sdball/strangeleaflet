@@ -1,16 +1,16 @@
 ---
 tags: elixir, beam, nodejs
 publish: false
-meta_description: A supervisor is page 5's restarter written as a GenServer. It starts processes, restarts them when they crash, and gives up when restarting isn't working, and supervisors of supervisors make a tree.
+meta_description: A supervisor is a restarter written as a GenServer. It starts processes, restarts them when they crash, and gives up when restarting isn't working, and supervisors of supervisors make a tree.
 ---
 
-Page 5 ended with a restarter: a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after three tries. Page 6 was GenServer. A supervisor is both of those at once. It's OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
+[Page 5 of The BEAM at Work](/leaflets/beam-at-work/page-5/) ended with a restarter: a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after three tries. Page 1 was GenServer. A supervisor is both of those at once. It's OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
 
 "Let it crash" only works if something starts the crashed process again. This page is about the thing that does.
 
-## Page 5's worker, supervised
+## The restarter's worker, supervised
 
-Here's page 5's worker again, the one that counts to 5 and fails one time in four, untouched. This time a supervisor starts it instead of the hand-written restarter ([supervised.exs](supervised.exs)):
+Here's that worker again, the one that counts to 5 and fails one time in four, untouched. This time a supervisor starts it instead of the hand-written restarter ([supervised.exs](supervised.exs)):
 
 ```elixir
 # A worker that counts, and fails one time in four
@@ -78,13 +78,13 @@ worker #PID<0.111.0>: 5
 supervisor still running, children: [{Task, :undefined, :worker, [Task]}]
 ```
 
-It behaves like page 5's restarter. Each crash gets a new worker, with a new pid, counting from 1 again. After the fourth crash the supervisor gives up and exits, with the reason `:shutdown`. By default a supervisor allows 3 restarts in 5 seconds, and a fourth inside that window is too many.
+It behaves like the restarter. Each crash gets a new worker, with a new pid, counting from 1 again. After the fourth crash the supervisor gives up and exits, with the reason `:shutdown`. By default a supervisor allows 3 restarts in 5 seconds, and a fourth inside that window is too many.
 
-`restart: :transient` says to restart the worker only if it crashed, as page 5's restarter did. When the worker finishes normally, the supervisor leaves it finished. Unlike the restarter, though, the supervisor doesn't exit when that happens. It keeps running with its child listed and the pid `:undefined`, meaning not running, in case it's asked to start it again.
+`restart: :transient` says to restart the worker only if it crashed, as the restarter did. When the worker finishes normally, the supervisor leaves it finished. Unlike the restarter, though, the supervisor doesn't exit when that happens. It keeps running with its child listed and the pid `:undefined`, meaning not running, in case it's asked to start it again.
 
 ## What a supervisor needs to know
 
-A supervisor starts its children from a *child specification*, a map that says how to start the child and what to do when it exits. Page 6 said `use GenServer` writes a `child_spec/1` function for you. Here's page 6's ticket server, given to a supervisor, along with the spec it wrote ([tickets.exs](tickets.exs)):
+A supervisor starts its children from a *child specification*, a map that says how to start the child and what to do when it exits. Page 1 said `use GenServer` writes a `child_spec/1` function for you. Here's page 1's ticket server, given to a supervisor, along with the spec it wrote ([tickets.exs](tickets.exs)):
 
 ```elixir
 defmodule Tickets do
@@ -127,7 +127,7 @@ bought 3, added 5: Tickets is #PID<0.109.0>, 12 left
 added "5": Tickets is #PID<0.110.0>, 10 left
 ```
 
-`{Tickets, 10}` in the list of children means "ask `Tickets` for its child spec, passing 10". The spec has an `id` the supervisor knows the child by, and a `start`: a module, a function, and its arguments. To start the child, the supervisor calls `Tickets.start_link(10)`. It's `start_link` and not page 6's `start` because the server has to be linked to the supervisor, so the supervisor gets its `{:EXIT, ...}` message when it dies. Anything the spec leaves out has a default:
+`{Tickets, 10}` in the list of children means "ask `Tickets` for its child spec, passing 10". The spec has an `id` the supervisor knows the child by, and a `start`: a module, a function, and its arguments. To start the child, the supervisor calls `Tickets.start_link(10)`. It's `start_link` and not page 1's `start` because the server has to be linked to the supervisor, so the supervisor gets its `{:EXIT, ...}` message when it dies. Anything the spec leaves out has a default:
 
 - `restart: :permanent`: always restart it. The other choices are `:transient`, restart it only if it crashed, and `:temporary`, never restart it.
 - `shutdown: 5000`: when the supervisor stops it, how many milliseconds to give it before killing it.
@@ -135,7 +135,7 @@ added "5": Tickets is #PID<0.110.0>, 10 left
 
 Then a bad request crashed the server. `left + "5"` raises an error, so `handle_cast` never returned, and the server died. The supervisor started a new one at once, and the next call worked. Nobody else had to know anything had happened. The new server has a new pid, but callers don't hold the pid; they use the name `Tickets`, which the new server registered as it started. A name is how a process that's restarted stays findable.
 
-It has 10 tickets, not 12. As page 5 said, a restart can only bring a process back to how it started, and how it started is whatever `init/1` returns. The 3 sold and the 5 added were lost along with the request that crashed it. Losing the bad request is the point. Losing the good state with it is the price.
+It has 10 tickets, not 12. As The BEAM at Work's page 5 said, a restart can only bring a process back to how it started, and how it started is whatever `init/1` returns. The 3 sold and the 5 added were lost along with the request that crashed it. Losing the bad request is the point. Losing the good state with it is the price.
 
 ## When one child dies
 
@@ -229,7 +229,7 @@ stopping the supervisor:
 
 Armstrong's thesis describes the first two as "OR" and "AND" supervisors: "AND supervision is used for dependent, or co-ordinated processes", and in an OR tree "the failure of one child has no consequence for the other children".
 
-The run also shows the order. A supervisor starts its children in the order they're listed, each one's `init/1` finishing before the next starts, and stops them in reverse. Stopping a child is page 5's `Process.exit(pid, :shutdown)`. A child that isn't trapping exits dies of it at once. One that is trapping exits, like these, gets to run its `terminate/2` callback and clean up, and the supervisor waits for it, 5 seconds by default, before sending `:kill`.
+The run also shows the order. A supervisor starts its children in the order they're listed, each one's `init/1` finishing before the next starts, and stops them in reverse. Stopping a child is the `Process.exit(pid, :shutdown)` from The BEAM at Work's page 5. A child that isn't trapping exits dies of it at once. One that is trapping exits, like these, gets to run its `terminate/2` callback and clean up, and the supervisor waits for it, 5 seconds by default, before sending `:kill`.
 
 ## Too many restarts
 
@@ -310,7 +310,7 @@ $ elixir intensity.exs
 
 Four crashes in 300 ms were one too many, and the supervisor stopped trying. Six crashes spread over ten seconds were never more than 3 in any 5, so it restarted the worker every time and would go on doing so.
 
-The limit is there for page 5's reason: a worker that fails because of something passing will probably work the next time, and one that fails because of a bug will fail every time. The OTP docs: "The intention of the restart mechanism is to prevent a situation where a process repeatedly dies for the same reason, only to be restarted again." A supervisor that gives up stops all its children, in reverse order, and then exits with the reason `:shutdown`.
+The limit is there for the restarter's reason: a worker that fails because of something passing will probably work the next time, and one that fails because of a bug will fail every time. The OTP docs: "The intention of the restart mechanism is to prevent a situation where a process repeatedly dies for the same reason, only to be restarted again." A supervisor that gives up stops all its children, in reverse order, and then exits with the reason `:shutdown`.
 
 And that exit goes somewhere, because a supervisor is a process like any other, linked to whatever started it.
 
@@ -385,13 +385,13 @@ That's how a supervision tree handles a failure. It's tried as close to where it
 
 The OTP docs point out that the tries multiply as they go up. If each level allows 10 restarts, "a crashing child below that level will be restarted 100 times, which is probably excessive."
 
-At the top of every Elixir program is a supervisor. An application's `start/2` callback starts its supervision tree, and Elixir's docs say it "has to spawn and link a supervisor". If that top supervisor gives up, the application stops. In a release, a program packaged by Mix to be deployed, applications are started `:permanent` by default, which means "the node shuts down if the application terminates". At that point the whole BEAM exits, and as page 5 said, something outside it has to start it again.
+At the top of every Elixir program is a supervisor. An application's `start/2` callback starts its supervision tree, and Elixir's docs say it "has to spawn and link a supervisor". If that top supervisor gives up, the application stops. In a release, a program packaged by Mix to be deployed, applications are started `:permanent` by default, which means "the node shuts down if the application terminates". At that point the whole BEAM exits, and as The BEAM at Work's page 5 said, something outside it has to start it again.
 
 ## And in Node?
 
 The closest thing to a supervisor in Node's standard library is the `cluster` module, which runs copies of a program in separate processes. Its docs are clear that the restarting is up to you: "Node.js does not automatically manage the number of workers, however. It is the application's responsibility to manage the worker pool based on its own needs." Their example restarts a worker every time it exits, with no limit.
 
-Here's supervised.exs again in Node, with worker threads, page 5's closest thing to BEAM processes, and the supervisor written by hand, giving up after more than 3 restarts in 5 seconds ([supervise.mjs](supervise.mjs)):
+Here's supervised.exs again in Node, with worker threads, Node's closest thing to BEAM processes, and the supervisor written by hand, giving up after more than 3 restarts in 5 seconds ([supervise.mjs](supervise.mjs)):
 
 ```javascript
 const work = `
@@ -466,7 +466,7 @@ exit code 0
 
 The threads don't print their crashes, but each new thread id is a restart. When it gives up, it ends the whole program with an error code, for an outside monitor to restart, which is what a release does when its top supervisor gives up.
 
-That's about twenty lines, and it works. It's also one strategy for one child. The rest of what a supervisor does is yours to write: several children, and what one dying means for the others; starting them in order and stopping them in reverse, waiting a while for each and then forcing it; a way for the rest of the program to find the new worker, since anything holding the old `Worker` object is holding a dead thread; and supervisors of supervisors. And page 2's measurements still apply. A worker thread is about 9 MB and a BEAM process about 2.6 KB, so a Node program supervises a few threads where an Elixir program can supervise a process for every connection.
+That's about twenty lines, and it works. It's also one strategy for one child. The rest of what a supervisor does is yours to write: several children, and what one dying means for the others; starting them in order and stopping them in reverse, waiting a while for each and then forcing it; a way for the rest of the program to find the new worker, since anything holding the old `Worker` object is holding a dead thread; and supervisors of supervisors. And The BEAM at Work's page 2 measurements still apply. A worker thread is about 9 MB and a BEAM process about 2.6 KB, so a Node program supervises a few threads where an Elixir program can supervise a process for every connection.
 
 ## Watch it happen
 
@@ -508,4 +508,4 @@ Starting is serialized too. A supervisor starts its children one at a time, and 
 - "The intention of the restart mechanism is to prevent a situation where a process repeatedly dies for the same reason", a supervisor that gives up terminating its children and then itself with the reason `shutdown`, the next supervisor up restarting it or terminating itself, and restart limits multiplying across levels: the OTP design principles, [Supervisor Behaviour](https://www.erlang.org/doc/system/sup_princ.html#maximum-restart-intensity).
 - OR and AND supervisors, and "Supervision trees are trees of Supervisors": Joe Armstrong, [*Making reliable distributed systems in the presence of software errors*](https://erlang.org/download/armstrong_thesis_2003.pdf) (2003), pages 118–123 (section 5.2). The AXD301's supervision tree of 141 nodes: page 174 (section 8.3.1).
 - An application's `start/2` callback having to "spawn and link a supervisor": Elixir's [Application docs](https://hexdocs.pm/elixir/1.19.5/Application.html). A permanent application terminating taking "the entire Erlang node" with it: [`application:start/2`](https://www.erlang.org/doc/apps/kernel/application.html#start/2). Releases starting applications `:permanent` by default: [`mix release`, Options](https://hexdocs.pm/mix/1.19.5/Mix.Tasks.Release.html#module-options).
-- Node not managing the number of workers, and restarting one from the `'exit'` event: Node's [cluster docs](https://nodejs.org/api/cluster.html). Worker threads and their `'exit'` event: page 5's sources. A worker thread's memory: page 2.
+- Node not managing the number of workers, and restarting one from the `'exit'` event: Node's [cluster docs](https://nodejs.org/api/cluster.html). Worker threads and their `'exit'` event: the sources of The BEAM at Work's page 5. A worker thread's memory: The BEAM at Work's page 2.

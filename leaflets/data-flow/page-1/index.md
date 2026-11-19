@@ -4,6 +4,8 @@ publish: false
 meta_description: GenStage is a designed answer to page 4's slow consumer problem. With GenStage consumers ask for events and producers respond. Backpressure is an inherent part of the data flow design.
 ---
 
+<!-- Parked 2026-11-19: this was page 8 of The BEAM at Work. Its "page N" references are to The BEAM at Work as it was then (page 1 scheduling, page 4 messages and the slow consumer, page 6 GenServer, now Elixir at Work's page 1). Fix them when this leaflet is planned. -->
+
 Page 4 ended with a producer sending faster than its consumer could keep up, and two potential answers. Send and move on or wait for each reply. If we send and move on then the consumer's mailbox can grow without bound if it's unable to keep up. Wait for each reply and there's only ever one message moving at a time and the consumer is idle while it waits for more messages.
 
 GenStage is a data flow designed to comprehensively address the slow consumer. With GenStage consumers ask for events and producers respond. Backpressure is an inherent part of the data flow design.
