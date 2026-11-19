@@ -195,6 +195,20 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     font-variant-numeric: tabular-nums;
     color: var(--ink);
   }
+  /* What the job is and what to watch, so the replay reads on its own */
+  beam-heaps .intro {
+    margin: 0 0 .75rem;
+  }
+  beam-heaps .intro-title {
+    margin: 0;
+    font-family: var(--type);
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  beam-heaps .intro-text {
+    margin: .3rem 0 0;
+    font-size: .95rem;
+  }
   beam-heaps .note {
     margin: .6rem 0 0;
     font-size: .9rem;
@@ -552,6 +566,10 @@ customElements.define("beam-heaps", class extends HTMLElement {
     const waited = `<p class="waited"><span>the longest a tick has waited so far</span><output></output></p>`;
 
     this.innerHTML = `
+      <div class="intro">
+        <p class="intro-title">Who waits while the garbage is collected?</p>
+        <p class="intro-text">One builder makes a list of 10 million pairs and keeps all of it, so the garbage collector has a lot to go through. Meanwhile three tickers try to tick every 10 ms. The same job ran in the BEAM and in Node. Watch the tickers' strips whenever a collection runs.</p>
+      </div>
       <div class="controls">
         <button type="button" class="play"></button>
         <button type="button" class="step">Step</button>
@@ -565,7 +583,7 @@ customElements.define("beam-heaps", class extends HTMLElement {
         <input type="range" min="0" max="${this.end}" step="${STEP}" value="0">
         <output></output>
       </label>
-      <p class="note">A replay of two real runs, slowed down: <a href="record-gc.exs">record-gc.exs</a> on ${beam.versions} with ${beam.schedulers} schedulers, and <a href="record-gc.mjs">record-gc.mjs</a> on ${node.versions}, on the same M1. Each builds a list of 10 million pairs, starting half a second in, while three tickers tick every 10 ms.</p>
+      <p class="note">A replay of two real runs, slowed down: <a href="record-gc.exs">record-gc.exs</a> on ${beam.versions} with ${beam.schedulers} schedulers, and <a href="record-gc.mjs">record-gc.mjs</a> on ${node.versions}, on the same M1. The builders start half a second in.</p>
 
       <div class="sides">
       <section class="side beam-side" aria-label="BEAM">
@@ -611,7 +629,7 @@ customElements.define("beam-heaps", class extends HTMLElement {
 
       <section class="side short" aria-label="Short-lived processes">
         <p class="side-title">Processes that never collect</p>
-        <p class="side-note">Like die-young.exs: each sums a list of 50 numbers in its 233-word heap and exits. Not to scale: each really lives a few microseconds.</p>
+        <p class="side-note">Each one sums a list of 50 numbers, which fits in a new process's first heap of 233 words, and exits before the heap fills. Not to scale: each really lives a few microseconds.</p>
         <button type="button" class="spawn">Spawn ${SHORT_BATCH} short-lived processes</button>
         <div class="tiles" aria-hidden="true"></div>
         <p class="short-count" aria-live="polite"></p>

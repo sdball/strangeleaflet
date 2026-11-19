@@ -8,7 +8,7 @@ Elixir data is immutable: it cannot be changed. Add an item to a list and you ge
 
 Every garbage collector has the same problem. To tell what's garbage, it has to look at what the program is using, and that's hard to do while the program keeps changing it. So collectors stop the program, at least for a moment. The interesting question is: stop *what*, exactly?
 
-Here are two real runs, replayed side by side and slowed down. In each, a builder makes a list of 10 million pairs and keeps all of it, while three tickers try to tick every 10 ms, once in the BEAM and once in Node. Watch the tickers' strips whenever a collection starts.
+Here's a job that gives the collector a lot to do, replayed from real runs in the BEAM and in Node.
 
 <beam-heaps>
 
