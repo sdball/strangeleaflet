@@ -1,12 +1,167 @@
 ---
 tags: elixir, beam, nodejs
 publish: false
-meta_description: What the BEAM doesn't do for you. A mailbox has no limit and a send never waits, so a process that can't keep up just falls further behind.
+meta_description: Where the BEAM doesn't help. Native code it calls can hold a scheduler the way a busy loop holds Node's thread, native code is faster at raw number crunching, and a mailbox has no limit.
 ---
 
-<!-- Draft, started 2026-11-19 with the slow consumer moved from page 4. Still to come, from todo/beam-elixir-split.md: the opening widget (page 1's with a NIF busy loop, if there's an honest real run, otherwise this section's), a huge heap being slow to collect (page 3's promise), raw speed (measure first: in page 1's runs fib(40) was 0.8 s in the BEAM and 1.04 s in Node), and what Node needs to match the BEAM (the old page 12 findings). -->
+<!-- Draft. Done: the opener, native code, raw speed, and the slow consumer (moved from page 4). Still to come, from todo/beam-elixir-split.md: one huge heap being slow to collect, and what Elixir programs do instead (page 3's promise); what Node needs to match the BEAM, from the old page 12 findings (worker threads for page 1's ticker, page 2's promise; a steady ticker for page 1's drifting intervals, page 1's promise). -->
 
-The pages so far have been about what the BEAM does that Node can't. This one is about what it doesn't do for you.
+The pages so far have been about what the BEAM does that Node can't. This one is about where it doesn't help, starting with page 1's busy loop, written in C.
+
+<native-code>
+
+![The simulation just after the busy loops, four lanes. BEAM, the busy loop in Elixir: the strip has even ticks right through the shaded stretch where the busy loop ran. Took 0.78 s, and the ticker kept ticking. BEAM, the busy loop in C, as a NIF: a short shaded stretch with no ticks in it, then four red late ticks at once at its end, marked ×4. Took 0.31 s, and the ticker stopped. Its missed ticks all came at once. BEAM, the same NIF, marked dirty: even ticks through its short shaded stretch. Took 0.31 s on a dirty scheduler, and the ticker kept ticking. Node, the busy loop in JavaScript: a long shaded stretch with no ticks, then one red late tick. Took 1.00 s, and the ticker stopped. One late tick; the rest skipped.](native-code.webp)
+
+*The live version of this needs JavaScript. In it, you can start page 1's busy loop in Elixir, in C as a NIF and as a dirty NIF, and in Node, and watch each one's ticker.*
+
+</native-code>
+
+<script type="module" src="native-code.js"></script>
+
+Written in C, the busy loop was two and a half times as fast as in Elixir, and it stopped the BEAM's ticker as completely as Node's busy loop stopped Node's. Everything page 1 said about preemption is about code the BEAM runs itself. Code it calls out to, in C or Rust or anything else compiled to native code, runs until it returns, and the scheduler running it can't take it back. Marked dirty, the same C code ran just as fast, somewhere the ticker didn't need.
+
+## Native code
+
+A NIF is a native implemented function: a function written in C, or in another language compiled to native code, that's "called like any other functions without any difference to the caller". Here's page 1's `fib` as one, twice: once ordinary, and once marked as dirty CPU-bound work ([fib_nif.c](fib_nif.c)):
+
+```c
+#include <erl_nif.h>
+
+static long fib(int n) {
+  return n < 2 ? n : fib(n - 1) + fib(n - 2);
+}
+
+static ERL_NIF_TERM fib_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+  int n;
+  if (!enif_get_int(env, argv[0], &n)) return enif_make_badarg(env);
+  return enif_make_long(env, fib(n));
+}
+
+static ErlNifFunc funcs[] = {
+  {"fib", 1, fib_nif, 0},
+  {"dirty_fib", 1, fib_nif, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+};
+
+ERL_NIF_INIT(Elixir.Fib, funcs, NULL, NULL, NULL, NULL)
+```
+
+And here's page 1's ticker experiment again, with the busy loop calling one of them. The script compiles the C first, then loads it into a module whose functions it replaces ([nif.exs](nif.exs)):
+
+```elixir
+include = Path.join([:code.root_dir(), "usr", "include"])
+{_, 0} = System.cmd("cc", ~w(-O2 -shared -undefined dynamic_lookup -I #{include} -o fib_nif.so fib_nif.c))
+
+defmodule Fib do
+  @on_load :load
+  def load, do: :erlang.load_nif(~c"./fib_nif", 0)
+  def fib(_n), do: :erlang.nif_error(:not_loaded)
+  def dirty_fib(_n), do: :erlang.nif_error(:not_loaded)
+end
+
+# ...then page 1's ticker, and at 350 ms a process that calls
+# Fib.fib(44) or Fib.dirty_fib(44)
+```
+
+It's `fib(44)` here, because in C `fib(40)` is over too quickly to see much. With one scheduler, as in page 1's `+S 1` run:
+
+```text
+$ elixir --erl "+S 1" nif.exs fib
+   0 ms  schedulers online: 1, dirty CPU schedulers: 1
+ 102 ms  tick 1 (1 due)
+ 202 ms  tick 2 (2 due)
+ 302 ms  tick 3 (3 due)
+ 351 ms  busy loop starts: fib(44), in C
+2496 ms  busy loop ends
+2496 ms  tick 4 (24 due)
+2497 ms  tick 5 (24 due)
+2497 ms  tick 6 (24 due)
+2497 ms  tick 7 (24 due)
+2497 ms  tick 8 (24 due)
+2497 ms  tick 9 (24 due)
+2497 ms  tick 10 (24 due)
+2497 ms  tick 11 (24 due)
+2497 ms  tick 12 (24 due)
+2497 ms  tick 13 (24 due)
+2497 ms  tick 14 (24 due)
+2497 ms  tick 15 (24 due)
+2497 ms  tick 16 (24 due)
+2497 ms  tick 17 (24 due)
+2497 ms  tick 18 (24 due)
+2497 ms  tick 19 (24 due)
+2497 ms  tick 20 (24 due)
+2497 ms  tick 21 (24 due)
+2497 ms  tick 22 (24 due)
+2497 ms  tick 23 (24 due)
+2497 ms  tick 24 (24 due)
+2502 ms  tick 25 (25 due)
+2602 ms  tick 26 (26 due)
+2702 ms  tick 27 (27 due)
+2820 ms  tick 28 (28 due)
+```
+
+For two seconds, nothing: the same silence as Node's on page 1. Then the BEAM's difference shows in a different way. Every tick that came due was delivered once the scheduler was free, all twenty of them in a millisecond, and the ticker went back to its beat. None were skipped, as they were in Node. They were just very late.
+
+The same function, marked dirty:
+
+```text
+$ elixir --erl "+S 1" nif.exs dirty_fib
+   0 ms  schedulers online: 1, dirty CPU schedulers: 1
+ 102 ms  tick 1 (1 due)
+ 202 ms  tick 2 (2 due)
+ 302 ms  tick 3 (3 due)
+ 351 ms  busy loop starts: dirty_fib(44), in C
+ 402 ms  tick 4 (4 due)
+ 502 ms  tick 5 (5 due)
+ 602 ms  tick 6 (6 due)
+ 702 ms  tick 7 (7 due)
+ 802 ms  tick 8 (8 due)
+ 902 ms  tick 9 (9 due)
+1002 ms  tick 10 (10 due)
+1102 ms  tick 11 (11 due)
+1202 ms  tick 12 (12 due)
+1302 ms  tick 13 (13 due)
+1402 ms  tick 14 (14 due)
+1502 ms  tick 15 (15 due)
+1602 ms  tick 16 (16 due)
+1702 ms  tick 17 (17 due)
+1802 ms  tick 18 (18 due)
+1902 ms  tick 19 (19 due)
+2002 ms  tick 20 (20 due)
+2102 ms  tick 21 (21 due)
+2202 ms  tick 22 (22 due)
+2302 ms  tick 23 (23 due)
+2402 ms  tick 24 (24 due)
+2502 ms  tick 25 (25 due)
+2545 ms  busy loop ends
+2602 ms  tick 26 (26 due)
+2702 ms  tick 27 (27 due)
+2802 ms  tick 28 (28 due)
+```
+
+Every tick on time. A dirty NIF runs on one of the dirty schedulers page 2 counted among the BEAM's threads, not on the scheduler that runs the ticker.
+
+More schedulers don't make the ordinary NIF safe. With all eight, in another run, the ticker still went quiet from the moment the NIF started at 351 ms until it returned at 2561 ms, and then printed tick 4 with 25 due. The dirty one, with eight, ticked on time throughout.
+
+The NIF docs are direct about all of this. They start with a warning: "The VM _cannot_ provide the same services as provided when executing Erlang code, such as pre-emptive scheduling or memory protection. If the native function does not behave well, the whole VM will misbehave." Then: "A native function that crashes will crash the whole VM", which is page 5's isolation gone too. And a native function should "return to its caller within 1 millisecond". Work that can't be split up that small "is called a 'dirty NIF'", and runs "on a separate set of schedulers called dirty schedulers", which is what `ERL_NIF_DIRTY_JOB_CPU_BOUND` asks for.
+
+Most Elixir programmers never write a NIF, but they may well call one. Erlang's own `crypto` module, for one, loads a NIF library when it starts, and its functions are native code. Wherever there's a NIF, the BEAM's guarantees stop at its edge.
+
+## Raw speed
+
+Why use native code at all? Because it's fast. Here's `fib(40)` timed on its own, in Elixir and as the NIFs above ([speed.exs](speed.exs)), and in Node ([speed.mjs](speed.mjs)):
+
+```text
+$ elixir speed.exs
+fib(40): Elixir 780 ms, C NIF 309 ms, dirty C NIF 310 ms
+fib(40): Elixir 780 ms, C NIF 309 ms, dirty C NIF 310 ms
+fib(40): Elixir 780 ms, C NIF 309 ms, dirty C NIF 309 ms
+$ node speed.mjs
+fib(40): Node 1006 ms
+fib(40): Node 1008 ms
+fib(40): Node 1004 ms
+```
+
+For this one job, the BEAM wasn't slower than Node: 0.78 s against 1.0. One recursive function is a small sample, and other work will come out differently, so I wouldn't stretch that into a claim about speed in general. What it does show is where the speed is. C did the same work in 0.31 s, two and a half times as fast as either. The BEAM's way to that speed is native code, and native code is outside the BEAM's preemption and its isolation. A dirty NIF keeps the scheduler free, but a crash in it is still a crash of the whole VM.
 
 ## When messages come in faster than they go out
 
@@ -142,7 +297,8 @@ One message at a time is the simplest kind of backpressure. It also means the co
 
 ## Sources
 
-- The scripts and their runs: [slow-consumer.exs](slow-consumer.exs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [fib_nif.c](fib_nif.c), [nif.exs](nif.exs), [speed.exs](speed.exs), and [speed.mjs](speed.mjs), run 2026-11-19 (the C compiled with Apple clang 17.0.0), and [slow-consumer.exs](slow-consumer.exs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12, all on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. The eight-scheduler runs of nif.exs: `elixir nif.exs fib` and `elixir nif.exs dirty_fib`, same machine and versions.
+- NIFs, the warning that the VM "_cannot_ provide the same services as provided when executing Erlang code, such as pre-emptive scheduling or memory protection", "A native function that crashes will crash the whole VM", returning "within 1 millisecond", dirty NIFs and dirty schedulers, and `ERL_NIF_DIRTY_JOB_CPU_BOUND`: the [erl_nif docs](https://www.erlang.org/doc/apps/erts/erl_nif.html) ([erl_nif.md at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/doc/references/erl_nif.md), the warning at L36–L50, long-running and dirty NIFs at L389–L446). NIFs "called like any other functions without any difference to the caller": the same docs, L28–L32. Loading a NIF library: [`erlang:load_nif/2`](https://www.erlang.org/doc/apps/erts/erlang.html#load_nif/2). `crypto` loading its NIF library: `-on_load` and `erlang:load_nif/2` in [crypto.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/crypto/src/crypto.erl#L3712-L3748).
 - The steps of a send, messages waiting counted as live by the collector, and a backed-up receiver using more memory: *The BEAM Book*, [The Process of Sending a Message to a Process](https://blog.stenmans.org/theBeamBook/#_the_process_of_sending_a_message_to_a_process) and [Tuning Message Passing](https://blog.stenmans.org/theBeamBook/#_tuning_message_passing).
 - `message_queue_data`, `off_heap` keeping messages out of collections, and the recommendation for processes that may pile up messages: [`process_flag/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_flag_message_queue_data). `message_queue_len`: [`process_info/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_info/2).
 - `GenServer.cast` not waiting: [GenServer.cast/2](https://hexdocs.pm/elixir/1.19.5/GenServer.html#cast/2).
