@@ -6,6 +6,20 @@ meta_description: What a BEAM process is (not an operating system process), what
 
 Page 1 had two processes, a ticker and a busy loop. Real Elixir programs run thousands. Cowboy, a web server Erlang and Elixir apps use, starts a process for every connection and another for every request. That only works if a process costs next to nothing. This page is about how little, and why.
 
+Here's page 1's three tickers and busy loop again, with a crowd of connections waiting alongside them, held three ways: a BEAM process each, a Node async function each, and a Node worker thread each. Pick how many, then add a busy loop.
+
+<how-many>
+
+![The simulation with 100 connections, just after the busy loop. BEAM, a process each: 270 KB of this M1's 8 GB, a sliver of the bar, and its three tickers' strips kept their even ticks right through the shaded stretch where the busy loop ran. The tickers kept ticking through the busy loop. Node, an async function each: 66 KB, but its three strips have a gap where the busy loop ran, then one late tick each in red. The tickers stopped while the busy loop ran. Node, a worker thread each: 960 MB, an eighth of the bar, and its strips kept ticking through the busy loop.](how-many.webp)
+
+*The live version of this needs JavaScript. In it, you can pick from 10 to a million connections, add a busy loop, and watch what each way of holding them costs and does.*
+
+</how-many>
+
+<script type="module" src="how-many.js"></script>
+
+Only the BEAM manages both. Node's async functions are cheaper than BEAM processes, but they share one thread, so the busy loop stops every ticker, as on page 1. A worker thread each keeps the tickers going, but at about 9 MB a worker, a thousand of them take more memory than this machine has. A million BEAM processes take about 2.5 GB, and none of them can hold up the rest. The rest of this page is about what a BEAM process is, what it costs, and where the BEAM runs it.
+
 ## Not that kind of process
 
 First, the word. To most programmers a process is what `ps` or Activity Monitor lists: a running program with its own process id, its own memory that the operating system keeps other programs out of, and the operating system deciding when it gets a core.
@@ -174,6 +188,29 @@ $ for i in 1 2 3; do node --expose-gc worker-cost.mjs; done
 
 Each one took 5 to 9 ms to start, and about 9.5 MB.
 
+That's eight. Start a few hundred and RSS stops being a good measure on this M1, which has 8 GB: at 500 it said 1.5 to 2.9 MB each. RSS, the resident set size, counts only what's in memory at that moment, and by then the workers' memory wasn't all there; macOS had swapped some of it out. `vmmap`'s physical footprint counts what the process has written to, whether it's resident or not. Here's the same script, measuring that instead ([worker-footprint.mjs](worker-footprint.mjs)):
+
+```javascript
+// vmmap's "Physical footprint" for this whole process, in MB
+const footprint = () => {
+  const out = execFileSync("vmmap", ["-summary", String(process.pid)], { encoding: "utf8", maxBuffer: 1 << 26 });
+  const line = out.split("\n").find((l) => l.startsWith("Physical footprint:"));
+  const [, n, unit] = line.match(/([\d.]+)([KMG])/);
+  return Number(n) * { K: 1 / 1024, M: 1, G: 1024 }[unit];
+};
+// ...then as in worker-cost.mjs: footprint() before, start N workers, footprint() after
+```
+
+```text
+$ for n in 8 100 300 500; do node --expose-gc worker-footprint.mjs $n; done
+8 idle workers: 10.1 MB of physical footprint each (0.09 GB in all), 9.7 MB of RSS each
+100 idle workers: 9.6 MB of physical footprint each (0.95 GB in all), 9.0 MB of RSS each
+300 idle workers: 9.2 MB of physical footprint each (2.70 GB in all), 8.5 MB of RSS each
+500 idle workers: 9.0 MB of physical footprint each (4.40 GB in all), 1.5 MB of RSS each
+```
+
+About 9 MB a worker, however many: 500 idle workers took 4.4 GB, more than half of this machine. A thousand would take more than all of it. (I stopped at 500.)
+
 If you want something that waits cheaply for a message, that's an async function paused on a promise. It's the shape a Node server's request handlers take while they wait on a database or the network. And it's cheaper than a BEAM process. Here's the spawn script above, done in Node with N async functions that each wait on a promise ([pending.mjs](pending.mjs)):
 
 ```javascript
@@ -296,7 +333,7 @@ schedulers online: 8
 
 Before the busy loop started, all six tickers ran on one scheduler. Once it started, the BEAM settled on two of its eight schedulers, with a few stray turns elsewhere. For a second the busy loop and the tickers happened to split up, one scheduler each, and then they mixed again. In three runs the shape was the same: a couple of schedulers, shared.
 
-## Watch it happen
+## Watch the schedulers share them out
 
 Here's the sixteen busy processes from spread.exs as a simulation, slowed way down. Each row is a scheduler: the process it's running, then its run queue.
 
@@ -318,7 +355,8 @@ The simulation's migration is simpler than the real one. It checks the loads eve
 
 ## Sources
 
-- The scripts and their runs: [os-view.exs](os-view.exs), [spawn.exs](spawn.exs), [spread.exs](spread.exs), [pending.mjs](pending.mjs), and [worker-cost.mjs](worker-cost.mjs), run 2026-11-12 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. The operating system process figures: `for i in {1..1000}; do /usr/bin/true; done` under `time` in zsh (1.43 to 1.44 seconds in three runs), and `vmmap -summary` on a running `sleep 60`, its DIRTY column grouped for the scale bar (the same in two runs; macOS 26.3.1).
+- The scripts and their runs: [os-view.exs](os-view.exs), [spawn.exs](spawn.exs), [spread.exs](spread.exs), [pending.mjs](pending.mjs), and [worker-cost.mjs](worker-cost.mjs), run 2026-11-12, and [worker-footprint.mjs](worker-footprint.mjs), run 2026-11-19, on an Apple M1 (8 cores, 8 GB) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. RSS undercounting under memory pressure: worker-cost.mjs with 500 workers said 2.2 and 2.9 MB each in two runs on 2026-11-19, against 8.2 and 8.3 MB with 100.
+- `vmmap` counting written memory whether resident or swapped ("Dirty and swapped are memory which has been written to by the process"): the `vmmap(1)` man page on macOS 26.3.1. A footprint being "the dirty and compressed segments", and vmmap's swapped column being compressed memory: Apple, [iOS Memory Deep Dive](https://developer.apple.com/videos/play/wwdc2018/416/) (WWDC 2018). That talk is about iOS; I haven't found Apple saying the same for macOS in so many words. The operating system process figures: `for i in {1..1000}; do /usr/bin/true; done` under `time` in zsh (1.43 to 1.44 seconds in three runs), and `vmmap -summary` on a running `sleep 60`, its DIRTY column grouped for the scale bar (the same in two runs; macOS 26.3.1).
 - Schedulers running in "separate OS threads", the BEAM using "several OS threads to indirectly execute Erlang processes", and the operating system deciding which cores those threads run on: *The BEAM Book*, [Scheduling](https://blog.stenmans.org/theBeamBook/#_scheduling), [Concurrency, Parallelism, and Preemptive Multitasking](https://blog.stenmans.org/theBeamBook/#_concurrency_parallelism_and_preemptive_multitasking), and [Load Balancing](https://blog.stenmans.org/theBeamBook/#_load_balancing).
 - Scheduler, dirty CPU scheduler, and dirty I/O scheduler threads, and their defaults: the [erl command docs](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+S) for `+S`, [`+SDcpu`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+SDcpu), and [`+SDio`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+SDio). The default process limit of 1,048,576 and the `+P` flag: [`+P`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+P).
 - The heap including the stack, and a process's memory including "call stack, heap, and internal structures": `heap_size` and `memory` in [`erlang:process_info/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_info/2).
