@@ -6,7 +6,34 @@ meta_description: How Elixir runs code, and why one busy loop can't stop everyth
 
 Here's a tiny experiment. A ticker prints a line every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math in a CPU-bound loop that takes about a second. Does the ticker keep ticking while the math runs?
 
-Let's ask Node.js first, then Elixir.
+Here it is in Node.js and in the BEAM, the virtual machine that runs Elixir (and Erlang), side by side. It's a simulation, slowed way down, with three tickers instead of one. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs next. Press **Add a busy loop**.
+
+<beam-vs-node>
+
+```text
+A moment from the simulation, one busy loop in each runtime
+
+BEAM, 1 scheduler
+  scheduler 1   running: busy 1 (3,300 of 4,000 reductions left)
+                run queue: ticker C
+  waiting for a tick: ticker A, ticker B
+  output: A tick 1, B tick 1, C tick 1, busy loop 1 starts, A tick 2, B tick 2
+
+Node.js, one thread
+  call stack    running: busy 1 (7,000 to go, no budget)
+                waiting for the stack: tick A, tick B, tick C
+  output: A tick 1, B tick 1, C tick 1, busy loop 1 starts
+```
+
+*The live version of this needs JavaScript. In it, the BEAM's tickers keep ticking between the busy loop's turns, and Node's wait until it's done.*
+
+</beam-vs-node>
+
+<script type="module" src="beam-vs-node.js"></script>
+
+The faint marks on the strips are the ideal: where every tick would land if nothing else wanted the CPU. The numbers at the top of each side score it against that ideal. **Behind now** is ticks that are due but haven't printed yet, **late so far** is ticks that printed late, and **skipped so far** is ticks that will never print.
+
+Node's tickers stop while the busy loop runs, and the BEAM's keep going. The rest of this page is about why. First, the real thing: the same experiment on a real machine, in Node and then in Elixir.
 
 ## The experiment in Node
 
@@ -42,7 +69,7 @@ setTimeout(() => {
 
 ## The same experiment in Elixir
 
-If you don't read Elixir yet, here's the short version. `spawn` starts a **process**: a small, independent piece of running code. It's not an operating system process; it lives inside the BEAM, the virtual machine that runs Elixir (and Erlang). `receive` waits for a message, `send` sends one, `self()` is the current process's own address, and `:timer.send_interval` sends a process the same message over and over.
+If you don't read Elixir yet, here's the short version. `spawn` starts a **process**: a small, independent piece of running code. It's not an operating system process; it lives inside the BEAM. `receive` waits for a message, `send` sends one, `self()` is the current process's own address, and `:timer.send_interval` sends a process the same message over and over.
 
 So the ticker is a process that gets a `:tick` message every 100 ms and prints a line. The busy loop is another process.
 
@@ -94,7 +121,7 @@ receive do
 end
 ```
 
-Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs). You don't need to. The simulation further down shows the same thing in your browser.
+Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs). You don't need to. The simulation above shows the same thing in your browser.
 
 ## What happened
 
@@ -203,38 +230,11 @@ How long is one turn? My busy loop made 331 million calls in about 0.8 seconds, 
 
 One more piece. When a scheduler's run queue is empty, it doesn't sit idle while another scheduler has a line. It steals a process from that line, so work spreads across the cores without you arranging it. With 8 schedulers, the ticker and the busy loop could each have one to themselves.
 
-## Watch it happen
+## Back to the simulation
 
-Ten microseconds is too fast to see, so here's the same workload as a simulation, slowed way down. Three tickers instead of one, so the run queue has something in it. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs next.
-
-Press **Add a busy loop**. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
+Ten microseconds is too fast to see, which is why the simulation at the top of this page is slowed way down. Its three tickers are there so the run queue has something in it. Go back up to it and press **Add a busy loop** again. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
 
 For the closest look, set the speed to **extra slow**, where one turn lasts about ten seconds. Then you can see preemption happen. The scheduler hands the busy loop its 4,000 reductions, counts every one of them down, and sends it to the back of the line, behind any ticker that came due while it ran. The ticker prints its tick, and then the busy loop gets its next turn.
-
-<beam-vs-node>
-
-```text
-A moment from the simulation, one busy loop in each runtime
-
-BEAM, 1 scheduler
-  scheduler 1   running: busy 1 (3,300 of 4,000 reductions left)
-                run queue: ticker C
-  waiting for a tick: ticker A, ticker B
-  output: A tick 1, B tick 1, C tick 1, busy loop 1 starts, A tick 2, B tick 2
-
-Node.js, one thread
-  call stack    running: busy 1 (7,000 to go, no budget)
-                waiting for the stack: tick A, tick B, tick C
-  output: A tick 1, B tick 1, C tick 1, busy loop 1 starts
-```
-
-*The live version of this needs JavaScript. In it, the BEAM's tickers keep ticking between the busy loop's turns, and Node's wait until it's done.*
-
-</beam-vs-node>
-
-<script type="module" src="beam-vs-node.js"></script>
-
-The faint marks on the strips are the ideal: where every tick would land if nothing else wanted the CPU. The numbers at the top of each side score it against that ideal. **Behind now** is ticks that are due but haven't printed yet, **late so far** is ticks that printed late, and **skipped so far** is ticks that will never print.
 
 With one scheduler, even one busy loop makes some of the BEAM's ticks late: a ticker that comes due mid-turn waits for that turn to end. Put three busy loops on one scheduler and both sides fall behind. There's only so much CPU, and preemption can't make more. The difference is what happens to the ticks that came due while they waited.
 
