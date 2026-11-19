@@ -5,14 +5,18 @@
 // short-lived processes at the bottom: every tick, every collection, and
 // every heap size is from the recordings (beam-run.json, node-run.json).
 //
-// The BEAM side shows each process's own heap: the young heap and the old
-// heap, each bar the size of its own block, and its collections. A
-// collection with 128K words or more to go through ran on a dirty CPU
-// scheduler (erl_gc.c, check_for_possibly_long_gc), so the tickers' own
-// scheduler went on running them. The Node side shows V8's one heap, its
-// young and old generations sampled during the run, and the stretches when
-// it was collecting. Each ticker gets a strip: its ticks over the last
-// stretch of the run, with how long each late one waited.
+// It opens page 3, so it leads with what anyone can read: each ticker's
+// strip, and a headline per side, the longest any tick has waited so far
+// (including one still waiting), which climbs while V8 collects and stays
+// at a millisecond or two in the BEAM. The heaps are behind "Show the
+// heaps". With them, the BEAM side shows each process's own heap: the young
+// heap and the old heap, each bar the size of its own block, and its
+// collections. A collection with 128K words or more to go through ran on a
+// dirty CPU scheduler (erl_gc.c, check_for_possibly_long_gc), so the
+// tickers' own scheduler went on running them. The Node side shows V8's one
+// heap, its young and old generations sampled during the run. Each ticker's
+// strip shows its ticks over the last stretch of the run, with how long each
+// late one waited, and the stretches when a collection was running.
 //
 // It holds a static fallback (what feed readers and no-JS visitors see) and
 // replaces it once this module runs. Readers who prefer reduced motion get
@@ -34,6 +38,10 @@ const LOGGED_GC = 5_000; // µs: collections at least this long get a log line
 // Microseconds of the run per millisecond of watching
 const SPEEDS = { "1/40": 25, "1/10": 100, "1/4": 250 };
 const STEP = 5_000; // µs per press of Step
+// Where the replay starts, and Restart goes back to: far enough in that the
+// strips already have ticks on them, and close to the builders starting at
+// 500 ms. The slider still goes back to 0.
+const START = 300_000;
 const LOG_LINES = 7; // tall enough for a few wrapped lines
 
 // The short-lived processes, after die-young.exs: each sums a list of 50
@@ -102,6 +110,28 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   beam-heaps button:disabled {
     cursor: default;
     opacity: .5;
+  }
+  beam-heaps button[aria-pressed=true] {
+    border-color: var(--brass);
+    background: var(--tint);
+  }
+  /* The heaps are there for a closer look, after the page explains them */
+  beam-heaps:not(.show-heaps) :is(.heap, .heap-row, .heap-note, .heap-key) {
+    display: none;
+  }
+  /* The headline: the longest any tick has waited so far */
+  beam-heaps .waited {
+    display: grid;
+    margin: .5rem 0 .4rem;
+    font-family: var(--type);
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  beam-heaps .waited output {
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
   }
   beam-heaps button:focus-visible,
   beam-heaps .choices label:has(:focus-visible),
@@ -519,11 +549,14 @@ customElements.define("beam-heaps", class extends HTMLElement {
         <span>old</span><span class="bar old"><i></i></span><span class="of old-of"></span>
       </div>`;
 
+    const waited = `<p class="waited"><span>the longest a tick has waited so far</span><output></output></p>`;
+
     this.innerHTML = `
       <div class="controls">
         <button type="button" class="play"></button>
         <button type="button" class="step">Step</button>
         <button type="button" class="restart">Restart</button>
+        <button type="button" class="show" aria-pressed="false">Show the heaps</button>
       </div>
       <div class="settings">
         <fieldset class="choices"><legend>Speed</legend>${speeds}</fieldset>
@@ -537,8 +570,9 @@ customElements.define("beam-heaps", class extends HTMLElement {
       <div class="sides">
       <section class="side beam-side" aria-label="BEAM">
         <p class="side-title">BEAM: every process has its own heap</p>
-        <p class="side-note">Each bar is one heap block, drawn the same width whatever its size.</p>
+        <p class="side-note heap-note">Each bar is one heap block, drawn the same width whatever its size.</p>
         <p class="banner beam-banner"><span class="badge" aria-hidden="true">collecting</span>When the builder collects, it's on a dirty CPU scheduler, and the tickers run on.</p>
+        ${waited}
         <div class="who builder">
           <span class="name">builder</span>${states(["waiting", "building", "collecting", "done"])}
           ${heapRows()}
@@ -549,8 +583,9 @@ customElements.define("beam-heaps", class extends HTMLElement {
 
       <section class="side node-side" aria-label="Node">
         <p class="side-title">Node: one heap for all of its JavaScript</p>
-        <p class="side-note">V8's young and old generations, as sampled during the run.</p>
+        <p class="side-note heap-note">V8's young and old generations, as sampled during the run.</p>
         <p class="banner node-banner"><span class="badge" aria-hidden="true">collecting</span>When V8 collects, no JavaScript runs, not even a ticker.</p>
+        ${waited}
         <div class="who heap-row">
           <span class="name">heap</span>
           <div class="heap">
@@ -567,8 +602,8 @@ customElements.define("beam-heaps", class extends HTMLElement {
       </div>
 
       <div class="key" aria-hidden="true">
-        <span style="--swatch: var(--code-string)">young heap in use</span>
-        <span style="--swatch: var(--code-number)">old heap in use</span>
+        <span class="heap-key" style="--swatch: var(--code-string)">young heap in use</span>
+        <span class="heap-key" style="--swatch: var(--code-number)">old heap in use</span>
         <span style="--swatch: color-mix(in srgb, var(--brass) 35%, transparent)">a collection running (the BEAM: the builder's)</span>
         <span style="--swatch: var(--ink)">a tick</span>
         <span style="--swatch: var(--code-error)">a late tick, and how long it waited</span>
@@ -594,11 +629,16 @@ customElements.define("beam-heaps", class extends HTMLElement {
     this.logged = -1;
 
     this.$(".play").addEventListener("click", () => {
-      if (!this.playing && this.t >= this.end) this.seek(0);
+      if (!this.playing && this.t >= this.end) this.seek(START);
       this.setPlaying(!this.playing);
     });
     this.$(".step").addEventListener("click", () => this.seek(this.t + STEP));
-    this.$(".restart").addEventListener("click", () => this.seek(0));
+    this.$(".restart").addEventListener("click", () => this.seek(START));
+    this.$(".show").addEventListener("click", (e) => {
+      const show = !this.classList.contains("show-heaps");
+      this.classList.toggle("show-heaps", show);
+      e.currentTarget.setAttribute("aria-pressed", String(show));
+    });
     this.$(".time input").addEventListener("input", (e) => {
       this.setPlaying(false);
       this.seek(Number(e.target.value));
@@ -617,7 +657,7 @@ customElements.define("beam-heaps", class extends HTMLElement {
     this.observer.observe(this);
 
     this.renderShort();
-    this.seek(0);
+    this.seek(START);
     this.setPlaying(this.playing);
   }
 
@@ -766,6 +806,15 @@ customElements.define("beam-heaps", class extends HTMLElement {
     };
     row("all", happened);
     row("gc", inGc);
+
+    // The headline counts a tick that's still waiting, so it climbs during a pause
+    let longest = 0;
+    for (const [due, late] of tickers.flatMap((tk) => tk.ticks)) {
+      if (due <= this.t) longest = Math.max(longest, Math.min(late, this.t - due));
+    }
+    const output = table.closest(".side").querySelector(".waited output");
+    const text = `${ms(longest)} ms`;
+    if (output.textContent !== text) output.textContent = text;
   }
 
   sampleAt(t) {

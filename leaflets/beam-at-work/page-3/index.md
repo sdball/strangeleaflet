@@ -8,7 +8,19 @@ Elixir data is immutable: it cannot be changed. Add an item to a list and you ge
 
 Every garbage collector has the same problem. To tell what's garbage, it has to look at what the program is using, and that's hard to do while the program keeps changing it. So collectors stop the program, at least for a moment. The interesting question is: stop *what*, exactly?
 
-In Node it's your JavaScript, all of it. In the BEAM it's one process, the one whose garbage it is. This page is about why.
+Here are two real runs, replayed side by side and slowed down. In each, a builder makes a list of 10 million pairs and keeps all of it, while three tickers try to tick every 10 ms, once in the BEAM and once in Node. Watch the tickers' strips whenever a collection starts.
+
+<beam-heaps>
+
+![The replay 640 ms into both runs, side by side. On the BEAM side the collecting badge is lit: when the builder collects, it's on a dirty CPU scheduler, and the tickers run on. The longest a tick has waited so far is 1 ms. The builder is collecting, and the three tickers are ticking, their strips evenly spaced: 189 ticks so far, 39 of them while the builder was collecting, the worst 1 ms late. On the Node side the collecting badge is lit too: when V8 collects, no JavaScript runs, not even a ticker. The longest a tick has waited so far is 40 ms, and climbing: the builder and all three tickers are paused, and each ticker's strip ends in a red bar for a tick that's still waiting.](beam-heaps.webp)
+
+*The live version of this needs JavaScript. In it, you can play the replay or drag through it, show each process's heaps, and spawn short-lived processes that never collect at all.*
+
+</beam-heaps>
+
+<script type="module" src="beam-heaps.js"></script>
+
+In Node, every collection stops the tickers too, and the ticks they owed come out late in a bunch. In the BEAM, the builder spends much longer collecting, and the tickers don't notice. The difference is what a collection stops. In Node it's your JavaScript, all of it. In the BEAM it's one process, the one whose garbage it is. This page is about why.
 
 ## Each process has its own heap
 
@@ -88,6 +100,8 @@ Read it a block at a time. The young heap fills to 216 of its 233 words, and eac
 The sizes go 233, 376, 610, 987, 1598, 2586: each is roughly the two before it added together. That's on purpose. The docs: "first a variation of the Fibonacci sequence is used starting at 233 words. Then at about 1 mega words the heap only grows in 20% increments." Heaps shrink too, when a collection finds them mostly empty.
 
 All of this happened inside one process, on its own memory. Nothing in it touched another process's heap, because nothing can: page 2's table says nothing in Elixir can point at another process's memory. So nothing else had to stop.
+
+The replay at the top shows that for every process at once. Press **Show the heaps**: each BEAM process gets its own young and old heap, filling and collecting on its own, and Node's side gets its one heap.
 
 ## Who waits?
 
@@ -220,6 +234,8 @@ Be fair to V8 here: it's much faster at this job. It spent about a tenth of a se
 
 But look at who waited. In Node the ticks that came due during a collection waited it out, and the worst of them was late by nearly the whole longest pause, every run, because the pause stopped all the JavaScript there was. The rest of the time the ticker was never more than a few milliseconds late. In the BEAM the builder waited a third of a second and nobody else waited at all. In a server, the ticker is every other request. One request building something big in Node makes every request wait for its garbage. In the BEAM it only slows down that one request.
 
+The replay at the top is another run of the same job ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)), with three tickers that make a little garbage every tick, the way a small request would, so their heaps fill and get collected too. Its numbers aren't quite these. In it the BEAM builder's longest collection was 260 ms, and V8's longest pause was 80 ms, where the runs above had 46 to 58.
+
 ## Most processes never collect at all
 
 There's a cheaper way still to deal with garbage: don't collect it. When a process ends, the BEAM frees its heaps whole, garbage and all, without a collection. A process that finishes before its heap fills up never collects once.
@@ -245,23 +261,7 @@ $ for size in 50 100 1000 10000; do elixir die-young.exs $size; done
 
 With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. [children-gcs.exs](children-gcs.exs) runs the same thing while tracing every new process's collections, and it counts zero for the children, at both sizes. The 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
 
-That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
-
-## Watch it happen
-
-Here are both runs again, side by side and slowed down. It's a replay, not a simulation: everything in it comes from recording the real thing ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)). The job is the one above, a builder keeping a list of 10 million pairs, with two changes: three tickers, and they make a little garbage every tick, the way a small request would, so their heaps fill and get collected too. It's a different run, so its numbers aren't quite the ones above. In it the BEAM builder's longest collection was 260 ms, and V8's longest pause was 80 ms, where the runs above had 46 to 58.
-
-On the BEAM side, every process has its own young and old heap. Watch the tickers' heaps fill and collect on their own, and then the builder's long collections, each on a dirty CPU scheduler, while the tickers' strips keep their even rhythm. On the Node side there's one heap. When V8 collects, the builder and all three tickers stop together, and the ticks they owed come out late in a bunch.
-
-<beam-heaps>
-
-![The replay 640 ms into both runs, side by side. On the BEAM side the collecting badge is lit: when the builder collects, it's on a dirty CPU scheduler, and the tickers run on. The builder is collecting, its young heap 19 of 19 MB and its old heap 39 of 47 MB. The three tickers each have their own small heaps, 1.2 of 4.8 KB young and 2.8 of 7.7 KB old, are marked ticking, and their strips show evenly spaced ticks: 189 so far, the worst 1 ms late, 39 of them while the builder was collecting. On the Node side the collecting badge is lit too: when V8 collects, no JavaScript runs, not even a ticker. Its one heap is 207 of 208 MB old. The builder and all three tickers are marked paused, and each ticker's strip ends in a red bar for a tick that's still waiting.](beam-heaps.webp)
-
-*The live version of this needs JavaScript. In it, you can play the replay or drag through it, and spawn short-lived processes that never collect at all.*
-
-</beam-heaps>
-
-<script type="module" src="beam-heaps.js"></script>
+That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once. The replay at the top can spawn some of these: press **Spawn 12 short-lived processes** under it. Each fills a little of its heap and is gone, and none of them collects.
 
 ## Where it gives ground
 
