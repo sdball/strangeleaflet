@@ -394,7 +394,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
         ${radios("schedulers", "BEAM schedulers", [["1", "1"], ["2", "2"], ["4", "4"]], "1")}
         ${radios("speed", "Speed", [["extra-slow", "extra slow"], ["slow", "slow"], ["normal", "normal"], ["fast", "fast"]], "normal")}
       </div>
-      <p class="note">A simulation, slowed way down to watch. Both sides do the same work at the same pace; only the scheduling differs: preemptive in the BEAM, cooperative in Node. Node runs its JavaScript on one thread however many cores you give the BEAM.</p>
+      <p class="note">Both sides do the same work at the same pace; only the scheduling differs: preemptive in the BEAM, cooperative in Node.</p>
       <div class="views">
         <section class="view" data-side="beam" aria-labelledby="${id}-beam">
           <h3 id="${id}-beam">BEAM</h3>
@@ -658,7 +658,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
         : "The tickers still get their turns."}`
       : behind
         ? "Catching up: every tick that waited in a mailbox gets printed."
-        : `${plural(s, "scheduler")}. The tickers tick on the ideal beat.`);
+        : `${plural(s, "scheduler")}. The tickers are ticking on the ideal beat.`);
     this.renderScore(view, side, behind);
   }
 
@@ -708,7 +708,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
       ? `A busy loop has the only thread. ${due ? "The tickers wait for it to finish." : "Nothing else can run."}`
       : side.drifted()
         ? "Ticking again, but off the ideal beat: each interval counts on from its late tick, and the ticks it missed are gone."
-        : "One thread, one callback at a time. The tickers tick on the ideal beat.");
+        : "The tickers are ticking on the ideal beat.");
     this.renderScore(view, side, behind);
   }
 

@@ -4,9 +4,9 @@ publish: false
 meta_description: How Elixir runs code, and why one busy loop can't stop everything else
 ---
 
-Here's a tiny experiment. A ticker prints a line every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math in a CPU-bound loop that takes about a second. Does the ticker keep ticking while the math runs?
+Here's a small simple application. Three tickers tick every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math in a CPU-bound loop that takes about a second. Can the tickers keep ticking while the application is stuck in the loop?
 
-Here it is in Node.js and in the BEAM, the virtual machine that runs Elixir (and Erlang), side by side. It's a simulation, slowed way down, with three tickers instead of one. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs next. Press **Add a busy loop**.
+Press **Add a busy loop** to trigger one (or more) CPU-bound loops.
 
 <beam-vs-node>
 
@@ -31,11 +31,13 @@ Node.js, one thread
 
 <script type="module" src="beam-vs-node.js"></script>
 
-The faint marks on the strips are the ideal: where every tick would land if nothing else wanted the CPU. The numbers at the top of each side score it against that ideal. **Behind now** is ticks that are due but haven't printed yet, **late so far** is ticks that printed late, and **skipped so far** is ticks that will never print.
+This widget simulates that application in Node.js and in the BEAM, the virtual machine that runs Elixir (and Erlang), side by side. It behaves the way the real runs further down this page do. The simulation is slowed way down to make the differences between the application architectures more easily observable. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs next.
 
-Node's tickers stop while the busy loop runs, and the BEAM's keep going. The rest of this page is about why. First, the real thing: the same experiment on a real machine, in Node and then in Elixir.
+The faint marks on the strips are the ideal: where every tick would land if nothing else occupied the CPU. The numbers at the top of each side score it against that ideal. **Behind now** is ticks that are due but haven't printed yet, **late so far** is ticks that printed late, and **skipped so far** is ticks that will never print.
 
-## The experiment in Node
+Node's tickers have no choice but to stop while the busy loop runs. The BEAM's tickers keep going and automatically recover to the correct (ideal) cadence without any explicit correction code. Why?
+
+## The ticker application in Node
 
 The slow math is the classic slow recursive Fibonacci: `fib(n)` calls itself twice, for every number down to 1. Asking for `fib(40)` makes about 331 million calls. That's our busy loop.
 
@@ -44,34 +46,45 @@ The slow math is the classic slow recursive Fibonacci: `fib(n)` calls itself twi
 const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
 
 const start = performance.now();
-const elapsed = () => performance.now() - start;
+const elapsed = () => Math.floor(performance.now() - start);
 
-const log = (message, at = elapsed()) => {
-  console.log(`${String(Math.floor(at)).padStart(4)} ms  ${message}`);
-};
-
-// n counts the ticks that ran. The clock says how many were due.
-let n = 0;
-const ticker = setInterval(() => {
-  const at = elapsed();
-  log(`tick ${++n} (${Math.floor(at / 100)} due)`, at);
-}, 100);
+// Each ticker starts `offset` ms in, then ticks every 100 ms and
+// writes down when each tick ran.
+const tickers = [["A", 0], ["B", 33], ["C", 67]].map(([name, offset]) => ({ name, offset, ticks: [] }));
+for (const ticker of tickers) {
+  setTimeout(() => {
+    ticker.interval = setInterval(() => ticker.ticks.push(elapsed()), 100);
+  }, ticker.offset);
+}
 
 setTimeout(() => {
-  log("busy loop starts");
+  const from = elapsed();
   fib(40);
-  log("busy loop ends");
-  setTimeout(() => clearInterval(ticker), 350);
+  const to = elapsed();
+  setTimeout(() => {
+    for (const ticker of tickers) clearInterval(ticker.interval);
+    report(tickers, from, to, elapsed());
+  }, 350);
 }, 350);
+
+// report() prints a column per ticker: when each tick ran, then how many
+// were due by the end. It's in ticker.mjs.
 ```
 
-`setInterval` asks Node to call a function every 100 ms. `setTimeout` asks it to call one once, later. Those functions you hand over to be called later are **callbacks**.
+`setInterval` asks Node to call a function every 100 ms. `setTimeout` asks it to call one once, later. Those functions you hand over to be called later are **callbacks**. The tickers start 0, 33, and 67 ms in, so their ticks come a third of a beat apart, as in the simulation.
 
-## The same experiment in Elixir
+## The ticker application in Elixir
 
-If you don't read Elixir yet, here's the short version. `spawn` starts a **process**: a small, independent piece of running code. It's not an operating system process; it lives inside the BEAM. `receive` waits for a message, `send` sends one, `self()` is the current process's own address, and `:timer.send_interval` sends a process the same message over and over.
+If you don't read Elixir yet, here's the gist:
 
-So the ticker is a process that gets a `:tick` message every 100 ms and prints a line. The busy loop is another process.
+- `spawn` starts a **process**: a small, independent piece of code running on the BEAM VM
+- `receive` waits for a message
+- `send` sends a message
+- `self()` is the current process's address
+- `:timer.send_interval` sends a process the same message repeatedly
+- `for` runs its block once for each item in a list and collects the results
+
+So each ticker is a process that gets a `:tick` message every 100 ms and writes down when it handled it. The busy loop is another process.
 
 ```elixir
 defmodule Fib do
@@ -81,13 +94,12 @@ defmodule Fib do
 end
 
 defmodule Ticker do
-  # n counts the ticks that ran. The clock says how many were due.
-  def loop(log, elapsed, n) do
+  # Writes down when each :tick message was handled, and hands the list
+  # over when asked.
+  def loop(elapsed, ticks) do
     receive do
-      :tick ->
-        at = elapsed.()
-        log.("tick #{n} (#{div(at, 100)} due)", at)
-        loop(log, elapsed, n + 1)
+      :tick -> loop(elapsed, [elapsed.() | ticks])
+      {:report, to} -> send(to, {:ticks, self(), Enum.reverse(ticks)})
     end
   end
 end
@@ -95,110 +107,123 @@ end
 start = System.monotonic_time(:millisecond)
 elapsed = fn -> System.monotonic_time(:millisecond) - start end
 
-log = fn message, at ->
-  IO.puts("#{String.pad_leading("#{at}", 4)} ms  #{message}")
-end
+IO.puts("schedulers online: #{System.schedulers_online()}")
 
-log.("schedulers online: #{System.schedulers_online()}", elapsed.())
+# Each ticker is a process that starts `offset` ms in, then gets a :tick
+# message every 100 ms.
+tickers =
+  for {name, offset} <- [{"A", 0}, {"B", 33}, {"C", 67}] do
+    pid =
+      spawn(fn ->
+        Process.sleep(offset)
+        :timer.send_interval(100, :tick)
+        Ticker.loop(elapsed, [])
+      end)
 
-spawn(fn ->
-  :timer.send_interval(100, :tick)
-  Ticker.loop(log, elapsed, 1)
-end)
+    {name, offset, pid}
+  end
 
 Process.sleep(350)
 me = self()
 
 spawn(fn ->
-  log.("busy loop starts", elapsed.())
+  from = elapsed.()
   Fib.fib(40)
-  log.("busy loop ends", elapsed.())
-  send(me, :done)
+  send(me, {:done, from, elapsed.()})
 end)
 
-receive do
-  :done -> Process.sleep(350)
-end
+{from, to} =
+  receive do
+    {:done, from, to} -> {from, to}
+  end
+
+Process.sleep(350)
+end_at = elapsed.()
+
+# Then each ticker hands over its list, and the script prints a column per
+# ticker, as ticker.mjs does. It's in ticker.exs.
 ```
 
 Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs). You don't need to. The simulation above shows the same thing in your browser.
 
 ## What happened
 
-I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). Each tick prints two numbers: which tick it is, counting the ones that ran, and how many ticks were due by then, going by the clock. If they ever differ, ticks went missing.
+I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). Each script prints a column per ticker: when each of its ticks ran, in milliseconds from the start, and at the bottom, how many ticks were due by the time it stopped, going by the clock. If a column has fewer ticks than were due, ticks went missing.
 
 ```text
 $ node ticker.mjs
- 100 ms  tick 1 (1 due)
- 201 ms  tick 2 (2 due)
- 302 ms  tick 3 (3 due)
- 350 ms  busy loop starts
-1390 ms  busy loop ends
-1391 ms  tick 4 (13 due)
-1494 ms  tick 5 (14 due)
-1594 ms  tick 6 (15 due)
-1695 ms  tick 7 (16 due)
+busy loop 351–1377 ms, stopped at 1728 ms
+tick      A      B      C
+   1    102    134    168
+   2    203    235    270
+   3    305    337   1378
+   4   1378   1378   1479
+   5   1479   1479   1580
+   6   1580   1580   1681
+   7   1681   1681
+ due     17     16     16
 ```
 
-Node's ticker went quiet for a whole second. Not one tick while `fib(40)` ran. When it came back, 13 ticks were due by the clock and it printed tick 4. The nine it missed never showed up: it stayed nine behind the clock from then on.
+Node's tickers went quiet for a whole second. Not one tick while `fib(40)` ran, from 351 to 1377 ms. When it ended, each ticker ran one late tick, all three at 1378 ms, and then carried on 100 ms apart. The ticks each one missed in between never showed up: by the end, A had run 7 of the 17 ticks that were due.
 
 ```text
 $ elixir ticker.exs
-   1 ms  schedulers online: 8
- 103 ms  tick 1 (1 due)
- 203 ms  tick 2 (2 due)
- 303 ms  tick 3 (3 due)
- 352 ms  busy loop starts
- 403 ms  tick 4 (4 due)
- 503 ms  tick 5 (5 due)
- 603 ms  tick 6 (6 due)
- 703 ms  tick 7 (7 due)
- 803 ms  tick 8 (8 due)
- 903 ms  tick 9 (9 due)
-1003 ms  tick 10 (10 due)
-1103 ms  tick 11 (11 due)
-1157 ms  busy loop ends
-1203 ms  tick 12 (12 due)
-1303 ms  tick 13 (13 due)
-1403 ms  tick 14 (14 due)
-1503 ms  tick 15 (15 due)
+schedulers online: 8
+busy loop 352–1137 ms, stopped at 1488 ms
+tick      A      B      C
+   1    103    137    171
+   2    203    237    271
+   3    303    337    371
+   4    403    437    471
+   5    503    537    571
+   6    603    637    671
+   7    703    737    771
+   8    803    837    871
+   9    903    937    971
+  10   1003   1037   1071
+  11   1103   1137   1171
+  12   1203   1237   1271
+  13   1303   1337   1371
+  14   1403   1437   1471
+ due     14     14     14
 ```
 
-Elixir's ticker didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop, and never behind the clock.
+Elixir's tickers didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop from 352 to 1137 ms, still a third of a beat apart, and every one of them ran every tick that was due.
 
 But hang on. The BEAM had 8 **schedulers** there (more on those in a moment), one per core, and Node runs JavaScript on one thread. Maybe the busy loop just went to another core? So here's Elixir again, held to a single scheduler with the `+S 1` flag:
 
 ```text
 $ elixir --erl "+S 1" ticker.exs
-   0 ms  schedulers online: 1
- 102 ms  tick 1 (1 due)
- 202 ms  tick 2 (2 due)
- 302 ms  tick 3 (3 due)
- 351 ms  busy loop starts
- 402 ms  tick 4 (4 due)
- 502 ms  tick 5 (5 due)
- 602 ms  tick 6 (6 due)
- 702 ms  tick 7 (7 due)
- 802 ms  tick 8 (8 due)
- 902 ms  tick 9 (9 due)
-1002 ms  tick 10 (10 due)
-1102 ms  tick 11 (11 due)
-1202 ms  tick 12 (12 due)
-1302 ms  tick 13 (13 due)
-1402 ms  tick 14 (14 due)
-1502 ms  tick 15 (15 due)
-1602 ms  tick 16 (16 due)
-1702 ms  tick 17 (17 due)
-1802 ms  tick 18 (18 due)
-1902 ms  tick 19 (19 due)
-1990 ms  busy loop ends
-2002 ms  tick 20 (20 due)
-2102 ms  tick 21 (21 due)
-2202 ms  tick 22 (22 due)
-2302 ms  tick 23 (23 due)
+schedulers online: 1
+busy loop 351–1973 ms, stopped at 2324 ms
+tick      A      B      C
+   1    102    136    170
+   2    202    236    270
+   3    302    336    370
+   4    402    436    470
+   5    502    536    570
+   6    602    636    670
+   7    702    736    770
+   8    802    836    870
+   9    902    936    970
+  10   1002   1036   1070
+  11   1102   1136   1170
+  12   1202   1236   1270
+  13   1302   1336   1370
+  14   1402   1436   1470
+  15   1502   1536   1570
+  16   1602   1636   1670
+  17   1702   1736   1770
+  18   1802   1836   1870
+  19   1902   1936   1970
+  20   2002   2036   2070
+  21   2102   2136   2170
+  22   2202   2236   2270
+  23   2302
+ due     23     22     22
 ```
 
-Still ticking. One scheduler, one core's worth of work, and the busy loop still couldn't shut the ticker out.
+Still ticking. One scheduler, one core's worth of work, and the busy loop still couldn't shut the tickers out.
 
 So it's not the extra cores that allows Elixir to be reliable here. Something else is going on.
 
@@ -206,7 +231,7 @@ So it's not the extra cores that allows Elixir to be reliable here. Something el
 
 Node runs your JavaScript on one thread, in a loop called the **event loop**. Each time around, it takes the next callback that's ready and calls it. The function that's running lives on the **call stack**, and there's only one call stack.
 
-Once a callback starts, it runs until it returns. Node can't pause it halfway to let something else go. When the 100 ms timer comes due during `fib(40)`, its callback just waits in line until the stack is empty. Node's own guide says it plainly: because a thread that's busy with one thing can't get to anything else, "the fair treatment of clients is thus the responsibility of your application."
+Once a callback starts, it runs until it returns. Node can't pause it halfway to let something else go. When a ticker's timer comes due during `fib(40)`, its callback just waits in line until the stack is empty. Node's own guide says it plainly: because a thread that's busy with one thing can't get to anything else, "the fair treatment of clients is thus the responsibility of your application."
 
 That's called **cooperative scheduling**. The code that's running decides when to give the thread back, by returning, and nothing can take it away sooner. Everything else gets a turn only when the running code cooperates.
 
@@ -220,7 +245,7 @@ A **scheduler** is a thread inside the BEAM whose whole job is running processes
 
 Each scheduler has a **run queue**: a line of processes that are ready to run. The scheduler takes the process at the front and runs it.
 
-How long does it get to run? That's measured in **reductions**. A reduction is a small unit of work, roughly one function call. Each process gets a budget of 4,000 reductions per turn. (It was 2,000 before OTP 20, so older write-ups, including [one of mine](/leaflets/about-elixir/page-3/), say 2,000.) The BEAM checks the budget every time a function is called. When it runs out, the process goes to the back of the line and the next one gets a turn. A process that's waiting for a message, like our ticker between ticks, steps out of the line until one arrives.
+How long does it get to run? That's measured in **reductions**. A reduction is a small unit of work, roughly one function call. Each process gets a budget of 4,000 reductions per turn. (It was 2,000 before OTP 20, so older write-ups, including [one of mine](/leaflets/about-elixir/page-3/), say 2,000.) The BEAM checks the budget every time a function is called. When it runs out, the process goes to the back of the line and the next one gets a turn. A process that's waiting for a message, like a ticker between ticks, steps out of the line until one arrives.
 
 Taking the CPU back like that, without the running code agreeing to it, is called **preemption**, and the BEAM's schedulers are **preemptive**. That's the whole difference on this page: Elixir's scheduling is preemptive, and Node's is cooperative. Your busy loop doesn't have to be polite. It just runs out of reductions.
 
@@ -228,11 +253,11 @@ And it can't dodge the count. Elixir has no `while` loop. To repeat something, a
 
 How long is one turn? My busy loop made 331 million calls in about 0.8 seconds, so roughly 400 million a second. At that pace, 4,000 reductions take about 10 microseconds. A ticker that comes due mid-turn waits ten millionths of a second at most.
 
-One more piece. When a scheduler's run queue is empty, it doesn't sit idle while another scheduler has a line. It steals a process from that line, so work spreads across the cores without you arranging it. With 8 schedulers, the ticker and the busy loop could each have one to themselves.
+One more piece. When a scheduler's run queue is empty, it doesn't sit idle while another scheduler has a line. It steals a process from that line, so work spreads across the cores without you arranging it. With 8 schedulers, the three tickers and the busy loop could each have one to themselves.
 
 ## Back to the simulation
 
-Ten microseconds is too fast to see, which is why the simulation at the top of this page is slowed way down. Its three tickers are there so the run queue has something in it. Go back up to it and press **Add a busy loop** again. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
+Ten microseconds is too fast to see, which is why the simulation at the top of this page is slowed way down. Go back up to it and press **Add a busy loop** again. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
 
 For the closest look, set the speed to **extra slow**, where one turn lasts about ten seconds. Then you can see preemption happen. The scheduler hands the busy loop its 4,000 reductions, counts every one of them down, and sends it to the back of the line, behind any ticker that came due while it ran. The ticker prints its tick, and then the busy loop gets its next turn.
 
@@ -240,9 +265,11 @@ With one scheduler, even one busy loop makes some of the BEAM's ticks late: a ti
 
 In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait in each ticker's mailbox. Every one gets printed, some of them late, and then the tickers are back on the ideal beat. (That's why the BEAM's "late so far" can run higher than Node's. It prints every tick.)
 
-In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, Node's ticks came at 1391, 1494, and 1594 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, and nine ticks behind the clock for good.
+In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, A's ticks came at 1378, 1479, 1580, and 1681 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, 1700, and about nine ticks behind the clock for good.
 
-That new beat has a side effect when there's more than one interval. Here are four: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
+That new beat has a side effect when there's more than one interval, and the real run shows it. Node's three tickers started a third of a beat apart. All three came due during the busy loop, all three ran the moment it ended, and Node counted each one's next tick from that same moment. From then on they tick together: 1479, 1580, 1681, all three at once. (C's column is a row behind because its third tick came due at 367 ms, just after the busy loop started.) The BEAM's tickers stayed a third of a beat apart the whole way through.
+
+Here's more of it, with four intervals: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
 
 ```javascript
 const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
@@ -288,7 +315,7 @@ Nothing ever spreads them back out. A long-running Node process that now and the
 
 So why did the real Elixir run never fall behind, even on one scheduler? Scale. In the simulation a turn is long next to the time between ticks, so a few busy loops push ticks late. On my M1 a turn is about 10 microseconds and the ticks are 100 milliseconds apart: room for 10,000 turns between ticks. You'd need around ten thousand busy processes on one scheduler before a ticker waited a whole tick.
 
-Want to press the button on a real machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) tick until you type `q` and Enter, and every press of Enter starts another `fib(40)` busy loop. Save them somewhere, and with Elixir and Node installed (I used the versions above), run them from that folder:
+Want to press the button on a real machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) have one ticker each, so you can read along as it ticks. They tick until you type `q` and Enter, and every press of Enter starts another `fib(40)` busy loop. Save them somewhere, and with Elixir and Node installed (I used the versions above), run them from that folder:
 
 ```sh
 elixir ticker-live.exs                  # Elixir, the default schedulers
@@ -300,14 +327,14 @@ Press Enter a few times while each one runs. In Elixir each busy loop is a new p
 
 ## Sources
 
-- The busy loop and ticker runs: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs), run 2026-11-12 (again, to print the ticks due) on an Apple M1 (8 cores) with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1). The calls-per-second figure comes from the 8-scheduler run. The interactive runs: [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs), same machine and versions, with the keypresses piped in.
+- The busy loop and ticker runs: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs), run 2026-11-19 on an Apple M1 (8 cores) with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1). The calls-per-second figure comes from the 8-scheduler run. The interactive runs: [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs), same machine and versions, with the keypresses piped in.
 - The 4,000 reduction budget: `CONTEXT_REDS` in erts's [erl_vm.h at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_vm.h#L53), and 2,000 in [erl_vm.h at OTP-19.3](https://github.com/erlang/otp/blob/OTP-19.3/erts/emulator/beam/erl_vm.h#L39).
 - Preemptive multitasking (the scheduler suspends a process and lets another run): *The BEAM Book*, [Concurrency, Parallelism, and Preemptive Multitasking](https://blog.stenmans.org/theBeamBook/#_concurrency_parallelism_and_preemptive_multitasking). The BEAM as "preemptive scheduling on top of cooperative scheduling", switching only at a function call or a `receive`: [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions).
 - Node's scheduling as cooperative: Node's guide puts fair turns on your code, and its fix for long work is code that "regularly yields (gives turns to) other pending events" ([Don't Block the Event Loop](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#what-does-this-mean-for-application-design), [Partitioning](https://nodejs.org/en/learn/asynchronous-work/dont-block-the-event-loop#partitioning)). Node's docs don't use the word "cooperative"; the definition (scheduling where the running code has to allow for its own suspension) is *The BEAM Book*'s, in [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions).
 - What a reduction is, the check on every function call, waiting processes leaving the queue, and "no way to loop forever without doing a function call": Erik Stenman, *The BEAM Book*, [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions) and [What is a Reduction Really?](https://blog.stenmans.org/theBeamBook/#_what_is_a_reduction_really)
 - Run queues and going to the back of the line: *The BEAM Book*, [Scheduling](https://blog.stenmans.org/theBeamBook/#_scheduling) and [The Ready Queue](https://blog.stenmans.org/theBeamBook/#_the_ready_queue).
 - `:timer.send_interval/2` sending its message repeatedly, every interval: [Erlang's timer docs](https://www.erlang.org/doc/apps/stdlib/timer.html#send_interval/2). Node's late interval and its new beat: the real Node run above.
-- Intervals counting their next tick from when their callback starts: Node v25.9.0's [lib/internal/timers.js](https://github.com/nodejs/node/blob/v25.9.0/lib/internal/timers.js#L599-L611) reads the time just before the callback and re-inserts the interval from it, and [src/env.cc](https://github.com/nodejs/node/blob/v25.9.0/src/env.cc#L1611) refreshes that clock first. The intervals locking together: [intervals.mjs](intervals.mjs), run on the same machine and versions as the ticker scripts.
+- Intervals counting their next tick from when their callback starts: Node v25.9.0's [lib/internal/timers.js](https://github.com/nodejs/node/blob/v25.9.0/lib/internal/timers.js#L599-L611) reads the time just before the callback and re-inserts the interval from it, and [src/env.cc](https://github.com/nodejs/node/blob/v25.9.0/src/env.cc#L1611) refreshes that clock first. The intervals locking together: the Node ticker run and [intervals.mjs](intervals.mjs), run on the same machine and versions as the ticker scripts.
 - Idle schedulers stealing work: *The BEAM Book*, [Task Stealing](https://blog.stenmans.org/theBeamBook/#_task_stealing).
 - One scheduler per logical processor by default, and the `+S` flag: the Erlang/OTP [erl command docs](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+S).
 - `System.schedulers_online/0`: [Elixir's System docs](https://hexdocs.pm/elixir/1.19.5/System.html#schedulers_online/0). `:timer.send_interval/2`: [Erlang's timer docs](https://www.erlang.org/doc/apps/stdlib/timer.html#send_interval/2).
