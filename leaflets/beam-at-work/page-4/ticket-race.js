@@ -203,6 +203,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   }
   /* Two fixed lines, what the buyer saw and how it ended, then the bar */
   ticket-race .buyer {
+    margin: 0; /* not the theme's space between list items: the grid has its own */
     display: grid;
     grid-template-columns: 4.6rem 1fr;
     gap: .1rem .5rem;
