@@ -8,6 +8,20 @@ Everything on the pages so far happened inside one BEAM, and one BEAM is one ope
 
 So a BEAM can connect to other BEAMs, on the same machine or on others, and processes on one can send messages to processes on another. Erlang's docs: "Message passing between processes at different nodes, as well as links and monitors, are transparent when pids are used." The `send`, `receive`, links, and monitors from pages 4 and 5 work across machines the way they work inside one.
 
+What changes is what can go wrong. Here's a program on one machine keeping a count on another, and then something happening to the other machine.
+
+<two-machines>
+
+![The simulation a few seconds after b froze, side by side. On the BEAM side, two nodes: a, a connection marked dropped by a, and b, marked frozen. a thinks b is down, in red: a heard nothing from b, not even a tick, and gave up on it after 4.2 s. b is only frozen, but a can't tell. On the Node side, two processes and a socket: a, a socket marked open, and b, marked frozen. a thinks b is up: b has gone quiet, and nothing tells a. Nothing for 5.5 s, and counting.](two-machines.webp)
+
+*The live version of this needs JavaScript. In it, you can close the connection between a and b, freeze b, or shut it down, in the BEAM and in Node side by side, and give Node a timeout of its own.*
+
+</two-machines>
+
+<script type="module" src="two-machines.js"></script>
+
+When the connection closed, or b shut down, both runtimes knew at once. When b froze, the BEAM noticed the silence and gave up on b after a few seconds, and Node never noticed at all, not without a timeout that a's own code sets and acts on. But look at what the BEAM concluded: that b was down, when it was only frozen. The rest of this page is about how nodes find each other, how a pid can point at another machine, and what a monitor can and can't tell you when the connection goes.
+
 ## Nodes
 
 A BEAM that can connect to others is a *node*: a running BEAM that has been given a name, like `a@MacBookAir`, a name and the machine it's on. `elixir --sname a script.exs` runs a script on a node named `a`.
@@ -283,7 +297,7 @@ Everything else is the program's job too. The counter's address is a port, not a
 
 What neither can do is the hard part. A Node process whose socket goes quiet is in the same spot as a BEAM node that gets `:noconnection`: it can't tell a stopped process from a slow one, or know which of its last messages arrived.
 
-## Watch it happen
+## A closer look at down.exs
 
 Here's down.exs as a simulation. Node `a` has a monitor on a counter on node `b`, and the two nodes send each other ticks whenever they have nothing else to send. You can send to the counter, close the connection, pause `b`, or halt it, and see what `a`'s mailbox gets. Under that it shows something `a` can't see: how many messages were lost on the way.
 
