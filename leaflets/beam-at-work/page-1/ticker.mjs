@@ -18,22 +18,28 @@ for (const ticker of tickers) {
   }, ticker.offset);
 }
 
+let from, to;
 setTimeout(() => {
-  const from = elapsed();
+  from = elapsed();
   fib(40);
-  const to = elapsed();
-  setTimeout(() => {
-    for (const ticker of tickers) clearInterval(ticker.interval);
-    report(tickers, from, to, elapsed());
-  }, 350);
+  to = elapsed();
 }, 350);
 
-// One column per ticker: when each tick ran, then how many were due by the end
+// Stop at 2490 ms: between beats, so every tick that's come due has had its
+// chance to run
+setTimeout(() => {
+  for (const ticker of tickers) clearInterval(ticker.interval);
+  report(tickers, from, to, elapsed());
+}, 2490);
+
+// One column per ticker: when each tick ran, then how many ticks the clock
+// expected by the end, and how many actually ran
 const report = (tickers, from, to, end) => {
-  const row = (label, cells) => console.log(String(label).padStart(4) + cells.map((c) => String(c).padStart(7)).join("").trimEnd());
+  const row = (label, cells) => console.log(String(label).padStart(8) + cells.map((c) => String(c).padStart(7)).join("").trimEnd());
   console.log(`busy loop ${from}–${to} ms, stopped at ${end} ms`);
   row("tick", tickers.map((t) => t.name));
   const rows = Math.max(...tickers.map((t) => t.ticks.length));
   for (let i = 0; i < rows; i++) row(i + 1, tickers.map((t) => t.ticks[i] ?? ""));
-  row("due", tickers.map((t) => Math.floor((end - t.offset) / 100)));
+  row("expected", tickers.map((t) => Math.floor((end - t.offset) / 100)));
+  row("actual", tickers.map((t) => t.ticks.length));
 };

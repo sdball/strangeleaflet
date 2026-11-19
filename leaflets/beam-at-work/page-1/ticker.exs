@@ -41,6 +41,10 @@ tickers =
     {name, offset, pid}
   end
 
+# Stop at 2490 ms: between beats, so every tick that's come due has had its
+# chance to run
+Process.send_after(self(), :stop, 2490)
+
 Process.sleep(350)
 me = self()
 
@@ -55,10 +59,14 @@ end)
     {:done, from, to} -> {from, to}
   end
 
-Process.sleep(350)
+receive do
+  :stop -> :ok
+end
+
 end_at = elapsed.()
 
-# One column per ticker: when each tick ran, then how many were due by the end
+# One column per ticker: when each tick ran, then how many ticks the clock
+# expected by the end, and how many actually ran
 columns =
   for {name, offset, pid} <- tickers do
     send(pid, {:report, me})
@@ -68,11 +76,12 @@ columns =
   end
 
 row = fn label, cells ->
-  IO.puts(String.pad_leading("#{label}", 4) <> String.trim_trailing(Enum.map_join(cells, &String.pad_leading("#{&1}", 7))))
+  IO.puts(String.pad_leading("#{label}", 8) <> String.trim_trailing(Enum.map_join(cells, &String.pad_leading("#{&1}", 7))))
 end
 
 IO.puts("busy loop #{from}–#{to} ms, stopped at #{end_at} ms")
 row.("tick", Enum.map(columns, &elem(&1, 0)))
 rows = columns |> Enum.map(&length(elem(&1, 1))) |> Enum.max()
 for i <- 0..(rows - 1), do: row.(i + 1, Enum.map(columns, &Enum.at(elem(&1, 1), i, "")))
-row.("due", Enum.map(columns, &elem(&1, 2)))
+row.("expected", Enum.map(columns, &elem(&1, 2)))
+row.("actual", Enum.map(columns, &length(elem(&1, 1))))

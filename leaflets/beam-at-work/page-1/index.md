@@ -57,18 +57,23 @@ for (const ticker of tickers) {
   }, ticker.offset);
 }
 
+let from, to;
 setTimeout(() => {
-  const from = elapsed();
+  from = elapsed();
   fib(40);
-  const to = elapsed();
-  setTimeout(() => {
-    for (const ticker of tickers) clearInterval(ticker.interval);
-    report(tickers, from, to, elapsed());
-  }, 350);
+  to = elapsed();
 }, 350);
 
+// Stop at 2490 ms: between beats, so every tick that's come due has had its
+// chance to run
+setTimeout(() => {
+  for (const ticker of tickers) clearInterval(ticker.interval);
+  report(tickers, from, to, elapsed());
+}, 2490);
+
 // report() prints a column per ticker: when each tick ran, then how many
-// were due by the end. It's in ticker.mjs.
+// ticks the clock expected by the end and how many actually ran. It's in
+// ticker.mjs.
 ```
 
 `setInterval` asks Node to call a function every 100 ms. `setTimeout` asks it to call one once, later. Those functions you hand over to be called later are **callbacks**. The tickers start 0, 33, and 67 ms in, so their ticks come a third of a beat apart, as in the simulation.
@@ -123,6 +128,10 @@ tickers =
     {name, offset, pid}
   end
 
+# Stop at 2490 ms: between beats, so every tick that's come due has had its
+# chance to run
+Process.send_after(self(), :stop, 2490)
+
 Process.sleep(350)
 me = self()
 
@@ -137,7 +146,10 @@ end)
     {:done, from, to} -> {from, to}
   end
 
-Process.sleep(350)
+receive do
+  :stop -> :ok
+end
+
 end_at = elapsed.()
 
 # Then each ticker hands over its list, and the script prints a column per
@@ -148,79 +160,101 @@ Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs)
 
 ## What happened
 
-I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). Each script prints a column per ticker: when each of its ticks ran, in milliseconds from the start, and at the bottom, how many ticks were due by the time it stopped, going by the clock. If a column has fewer ticks than were due, ticks went missing.
+I ran both on an Apple M1 with 8 cores, with Node v25.9.0 and Elixir 1.19.5 on Erlang/OTP 28 (erts 16.3.1). Each script prints a column per ticker: when each of its ticks ran, in milliseconds from the start, and at the bottom, how many ticks the clock expected by the time the script stopped, and how many actually ran. If actual is lower than expected, ticks went missing.
 
 ```text
 $ node ticker.mjs
-busy loop 351–1377 ms, stopped at 1728 ms
-tick      A      B      C
-   1    102    134    168
-   2    203    235    270
-   3    305    337   1378
-   4   1378   1378   1479
-   5   1479   1479   1580
-   6   1580   1580   1681
-   7   1681   1681
- due     17     16     16
+busy loop 350–1359 ms, stopped at 2490 ms
+    tick      A      B      C
+       1    101    134    168
+       2    202    236    269
+       3    303    336   1359
+       4   1359   1359   1460
+       5   1460   1460   1561
+       6   1561   1561   1662
+       7   1663   1663   1763
+       8   1763   1763   1864
+       9   1864   1864   1965
+      10   1965   1965   2066
+      11   2066   2066   2167
+      12   2167   2167   2269
+      13   2269   2269   2370
+      14   2370   2370   2470
+      15   2471   2471
+expected     24     24     24
+  actual     15     15     14
 ```
 
-Node's tickers went quiet for a whole second. Not one tick while `fib(40)` ran, from 351 to 1377 ms. When it ended, each ticker ran one late tick, all three at 1378 ms, and then carried on 100 ms apart. The ticks each one missed in between never showed up: by the end, A had run 7 of the 17 ticks that were due.
+Node's tickers went quiet for a whole second. Not one tick while `fib(40)` ran, from 350 to 1359 ms. When it ended, each ticker ran one late tick, all three at 1359 ms, and then carried on 100 ms apart. The ticks each one missed in between never showed up: by the end, A had run 15 of the 24 ticks the clock expected.
 
 ```text
 $ elixir ticker.exs
 schedulers online: 8
-busy loop 352–1137 ms, stopped at 1488 ms
-tick      A      B      C
-   1    103    137    171
-   2    203    237    271
-   3    303    337    371
-   4    403    437    471
-   5    503    537    571
-   6    603    637    671
-   7    703    737    771
-   8    803    837    871
-   9    903    937    971
-  10   1003   1037   1071
-  11   1103   1137   1171
-  12   1203   1237   1271
-  13   1303   1337   1371
-  14   1403   1437   1471
- due     14     14     14
+busy loop 352–1165 ms, stopped at 2492 ms
+    tick      A      B      C
+       1    103    137    171
+       2    203    237    271
+       3    303    337    371
+       4    403    437    471
+       5    503    537    571
+       6    603    637    671
+       7    703    737    771
+       8    803    837    871
+       9    903    937    971
+      10   1003   1037   1071
+      11   1103   1137   1171
+      12   1203   1237   1271
+      13   1303   1337   1371
+      14   1403   1437   1471
+      15   1503   1537   1571
+      16   1603   1637   1671
+      17   1703   1737   1771
+      18   1803   1837   1871
+      19   1903   1937   1971
+      20   2003   2037   2071
+      21   2103   2137   2171
+      22   2203   2237   2271
+      23   2303   2337   2371
+      24   2403   2437   2471
+expected     24     24     24
+  actual     24     24     24
 ```
 
-Elixir's tickers didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop from 352 to 1137 ms, still a third of a beat apart, and every one of them ran every tick that was due.
+Elixir's tickers didn't notice. Tick, tick, tick, every 100 ms, right through the busy loop from 352 to 1165 ms, still a third of a beat apart, and every one of them ran every tick the clock expected.
 
 But hang on. The BEAM had 8 **schedulers** there (more on those in a moment), one per core, and Node runs JavaScript on one thread. Maybe the busy loop just went to another core? So here's Elixir again, held to a single scheduler with the `+S 1` flag:
 
 ```text
 $ elixir --erl "+S 1" ticker.exs
 schedulers online: 1
-busy loop 351–1973 ms, stopped at 2324 ms
-tick      A      B      C
-   1    102    136    170
-   2    202    236    270
-   3    302    336    370
-   4    402    436    470
-   5    502    536    570
-   6    602    636    670
-   7    702    736    770
-   8    802    836    870
-   9    902    936    970
-  10   1002   1036   1070
-  11   1102   1136   1170
-  12   1202   1236   1270
-  13   1302   1336   1370
-  14   1402   1436   1470
-  15   1502   1536   1570
-  16   1602   1636   1670
-  17   1702   1736   1770
-  18   1802   1836   1870
-  19   1902   1936   1970
-  20   2002   2036   2070
-  21   2102   2136   2170
-  22   2202   2236   2270
-  23   2302
- due     23     22     22
+busy loop 351–1980 ms, stopped at 2491 ms
+    tick      A      B      C
+       1    102    136    170
+       2    202    236    270
+       3    302    336    370
+       4    402    436    470
+       5    502    536    570
+       6    602    636    670
+       7    702    736    770
+       8    802    836    870
+       9    902    936    970
+      10   1002   1036   1070
+      11   1102   1136   1170
+      12   1202   1236   1270
+      13   1302   1336   1370
+      14   1402   1436   1470
+      15   1502   1536   1570
+      16   1602   1636   1670
+      17   1702   1736   1770
+      18   1802   1836   1870
+      19   1902   1936   1970
+      20   2002   2036   2070
+      21   2102   2136   2170
+      22   2202   2236   2270
+      23   2302   2336   2370
+      24   2402   2436   2470
+expected     24     24     24
+  actual     24     24     24
 ```
 
 Still ticking. One scheduler, one core's worth of work, and the busy loop still couldn't shut the tickers out.
@@ -265,9 +299,9 @@ With one scheduler, even one busy loop makes some of the BEAM's ticks late: a ti
 
 In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait in each ticker's mailbox. Every one gets printed, some of them late, and then the tickers are back on the ideal beat. (That's why the BEAM's "late so far" can run higher than Node's. It prints every tick.)
 
-In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, A's ticks came at 1378, 1479, 1580, and 1681 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, 1700, and about nine ticks behind the clock for good.
+In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, A's ticks came at 1359, 1460, 1561, and 1663 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, and nine ticks behind the clock for good.
 
-That new beat has a side effect when there's more than one interval, and the real run shows it. Node's three tickers started a third of a beat apart. All three came due during the busy loop, all three ran the moment it ended, and Node counted each one's next tick from that same moment. From then on they tick together: 1479, 1580, 1681, all three at once. (C's column is a row behind because its third tick came due at 367 ms, just after the busy loop started.) The BEAM's tickers stayed a third of a beat apart the whole way through.
+That new beat has a side effect when there's more than one interval, and the real run shows it. Node's three tickers started a third of a beat apart. All three came due during the busy loop, all three ran the moment it ended, and Node counted each one's next tick from that same moment. From then on they tick together, all three within a millisecond: 1460, 1561, 1662. (C's column is a row behind because its third tick came due at 367 ms, just after the busy loop started.) The BEAM's tickers stayed a third of a beat apart the whole way through.
 
 Here's more of it, with four intervals: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
 

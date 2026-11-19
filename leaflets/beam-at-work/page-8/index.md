@@ -201,7 +201,7 @@ For data that's read all the time and hardly ever changes, like configuration, t
 
 ## What Node needs to match the BEAM
 
-Page 1 left Node's tickers with two problems. While the busy loop ran, they couldn't tick at all. And afterwards each was on a new beat, about nine ticks behind for good, and every interval that came due during the busy loop was locked to that new beat from then on. Here's what it takes to fix both in Node ([fixed.mjs](fixed.mjs)).
+Page 1 left Node's tickers with two problems. While the busy loop ran, they couldn't tick at all. And afterwards each was on a new beat, nine ticks behind for good, and every interval that came due during the busy loop was locked to that new beat from then on. Here's what it takes to fix both in Node ([fixed.mjs](fixed.mjs)).
 
 The second is the smaller job. `setInterval` counts each tick from when the last one ran. A steady interval counts from the start, and runs the ticks it missed:
 
