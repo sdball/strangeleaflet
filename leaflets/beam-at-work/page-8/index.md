@@ -1,10 +1,10 @@
 ---
 tags: elixir, beam, nodejs
 publish: false
-meta_description: Where the BEAM doesn't help. Native code it calls can hold a scheduler the way a busy loop holds Node's thread, native code is faster at raw number crunching, and a mailbox has no limit.
+meta_description: Where the BEAM doesn't help. Native code it calls can hold a scheduler the way a busy loop holds Node's thread, a huge heap is slow to collect, a mailbox has no limit, and what Node needs to match the rest.
 ---
 
-<!-- Draft. Done: the opener, native code, raw speed, and the slow consumer (moved from page 4). Still to come, from todo/beam-elixir-split.md: one huge heap being slow to collect, and what Elixir programs do instead (page 3's promise); what Node needs to match the BEAM, from the old page 12 findings (worker threads for page 1's ticker, page 2's promise; a steady ticker for page 1's drifting intervals, page 1's promise). -->
+<!-- Draft, complete 2026-11-19 apart from review: the opener, native code, raw speed, one huge heap, what Node needs, and the slow consumer (moved from page 4). -->
 
 The pages so far have been about what the BEAM does that Node can't. This one is about where it doesn't help, starting with page 1's busy loop, written in C.
 
@@ -163,7 +163,140 @@ fib(40): Node 1004 ms
 
 For this one job, the BEAM wasn't slower than Node: 0.78 s against 1.0. One recursive function is a small sample, and other work will come out differently, so I wouldn't stretch that into a claim about speed in general. What it does show is where the speed is. C did the same work in 0.31 s, two and a half times as fast as either. The BEAM's way to that speed is native code, and native code is outside the BEAM's preemption and its isolation. A dirty NIF keeps the scheduler free, but a crash in it is still a crash of the whole VM.
 
+## One huge heap
+
+Page 3's builder kept 10 million pairs in its own heap, and spent much of its time collecting, a few hundred milliseconds at a time near the end. The BEAM kept that from holding up anyone else. It didn't make it any faster for the builder: a copying collector's work "is proportional to the amount of live data on the heap", and the builder's heap was nearly all live.
+
+The usual answer is not to keep data like that in a process at all. ETS, Erlang term storage, is built into the BEAM, and its docs say it can "store very large quantities of data". A table isn't part of any process's heap: "every object insert and look-up operation results in a copy of the object", into the table or out of it. Here's the builder twice, once as on page 3 and once putting each pair in a table ([big-data.exs](big-data.exs)):
+
+```elixir
+defmodule Build do
+  def heap(acc, 0), do: acc
+  def heap(acc, n), do: heap([{n, n} | acc], n - 1)
+
+  def ets(table, 0), do: table
+  def ets(table, n) do
+    :ets.insert(table, {n, n})
+    ets(table, n - 1)
+  end
+end
+
+# ...a builder process runs one of them on 10 million pairs, traced
+# with :erlang.trace/3 as on page 3, and reports how long it took
+```
+
+```text
+$ elixir big-data.exs heap; elixir big-data.exs ets
+heap: built in 702 ms; the builder's heaps 590 MB
+  its GCs while building: 68, 657 ms in all, longest 139 ms
+ets: built in 3931 ms; the builder's heaps 0 MB, the table 611 MB
+  its GCs while building: 136987, 162 ms in all, longest under 1 ms
+```
+
+Kept in its own heap, the list took 702 ms to build, and 657 ms of that was the builder collecting it. In a table it took more than five times as long, because every insert copied a pair into the table. But the builder's heap stayed almost empty, its collections were tiny (137,000 of them, none as long as a millisecond), and the 611 MB sat in the table, where no process's collector goes.
+
+That's the trade: copying in and out, for data that's out of every collection. A table needs looking after, too. "There is no automatic garbage collection for tables": a table goes when the process that created it ends, or when it's deleted.
+
+For data that's read all the time and hardly ever changes, like configuration, there's `persistent_term`, which doesn't even copy on a read: "the term is **not** copied to the heap (as is the case with terms stored in ETS tables)". It pays on writes instead: "When a persistent term is updated or deleted, a global garbage collection pass is run to scan all processes for the deleted term".
+
+## What Node needs to match the BEAM
+
+Page 1 left Node's ticker with two problems. While the busy loop ran, it couldn't tick at all. And afterwards it was on a new beat, nine ticks behind for good, and every interval that came due during the busy loop was locked to that new beat from then on. Here's what it takes to fix both in Node ([fixed.mjs](fixed.mjs)).
+
+The second is the smaller job. `setInterval` counts each tick from when the last one ran. A steady interval counts from the start, and runs the ticks it missed:
+
+```javascript
+// Like setInterval, except that tick n is due at start + n * period, and a
+// tick that came due while the thread was busy runs late instead of not at all
+const steadyInterval = (period, onTick) => {
+  const start = performance.now();
+  let n = 0;
+  let timer;
+  const fire = () => {
+    while (start + (n + 1) * period <= performance.now()) onTick(++n);
+    timer = setTimeout(fire, start + (n + 1) * period - performance.now());
+  };
+  timer = setTimeout(fire, period);
+  return () => clearTimeout(timer);
+};
+```
+
+Here's page 1's ticker with it, and the busy loop still on the main thread:
+
+```text
+$ node fixed.mjs main
+ 101 ms  tick 1 (1 due)
+ 200 ms  tick 2 (2 due)
+ 300 ms  tick 3 (3 due)
+ 351 ms  busy loop starts
+1346 ms  busy loop ends
+1347 ms  tick 4 (13 due)
+1347 ms  tick 5 (13 due)
+1347 ms  tick 6 (13 due)
+1347 ms  tick 7 (13 due)
+1347 ms  tick 8 (13 due)
+1347 ms  tick 9 (13 due)
+1347 ms  tick 10 (13 due)
+1347 ms  tick 11 (13 due)
+1347 ms  tick 12 (13 due)
+1347 ms  tick 13 (13 due)
+1401 ms  tick 14 (14 due)
+1500 ms  tick 15 (15 due)
+1600 ms  tick 16 (16 due)
+```
+
+Still nothing while the busy loop ran, but afterwards every tick that came due, and then back on the beat at 1401 ms. That's what the BEAM did with the ordinary NIF at the top of this page. And here are page 1's four intervals, each made steady:
+
+```text
+$ node fixed.mjs intervals
+busy loops: 501–588 ms, 1001–1411 ms
+A  103 201 302 402 588 601 702 802 901 1411 1411 1411 1411 1411 1503 1602 1702 1802 1902
+B  142 241 342 441 589 642 741 841 941 1412 1412 1412 1412 1441 1541 1641 1741 1841 1942
+D  191 292 391 491 591 692 792 891 991 1412 1412 1412 1412 1492 1591 1691 1791 1891 1991
+C  172 321 472 620 771 920 1412 1412 1412 1521 1670 1820 1971
+```
+
+Each one catches up after each busy loop, then goes back to its own beat: A on the hundreds, B forty past, D ninety past, and C every 150 ms. Nothing locks together.
+
+The first problem needs another thread. Here's the busy loop moved into a worker thread, which sends its result back as a message:
+
+```javascript
+if (!isMainThread) {
+  parentPort.postMessage(fib(workerData));
+} else {
+  // ...the steady ticker, and at 350 ms:
+  new Worker(new URL(import.meta.url), { workerData: 40 }).once("message", done);
+}
+```
+
+```text
+$ node fixed.mjs worker
+ 101 ms  tick 1 (1 due)
+ 200 ms  tick 2 (2 due)
+ 301 ms  tick 3 (3 due)
+ 351 ms  busy loop starts
+ 400 ms  tick 4 (4 due)
+ 500 ms  tick 5 (5 due)
+ 600 ms  tick 6 (6 due)
+ 700 ms  tick 7 (7 due)
+ 800 ms  tick 8 (8 due)
+ 900 ms  tick 9 (9 due)
+1000 ms  tick 10 (10 due)
+1100 ms  tick 11 (11 due)
+1200 ms  tick 12 (12 due)
+1300 ms  tick 13 (13 due)
+1396 ms  busy loop ends
+1400 ms  tick 14 (14 due)
+1501 ms  tick 15 (15 due)
+1600 ms  tick 16 (16 due)
+1700 ms  tick 17 (17 due)
+```
+
+Every tick on time. So Node can do it: a dozen lines of steady interval, and a worker for the busy loop. What that asks of the programmer is the same kind of list as page 4's queue. Knowing the problem exists. Knowing ahead of time which code is CPU-bound, since only that goes to a worker. And each worker's costs: about 9 MB (page 2), an entry point of its own, data copied in and out (page 4), and its errors and exits handled by hand (page 5). In the BEAM, every process is all of that already.
+
 ## When messages come in faster than they go out
+
+The BEAM has its own version of page 1's problem, though. It never skips a tick: a tick that comes due is a message, and it waits in the ticker's mailbox until the ticker gets to it. When there's more work than CPU for long enough, that's where the extra goes.
 
 Nothing limits how many messages a mailbox can hold, and nothing slows a sender down when the receiver falls behind. Here's a producer sending 1,000 messages a second to a consumer that works on each one for 2 ms, so it can only handle 500 a second. Every second the producer reports how many it's sent, how many the consumer has handled, how many are waiting in the consumer's mailbox, and the consumer's size ([slow-consumer.exs](slow-consumer.exs)):
 
@@ -298,6 +431,10 @@ One message at a time is the simplest kind of backpressure. It also means the co
 ## Sources
 
 - The scripts and their runs: [fib_nif.c](fib_nif.c), [nif.exs](nif.exs), [speed.exs](speed.exs), and [speed.mjs](speed.mjs), run 2026-11-19 (the C compiled with Apple clang 17.0.0), and [slow-consumer.exs](slow-consumer.exs), [slow-worker.mjs](slow-worker.mjs), [queue-memory.exs](queue-memory.exs), and [queue-memory.mjs](queue-memory.mjs), run 2026-11-12, all on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. The eight-scheduler runs of nif.exs: `elixir nif.exs fib` and `elixir nif.exs dirty_fib`, same machine and versions.
+- [big-data.exs](big-data.exs) and [fixed.mjs](fixed.mjs), run 2026-11-19, same machine and versions. big-data.exs ran four times in the heap, built in 702 to 761 ms with 657 to 707 ms of collecting (longest 139 to 144 ms), and three times in a table, built in 3931 to 4031 ms.
+- ETS storing "very large quantities of data", tables owned by and destroyed with the process that created them, "no automatic garbage collection for tables", and "every object insert and look-up operation results in a copy of the object": the [ets docs](https://www.erlang.org/doc/apps/stdlib/ets.html) ([ets.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/stdlib/src/ets.erl#L23-L82)). `:ets.info/2` and `memory` in words: the same docs.
+- `persistent_term` reads not copied to the heap, and a global garbage collection pass on update or delete: the [persistent_term docs](https://www.erlang.org/doc/apps/erts/persistent_term.html) ([persistent_term.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/preloaded/src/persistent_term.erl#L23-L64)).
+- A copying collector's cost "proportional to the amount of live data on the heap": page 3's sources. Page 1's drifting and locking intervals, and Node re-arming an interval from when its callback runs: page 1's sources. `Worker`, `workerData`, and `parentPort.postMessage`: Node's [worker_threads docs](https://nodejs.org/api/worker_threads.html).
 - NIFs, the warning that the VM "_cannot_ provide the same services as provided when executing Erlang code, such as pre-emptive scheduling or memory protection", "A native function that crashes will crash the whole VM", returning "within 1 millisecond", dirty NIFs and dirty schedulers, and `ERL_NIF_DIRTY_JOB_CPU_BOUND`: the [erl_nif docs](https://www.erlang.org/doc/apps/erts/erl_nif.html) ([erl_nif.md at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/doc/references/erl_nif.md), the warning at L36–L50, long-running and dirty NIFs at L389–L446). NIFs "called like any other functions without any difference to the caller": the same docs, L28–L32. Loading a NIF library: [`erlang:load_nif/2`](https://www.erlang.org/doc/apps/erts/erlang.html#load_nif/2). `crypto` loading its NIF library: `-on_load` and `erlang:load_nif/2` in [crypto.erl at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/lib/crypto/src/crypto.erl#L3712-L3748).
 - The steps of a send, messages waiting counted as live by the collector, and a backed-up receiver using more memory: *The BEAM Book*, [The Process of Sending a Message to a Process](https://blog.stenmans.org/theBeamBook/#_the_process_of_sending_a_message_to_a_process) and [Tuning Message Passing](https://blog.stenmans.org/theBeamBook/#_tuning_message_passing).
 - `message_queue_data`, `off_heap` keeping messages out of collections, and the recommendation for processes that may pile up messages: [`process_flag/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_flag_message_queue_data). `message_queue_len`: [`process_info/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_info/2).
