@@ -9,7 +9,8 @@
 // It holds a static fallback (what feed readers and no-JS visitors see) and
 // replaces it once this module runs. It's a simulation from ../beam-sim.js,
 // slowed down to watch. Readers who prefer reduced motion get it paused,
-// with Play and Step.
+// with Play and Step. A speed attribute (extra-slow, slow, normal, fast)
+// picks the speed it starts at; normal is the default.
 
 import { Beam, EventLoop, CONTEXT_REDS } from "../beam-sim.js";
 
@@ -376,6 +377,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
     if (this.built) return;
     this.built = true;
     const id = `beam-vs-node-${++ids}`;
+    const speed = SPEEDS[this.getAttribute("speed")] ? this.getAttribute("speed") : "normal";
     const radios = (name, legend, options, checked) => `
       <fieldset class="choices">
         <legend>${legend}</legend>
@@ -392,7 +394,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
       </div>
       <div class="settings">
         ${radios("schedulers", "BEAM schedulers", [["1", "1"], ["2", "2"], ["4", "4"]], "1")}
-        ${radios("speed", "Speed", [["extra-slow", "extra slow"], ["slow", "slow"], ["normal", "normal"], ["fast", "fast"]], "normal")}
+        ${radios("speed", "Speed", [["extra-slow", "extra slow"], ["slow", "slow"], ["normal", "normal"], ["fast", "fast"]], speed)}
       </div>
       <p class="note">Both sides do the same work at the same pace; only the scheduling differs: preemptive in the BEAM, cooperative in Node.</p>
       <div class="views">
@@ -426,7 +428,7 @@ customElements.define("beam-vs-node", class extends HTMLElement {
       beam: this.$('[data-side="beam"]'),
       node: this.$('[data-side="node"]'),
     };
-    this.speed = SPEEDS.normal;
+    this.speed = SPEEDS[speed];
     this.playing = !reducedMotion.matches;
     this.visible = false;
 

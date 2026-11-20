@@ -293,17 +293,40 @@ When a scheduler's run queue is empty, it doesn't sit idle while another schedul
 
 ## Back to the simulation
 
-Ten microseconds is too fast to see, which is why the simulation at the top of this page is slowed way down. Go back up to it and press **Add a busy loop** again. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
+Ten microseconds is too fast to see, which is why the simulation is slowed way down. Here it is again and slowed down even further by default to the slow setting so you can more easily watch the reductions count on the BEAM side.
+
+Press **Add a busy loop**. On the BEAM side, watch the running process's reductions count down from 4,000 and the busy loop go to the back of the queue when it has zero reductions left. On the Node side, the busy loop takes the stack and the tick callbacks pile up behind it. Then try 2 or 4 schedulers, or three busy loops on one.
+
+<beam-vs-node speed="slow">
+
+```text
+The moment the busy loop used up its first 4,000 reductions
+
+BEAM, 1 scheduler
+  scheduler 1   running: ticker B (3,900 of 4,000 reductions left)
+                run queue: ticker C, busy 1 33%
+  waiting for a tick: ticker A
+  output: A tick 1, busy loop 1 starts
+
+Node.js, one thread
+  call stack    running: busy 1 (7,900 to go, no budget)
+                waiting for the stack: tick B, tick C
+  output: A tick 1, busy loop 1 starts
+```
+
+*The live version of this needs JavaScript. In it, the BEAM's busy loop goes to the back of the line after every 4,000 reductions, behind the tickers that came due, and Node's tick callbacks wait for the whole busy loop.*
+
+</beam-vs-node>
 
 For the closest look, set the speed to **extra slow**, where one turn lasts about ten seconds. Then you can see preemption happen. The scheduler hands the busy loop its 4,000 reductions, counts every one of them down, and sends it to the back of the line, behind any ticker that came due while it ran. The ticker prints its tick, and then the busy loop gets its next turn.
 
 With one scheduler, even one busy loop makes some of the BEAM's ticks late: a ticker that comes due mid-turn waits for that turn to end. Put three busy loops on one scheduler and both sides fall behind. There's only so much CPU, and preemption can't make more. The difference is what happens to the ticks that came due while they waited.
 
-In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait in each ticker's mailbox. Every one gets printed, some of them late, and then the tickers are back on the ideal beat. (That's why the BEAM's "late so far" can run higher than Node's. It prints every tick.)
+In the BEAM, the timer keeps sending `:tick` messages on schedule, and they wait in each ticker's mailbox. Every one gets printed, some of them late, and then the tickers are back on the ideal beat without any code needed to handle timing correction.
 
 In Node, one late callback stands in for all the ticks its interval missed. The rest are skipped, and the next tick counts on from the late one. You can see that in the real output above: after the busy loop, A's ticks came at 1359, 1460, 1561, and 1663 ms. Still 100 ms apart, but on a new beat instead of 1400, 1500, 1600, and nine ticks behind the clock for good.
 
-That new beat has a side effect when there's more than one interval, and the real run shows it. Node's three tickers started a third of a beat apart. All three came due during the busy loop, all three ran the moment it ended, and Node counted each one's next tick from that same moment. From then on they tick together, all three within a millisecond: 1460, 1561, 1662. (C's column is a row behind because its third tick came due at 367 ms, just after the busy loop started.) The BEAM's tickers stayed a third of a beat apart the whole way through.
+That new beat has a side effect when there's more than one interval. Node's three tickers started a third of a beat apart. But then all three came due during the busy loop and all three ran the moment it ended. From that point onward Node counts each one's next tick from that same moment. At that point all of the intervals tick together and application level code would be required to enforce their timing differential.
 
 Here's more of it, with four intervals: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
 
