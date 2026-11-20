@@ -1,6 +1,6 @@
 // A ticker prints every 100 ms. Press Enter to start a busy loop, fib(40):
-// about a second of work each. Press Enter as often as you like. Type q and
-// Enter (or Ctrl-C) to quit.
+// about a second of work each. Press Enter as often as you like. Press q (or
+// Ctrl-C) to quit.
 //
 //   node ticker-live.mjs
 //
@@ -17,17 +17,21 @@ const log = (message) => {
   console.log(`${String(elapsed).padStart(5)} ms  ${message}`);
 };
 
-log("one event loop. Enter: busy loop. q, Enter: quit.");
+log("one event loop. Enter: busy loop. q: quit.");
 
 let n = 0;
 setInterval(() => log(`tick ${++n}`), 100);
 
 let busy = 0;
+// Raw mode hands over each key as it's pressed, without waiting for Enter.
+// Ctrl-C arrives as a key then, instead of stopping the process.
+if (process.stdin.isTTY) process.stdin.setRawMode(true);
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
-  // Enters that arrived while the loop was busy come in together
-  for (const line of chunk.split("\n").slice(0, -1)) {
-    if (line.trim() === "q") process.exit(0);
+  // Keys pressed while the loop was busy come in together
+  for (const key of chunk) {
+    if (key === "q" || key === "\x03") process.exit(0);
+    if (key !== "\r" && key !== "\n") continue;
     const b = ++busy;
     log(`busy loop ${b} starts`);
     fib(40);

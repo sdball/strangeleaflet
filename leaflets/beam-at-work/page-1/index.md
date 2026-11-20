@@ -328,11 +328,9 @@ In Node, one late callback stands in for all the ticks its interval missed. The 
 
 That new beat has a side effect when there's more than one interval. Node's three tickers started a third of a beat apart. But then all three came due during the busy loop and all three ran the moment it ended. From that point onward Node counts each one's next tick from that same moment. At that point all of the intervals tick together and application level code would be required to enforce their timing differential.
 
-A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 comes back to this. It also covers the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
+A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 will come back to this and also cover the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
 
-So why did the real Elixir run never fall behind, even on one scheduler? Scale. In the simulation a turn is long next to the time between ticks, so a few busy loops push ticks late. On my M1 a turn is about 10 microseconds and the ticks are 100 milliseconds apart: room for 10,000 turns between ticks. You'd need around ten thousand busy processes on one scheduler before a ticker waited a whole tick.
-
-Want to press the button on a real machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) have one ticker each, so you can read along as it ticks. They tick until you type `q` and Enter, and every press of Enter starts another `fib(40)` busy loop. Save them somewhere, and with Elixir and Node installed (I used the versions above), run them from that folder:
+Want to generate CPU loops at runtime for each of these approaches on your own machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) have one ticker each, so you can read along as they tick. When you press "Enter" that will start a `fib(40)` busy loop. `q` will quit.
 
 ```sh
 elixir ticker-live.exs                  # Elixir, the default schedulers
