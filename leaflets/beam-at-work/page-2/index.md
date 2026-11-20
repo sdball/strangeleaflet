@@ -18,15 +18,15 @@ Here's page 1's three tickers and busy loop again, with a crowd of connections w
 
 <script type="module" src="how-many.js"></script>
 
-Only the BEAM manages both. Node's async functions are cheaper than BEAM processes, but they share one thread, so the busy loop stops every ticker, as on page 1. A worker thread each keeps the tickers going, but at about 9 MB a worker, a thousand of them take more memory than this machine has. A million BEAM processes take about 2.5 GB, and none of them can hold up the rest. The rest of this page is about what a BEAM process is, what it costs, and where the BEAM runs it.
+Only the BEAM manages both. Node's async functions are cheaper than BEAM processes, but they share one thread, so the busy loop stops every ticker, as on page 1. A worker thread each keeps the tickers going, but at about 9 MB a worker they are exceedingly expensive to run. A million BEAM processes take about 2.5 GB, and none of them can hold up the rest. The rest of this page is about what a BEAM process is, what it costs, and where the BEAM runs it.
 
 ## Not that kind of process
 
 First, the word. To most programmers a process is what `ps` or Activity Monitor lists: a running program with its own process id, its own memory that the operating system keeps other programs out of, and the operating system deciding when it gets a core.
 
-A BEAM process isn't one of those. The whole BEAM is one operating system process. Its schedulers, from page 1, are threads inside that process, one per logical processor. BEAM processes live inside the BEAM, in its memory, and the schedulers take turns running them. The operating system never hears about them.
+A BEAM process isn't one of those. The whole BEAM runs on one operating system process. Its schedulers are threads inside that process, one per logical processor. BEAM processes live entirely inside the BEAM.
 
-You don't have to take my word for it. This script starts 100,000 BEAM processes and asks the operating system what changed:
+This script starts 100,000 BEAM processes and asks the operating system what changed:
 
 ```elixir
 # Start 100,000 BEAM processes and ask the operating system what changed.
@@ -76,9 +76,9 @@ after spawning 100,000
 
 A hundred thousand new processes, and the operating system saw nothing new. Same process id, same 32 threads, same one child.
 
-The 59 processes before we started are the BEAM's own, and Elixir's: the code server, the logger, the processes that read your keyboard and write to your terminal. They're ordinary BEAM processes too. (`Process.registered()` lists the ones with names, like `:code_server`, `:logger`, and `:user_drv_reader`.)
+The 59 processes before we started are from the BEAM and from Elixir: the code server, the logger, the processes that read the keyboard and write to the terminal. They're ordinary BEAM processes too. (`Process.registered()` lists the ones with names, like `:code_server`, `:logger`, and `:user_drv_reader`.)
 
-The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. Page 8 comes back to them. And the one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
+The 32 threads are the 8 schedulers, plus 8 dirty CPU schedulers and 10 dirty I/O schedulers, plus a few helpers. Dirty schedulers run work that can't be counted in reductions, like long calls into native code. The one child, `erl_child_setup`, is a small program the BEAM starts when it boots. Whenever Elixir runs an outside program, like the `ps` calls in this script, `erl_child_setup` is the one that launches it.
 
 So there are two layers of scheduling. The operating system decides which cores the BEAM's scheduler threads run on, and each scheduler decides which BEAM process runs on it. The operating system only ever sees the threads.
 
@@ -90,19 +90,19 @@ Because they act like operating system processes in the ways that matter for wri
 | --- | --- | --- |
 | Has an id | `77690` | `#PID<0.115.0>` |
 | Its own memory | yes | yes, its own heap and stack |
-| What keeps others out | the operating system: it maps out what each process may touch, and the CPU checks every memory access against that map | the language: nothing in Elixir or Erlang can point at another process's memory |
+| What keeps others out | the operating system: it maps out what each process may touch, and the CPU checks every memory access against that map | the BEAM: none of its instructions can reach another process's memory, so no language that runs on it can either |
 | Talks to others by | pipes, sockets, signals | messages (page 4) |
-| Who decides when it runs | the operating system, preemptively | a BEAM scheduler, preemptively, by counting reductions (page 1) |
+| Who decides when it runs | the operating system, preemptively | a BEAM scheduler, preemptively |
 | When it crashes | it ends, and its parent process can find out | it ends, and processes watching it are notified (page 5) |
 | Cost to start, on my M1 | about 1.4 ms and 830 KB | about 1 µs and 2.6 KB |
 
 BEAM processes aren't threads either. The book again: "Erlang processes are not like threads — they have no shared memory to modify, they can only communicate via messages". Threads in most languages share their memory with each other, so any thread can change data another thread is using. Data sent from one BEAM process to another is copied, so neither can change what the other is using.
 
-That's what makes page 1's preemption safe in the BEAM. In languages like Java or C++, threads get preempted too, and a thread paused halfway through changing shared data leaves it half-changed for every other thread to see. That's why threads that share memory need locks, in any language. But when a BEAM process runs out of reductions any of its half-changed work is only its own data that no other process can see. The BEAM scheduler can pause any process at any function call, and, in the book's words, "Erlang programs do not need locking or protected sections."
+That's what makes page 1's preemption safe in the BEAM. In languages like Java or C++, threads get preempted too, and a thread paused halfway through changing shared data leaves it half-changed which could break other threads. That's why threads that share memory need locks. But when a BEAM process runs out of reductions any of its half-changed work is only its own data that no other process can manipulate or even see. The BEAM scheduler can safely pause any process at any function call.
 
 ## How cheap is cheap?
 
-Here's a script spawning N processes that each sit waiting for a message, which is what most processes in a real program spend their time doing:
+Here's a script spawning N processes that each sit waiting for a message:
 
 ```elixir
 # Spawn N processes that each wait for a message, then measure.
@@ -137,7 +137,7 @@ A million processes in under a second, in about 2.5 GB. The BEAM's default limit
 
 A brand-new process is 2,616 bytes: 327 words of 8 bytes, which is what the Erlang efficiency guide says to expect. 233 of those words are its heap, where its data lives. The rest is the BEAM's own record of the process. The heap starts small on purpose, so a system can hold millions of processes, and grows when a process needs more. So 2.6 KB is the floor. A process that's holding real data is bigger.
 
-Here's what 2.6 KB looks like next to an operating system process. The top bar is an idle `sleep`, broken down by `vmmap`, the macOS tool that lists a process's memory. It counts only memory the process has written to, which is its own; the code of the libraries it loads is shared with every other program, so it's left out. The bottom bar is a new BEAM process, from `:erlang.process_info/2`. Both are drawn to the same scale.
+Here's what 2.6 KB looks like next to an operating system process. The top bar is an idle `sleep` command process, broken down by `vmmap`, the macOS tool that lists a process's memory. It counts only memory the process has written to, which is its own; the code of the libraries it loads is shared with every other program, so it's left out. The bottom bar is a new BEAM process, from `:erlang.process_info/2`. Both are drawn to the same scale.
 
 <process-scale>
 
@@ -170,8 +170,8 @@ if (isMainThread) {
     ws.push(w);
   })));
   const ms = performance.now() - t0;
-  const after = process.memoryUsage().rss;
-  console.log(`${n} idle workers: ${((after - before) / n / 1024 / 1024).toFixed(1)} MB of RSS each, ${(ms / n).toFixed(1)} ms each to start (${ms.toFixed(0)} ms total)`);
+  const mb = (process.memoryUsage().rss - before) / 1024 / 1024;
+  console.log(`${n} idle workers: ${(mb / n).toFixed(1)} MB of RSS each (${mb.toFixed(1)} MB in all), ${(ms / n).toFixed(1)} ms each to start (${ms.toFixed(0)} ms total)`);
   ws.forEach((w) => w.terminate());
 } else {
   parentPort.postMessage("up");
@@ -181,12 +181,12 @@ if (isMainThread) {
 
 ```text
 $ for i in 1 2 3; do node --expose-gc worker-cost.mjs; done
-8 idle workers: 9.7 MB of RSS each, 9.2 ms each to start (74 ms total)
-8 idle workers: 9.4 MB of RSS each, 5.3 ms each to start (43 ms total)
-8 idle workers: 9.4 MB of RSS each, 5.5 ms each to start (44 ms total)
+8 idle workers: 9.6 MB of RSS each (76.7 MB in all), 10.0 ms each to start (80 ms total)
+8 idle workers: 9.3 MB of RSS each (74.1 MB in all), 6.5 ms each to start (52 ms total)
+8 idle workers: 9.2 MB of RSS each (73.9 MB in all), 6.4 ms each to start (51 ms total)
 ```
 
-Each one took 5 to 9 ms to start, and about 9.5 MB.
+Each one took 6 to 10 ms to start, and each took about 9.5 MB of memory.
 
 That's eight. Start a few hundred and RSS stops being a good measure on this M1, which has 8 GB: at 500 it said 1.5 to 2.9 MB each. RSS, the resident set size, counts only what's in memory at that moment, and by then the workers' memory wasn't all there; macOS had swapped some of it out. `vmmap`'s physical footprint counts what the process has written to, whether it's resident or not. Here's the same script, measuring that instead ([worker-footprint.mjs](worker-footprint.mjs)):
 
@@ -241,15 +241,13 @@ $ for n in 1000 10000 100000 1000000; do node --expose-gc pending.mjs $n; done
 1000000 pending async functions: 0.50 µs each to start, 565 bytes each of V8 heap
 ```
 
-About as fast to start, and a fifth of the memory. But a paused async function isn't a process. They all share one thread and one heap, and when one of them wakes up it runs until it pauses again or returns, however long that takes. Page 1 showed where that leads. A BEAM process costs a few hundred bytes more and gets its own heap (page 3 shows why that matters for garbage collection), its own turn in a run queue, preemption, and a crash that's its own.
-
-These numbers come from three different measures: the BEAM's count of its process memory, V8's heap, and the operating system's view of resident memory for the worker threads. So read them as orders of magnitude, not exact ratios. For an operating system process, starting `/usr/bin/true` a thousand times from a shell took 1.4 ms each, and an idle `sleep` had about 830 KB of memory of its own (the scale bar above).
+About as fast to start, and a fifth of the memory. But a paused async function isn't a process. They all share one thread and one heap, and when one of them wakes up it runs until it pauses again or returns, however long that takes. Page 1 showed where that leads. A BEAM process costs a few hundred bytes more and gets its own heap, its own turn in a run queue, preemptive scheduling, and crash isolation.
 
 ## Where a new BEAM process runs
 
 When a BEAM process spawns another, the new one goes on the back of the run queue of the scheduler its parent is running on. So a BEAM process that spawns sixteen more puts all sixteen in one line.
 
-The BEAM evens that out in two ways. One is page 1's: a scheduler with an empty run queue can pick up a process from another scheduler's queue. The other is migration. Every 8 million reductions or so (2,000 turns' worth), the schedulers compare their run queue lengths. Schedulers with longer queues than average hand processes over to ones with shorter queues.
+The BEAM evens that out in two ways. A scheduler with an empty run queue can pick up a process from another scheduler's queue. The other is migration. Every 8 million reductions or so (2,000 turns' worth), the schedulers compare their run queue lengths. Schedulers with longer queues than average hand processes over to ones with shorter queues.
 
 Here's a parent spawning sixteen busy processes ([spread.exs](spread.exs)). It counts the processes waiting in each scheduler's run queue just before and just after spawning, and again half a second later. Each new process reports which scheduler it first ran on, then spins for a second:
 
@@ -302,11 +300,11 @@ process:        1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
 first ran on:   1  1  8  7  7  6  5  8  8  8  1  1  1  1  1  1
 ```
 
-Right after spawning, all sixteen were waiting in scheduler 1's queue, the parent's. (The seventeenth was already there before.) But schedulers 5 through 8 had nothing to do, so they took eight of them before those had even run once. That's the "first ran on" row: processes 3 to 10 first ran somewhere other than scheduler 1. Half a second later, every scheduler had work. Not perfectly even, but nobody wrote any code to spread it out. The exact numbers change from run to run, but the shape doesn't.
+Right after spawning, all sixteen were waiting in scheduler 1's queue, the parent's. (The seventeenth was already there before.) But schedulers 5 through 8 had nothing to do, so they took eight of them before those had even run once. That's the "first ran on" row: processes 3 to 10 first ran somewhere other than scheduler 1. Half a second later, every scheduler had work. Not perfectly even, but no one had to write any application level code to spread out the work.
 
 ### A busy process gets no special treatment
 
-Does the BEAM notice an expensive process and give it a scheduler of its own? No. Balancing looks at how much is waiting in each run queue, not at what any one process costs. And when there isn't enough work to keep every scheduler busy, it does the opposite of spreading out: it packs the work onto as few schedulers as it can keep fully loaded, so the rest can sleep. The docs call that scheduler compaction of load, and it's on by default.
+Balancing looks at how much is waiting in each run queue, not at what any one process costs. And when there isn't enough work to keep every scheduler busy, it does the opposite of spreading out: it packs the work onto as few schedulers as it can keep fully loaded, so the rest can sleep. The docs call that scheduler compaction of load, and it's on by default.
 
 Here's page 1's kind of busy loop among six tickers that tick every 10 ms ([busy-alone.exs](busy-alone.exs)). Every tick notes which scheduler it ran on, and so does the busy loop after each chunk of its work:
 
@@ -339,7 +337,7 @@ Here's the sixteen busy processes from spread.exs as a simulation, slowed way do
 
 Press **Spawn 16 busy processes**. A parent process starts on one scheduler and spawns sixteen children onto that scheduler's queue. Watch the idle schedulers take processes from it, and then migration move a few more, until each scheduler has about the same amount of work. Press it again while the first sixteen are still running and see where the next batch goes.
 
-Then press **Spawn 1,000 waiting processes**. Each one runs just long enough to reach its `receive`, then waits for a message that never comes. They pass through the run queues on the way and then leave them, because a waiting process isn't in any run queue. That's most of what makes processes cheap: one that's waiting costs its memory and nothing else.
+Then press **Spawn 1,000 waiting processes**. Each one runs just long enough to reach its `receive`, then waits for a message. They pass through the run queues on the way and then leave them, because a waiting process isn't in any run queue.
 
 <beam-spread>
 
@@ -355,7 +353,7 @@ The simulation's migration is simpler than the real one. It checks the loads eve
 
 ## Sources
 
-- The scripts and their runs: [os-view.exs](os-view.exs), [spawn.exs](spawn.exs), [spread.exs](spread.exs), [pending.mjs](pending.mjs), and [worker-cost.mjs](worker-cost.mjs), run 2026-11-12, and [worker-footprint.mjs](worker-footprint.mjs), run 2026-11-19, on an Apple M1 (8 cores, 8 GB) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. RSS undercounting under memory pressure: worker-cost.mjs with 500 workers said 2.2 and 2.9 MB each in two runs on 2026-11-19, against 8.2 and 8.3 MB with 100.
+- The scripts and their runs: [os-view.exs](os-view.exs), [spawn.exs](spawn.exs), [spread.exs](spread.exs), and [pending.mjs](pending.mjs), run 2026-11-12, [worker-footprint.mjs](worker-footprint.mjs), run 2026-11-19, and [worker-cost.mjs](worker-cost.mjs), run 2026-11-20, on an Apple M1 (8 cores, 8 GB) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0. RSS undercounting under memory pressure: worker-cost.mjs with 500 workers said 2.2 and 2.9 MB each in two runs on 2026-11-19, against 8.2 and 8.3 MB with 100.
 - `vmmap` counting written memory whether resident or swapped ("Dirty and swapped are memory which has been written to by the process"): the `vmmap(1)` man page on macOS 26.3.1. A footprint being "the dirty and compressed segments", and vmmap's swapped column being compressed memory: Apple, [iOS Memory Deep Dive](https://developer.apple.com/videos/play/wwdc2018/416/) (WWDC 2018). That talk is about iOS; I haven't found Apple saying the same for macOS in so many words. The operating system process figures: `for i in {1..1000}; do /usr/bin/true; done` under `time` in zsh (1.43 to 1.44 seconds in three runs), and `vmmap -summary` on a running `sleep 60`, its DIRTY column grouped for the scale bar (the same in two runs; macOS 26.3.1).
 - Schedulers running in "separate OS threads", the BEAM using "several OS threads to indirectly execute Erlang processes", and the operating system deciding which cores those threads run on: *The BEAM Book*, [Scheduling](https://blog.stenmans.org/theBeamBook/#_scheduling), [Concurrency, Parallelism, and Preemptive Multitasking](https://blog.stenmans.org/theBeamBook/#_concurrency_parallelism_and_preemptive_multitasking), and [Load Balancing](https://blog.stenmans.org/theBeamBook/#_load_balancing).
 - Scheduler, dirty CPU scheduler, and dirty I/O scheduler threads, and their defaults: the [erl command docs](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+S) for `+S`, [`+SDcpu`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+SDcpu), and [`+SDio`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+SDio). The default process limit of 1,048,576 and the `+P` flag: [`+P`](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+P).
