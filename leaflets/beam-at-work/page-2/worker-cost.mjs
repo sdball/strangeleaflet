@@ -12,8 +12,8 @@ if (isMainThread) {
     ws.push(w);
   })));
   const ms = performance.now() - t0;
-  const after = process.memoryUsage().rss;
-  console.log(`${n} idle workers: ${((after - before) / n / 1024 / 1024).toFixed(1)} MB of RSS each, ${(ms / n).toFixed(1)} ms each to start (${ms.toFixed(0)} ms total)`);
+  const mb = (process.memoryUsage().rss - before) / 1024 / 1024;
+  console.log(`${n} idle workers: ${(mb / n).toFixed(1)} MB of RSS each (${mb.toFixed(1)} MB in all), ${(ms / n).toFixed(1)} ms each to start (${ms.toFixed(0)} ms total)`);
   ws.forEach((w) => w.terminate());
 } else {
   parentPort.postMessage("up");
