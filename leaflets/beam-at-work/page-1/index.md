@@ -338,7 +338,8 @@ elixir --erl "+S 1" ticker-live.exs     # Elixir, one scheduler
 node ticker-live.mjs                    # Node
 ```
 
-Press Enter a few times while each one runs. In Elixir each busy loop is a new process (BEAM process, not operating system process), so it starts the moment you press Enter, and the ticker keeps ticking: with two busy loops sharing one scheduler (`elixir --erl "+S 1" ticker-live.exs`), the longest gap between ticks in my run was still 100 ms. In Node, reading the keyboard is a callback too, so a second Enter waits in line behind the busy loop that's running. When I tried it, one late tick slipped out between the two busy loops, and then the ticker went quiet again until the second one finished.
+Press Enter a few times while each one runs. In Elixir each busy loop is a new process (BEAM process, not operating system process), so it starts the moment you press Enter, and the ticker keeps ticking: with two busy loops sharing one scheduler (`elixir --erl "+S 1" ticker-live.exs`), the longest gap between ticks in my run was still 100 ms. In Node, reading the keyboard is a callback too, so a second Enter waits in line behind the busy loop that's running.
+
 
 ## Sources
 
