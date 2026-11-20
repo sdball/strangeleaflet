@@ -328,49 +328,7 @@ In Node, one late callback stands in for all the ticks its interval missed. The 
 
 That new beat has a side effect when there's more than one interval. Node's three tickers started a third of a beat apart. But then all three came due during the busy loop and all three ran the moment it ended. From that point onward Node counts each one's next tick from that same moment. At that point all of the intervals tick together and application level code would be required to enforce their timing differential.
 
-Here's more of it, with four intervals: A, B, and D every 100 ms, C every 150 ms, each starting a little after the last, with a short busy loop at 500 ms and a longer one at 1000 ms ([intervals.mjs](intervals.mjs), same machine):
-
-```javascript
-const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
-
-const start = performance.now();
-const now = () => Math.round(performance.now() - start);
-
-// A, B, and D tick every 100 ms, starting 0, 40, and 90 ms in.
-// C ticks every 150 ms, starting 20 ms in.
-const ticks = { A: [], B: [], D: [], C: [] };
-for (const [name, offset, every] of [["A", 0, 100], ["B", 40, 100], ["D", 90, 100], ["C", 20, 150]]) {
-  setTimeout(() => setInterval(() => ticks[name].push(now()), every), offset);
-}
-
-const busy = [];
-const busyLoop = (n) => {
-  const from = now();
-  fib(n);
-  busy.push(`${from}–${now()} ms`);
-};
-setTimeout(() => busyLoop(34), 500);
-setTimeout(() => busyLoop(38), 1000);
-
-setTimeout(() => {
-  console.log(`busy loops: ${busy.join(", ")}`);
-  for (const [name, times] of Object.entries(ticks)) console.log(`${name}  ${times.join(" ")}`);
-  process.exit();
-}, 2000);
-```
-
-```text
-$ node intervals.mjs
-busy loops: 500–560 ms, 1002–1433 ms
-A  103 203 303 403 560 662 761 863 963 1434 1534 1636 1744 1845 1946
-B  142 244 344 446 560 662 761 863 963 1434 1534 1636 1744 1845 1946
-D  194 296 396 496 597 698 800 900 1433 1534 1636 1744 1845 1946
-C  172 323 474 625 777 927 1434 1585 1744 1895
-```
-
-A and B both came due during the short busy loop. They both ran the moment it ended, Node counted each one's next tick from that same moment, and from then on they tick together. D wasn't due until just after, so it kept its own beat until the longer busy loop caught it too. C has a different period, so it can't lock on, but now it lands on the same millisecond as the others every so often (1434, 1744). The details shift from run to run; in another run the short busy loop lasted until 594 ms and caught D as well.
-
-Nothing ever spreads them back out. A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 comes back to this. It also covers the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
+A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 comes back to this. It also covers the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
 
 So why did the real Elixir run never fall behind, even on one scheduler? Scale. In the simulation a turn is long next to the time between ticks, so a few busy loops push ticks late. On my M1 a turn is about 10 microseconds and the ticks are 100 milliseconds apart: room for 10,000 turns between ticks. You'd need around ten thousand busy processes on one scheduler before a ticker waited a whole tick.
 
@@ -393,7 +351,7 @@ Press Enter a few times while each one runs. In Elixir each busy loop is a new p
 - What a reduction is, the check on every function call, waiting processes leaving the queue, and "no way to loop forever without doing a function call": Erik Stenman, *The BEAM Book*, [Reductions](https://blog.stenmans.org/theBeamBook/#_reductions) and [What is a Reduction Really?](https://blog.stenmans.org/theBeamBook/#_what_is_a_reduction_really)
 - Run queues and going to the back of the line: *The BEAM Book*, [Scheduling](https://blog.stenmans.org/theBeamBook/#_scheduling) and [The Ready Queue](https://blog.stenmans.org/theBeamBook/#_the_ready_queue).
 - `:timer.send_interval/2` sending its message repeatedly, every interval: [Erlang's timer docs](https://www.erlang.org/doc/apps/stdlib/timer.html#send_interval/2). Node's late interval and its new beat: the real Node run above.
-- Intervals counting their next tick from when their callback starts: Node v25.9.0's [lib/internal/timers.js](https://github.com/nodejs/node/blob/v25.9.0/lib/internal/timers.js#L599-L611) reads the time just before the callback and re-inserts the interval from it, and [src/env.cc](https://github.com/nodejs/node/blob/v25.9.0/src/env.cc#L1611) refreshes that clock first. The intervals locking together: the Node ticker run and [intervals.mjs](intervals.mjs), run on the same machine and versions as the ticker scripts.
+- Intervals counting their next tick from when their callback starts: Node v25.9.0's [lib/internal/timers.js](https://github.com/nodejs/node/blob/v25.9.0/lib/internal/timers.js#L599-L611) reads the time just before the callback and re-inserts the interval from it, and [src/env.cc](https://github.com/nodejs/node/blob/v25.9.0/src/env.cc#L1611) refreshes that clock first. The intervals locking together: the Node ticker run above.
 - Idle schedulers stealing work: *The BEAM Book*, [Task Stealing](https://blog.stenmans.org/theBeamBook/#_task_stealing).
 - One scheduler per logical processor by default, and the `+S` flag: the Erlang/OTP [erl command docs](https://www.erlang.org/doc/apps/erts/erl_cmd.html#+S).
 - `System.schedulers_online/0`: [Elixir's System docs](https://hexdocs.pm/elixir/1.19.5/System.html#schedulers_online/0). `:timer.send_interval/2`: [Erlang's timer docs](https://www.erlang.org/doc/apps/stdlib/timer.html#send_interval/2).

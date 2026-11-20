@@ -245,7 +245,7 @@ $ node fixed.mjs main
 1600 ms  tick 16 (16 due)
 ```
 
-Still nothing while the busy loop ran, but afterwards every tick that came due, and then back on the beat at 1401 ms. That's what the BEAM did with the ordinary NIF at the top of this page. And here are page 1's four intervals, each made steady:
+Still nothing while the busy loop ran, but afterwards every tick that came due, and then back on the beat at 1401 ms. That's what the BEAM did with the ordinary NIF at the top of this page. And here are four intervals, each made steady: A, B, and D every 100 ms, starting 0, 40, and 90 ms in, and C every 150 ms, starting 20 ms in, with a short busy loop at 500 ms and a longer one at 1000 ms. With plain `setInterval`, each busy loop would lock the intervals that came due during it onto one beat, as page 1's three tickers were:
 
 ```text
 $ node fixed.mjs intervals

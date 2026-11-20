@@ -4,7 +4,7 @@
 // and the busy loop moved off the main thread into a worker thread.
 //   node fixed.mjs main        steady ticker, busy loop on the main thread
 //   node fixed.mjs worker      steady ticker, busy loop in a worker thread
-//   node fixed.mjs intervals   page 1's four intervals, made steady
+//   node fixed.mjs intervals   four intervals, made steady
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 
 const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));
@@ -32,7 +32,8 @@ if (!isMainThread) {
   const log = (message, at = elapsed()) => console.log(`${String(Math.floor(at)).padStart(4)} ms  ${message}`);
 
   if (mode === "intervals") {
-    // As page 1's intervals.mjs, with steadyInterval for setInterval
+    // A, B, and D every 100 ms and C every 150 ms, each starting a little
+    // after the last, with busy loops at 500 and 1000 ms
     const now = () => Math.round(elapsed());
     const ticks = { A: [], B: [], D: [], C: [] };
     for (const [name, offset, every] of [["A", 0, 100], ["B", 40, 100], ["D", 90, 100], ["C", 20, 150]]) {
