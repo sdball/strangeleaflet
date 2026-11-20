@@ -4,9 +4,9 @@ publish: false
 meta_description: How Elixir runs code, and why one busy loop can't stop everything else
 ---
 
-Here's a small simple application. Three tickers tick every 100 milliseconds. At 350 milliseconds, something else starts a pile of slow math in a CPU-bound loop that takes about a second. Can the tickers keep ticking while the application is stuck in the loop?
+Let's consider a simple application. Three tickers that tick every 100 milliseconds. Then something starts a CPU-bound loop within the application that takes about 1000 milliseconds to run. Can the tickers keep ticking while the application is still working the loop?
 
-Press **Add a busy loop** to trigger one (or more) CPU-bound loops.
+Press **Add a busy loop** to trigger one (or more) of those CPU-bound loops and watch the effect on a BEAM application vs NodeJS.
 
 <beam-vs-node>
 
@@ -31,7 +31,9 @@ Node.js, one thread
 
 <script type="module" src="beam-vs-node.js"></script>
 
-This widget simulates that application in Node.js and in the BEAM, the virtual machine that runs Elixir (and Erlang), side by side. It behaves the way the real runs further down this page do. The simulation is slowed way down to make the differences between the application architectures more easily observable. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs next.
+This widget simulates that application in the BEAM and in NodeJS. The BEAM is the virtual machine that runs Elixir and Erlang applications.
+
+The simulation behaves the way the real runs further down this page do. It's also slowed way down to make the differences between the application architectures more easily observable. Both sides do the same work at the same pace; the only difference is how each runtime decides what runs.
 
 The faint marks on the strips are the ideal: where every tick would land if nothing else occupied the CPU. The numbers at the top of each side score it against that ideal. **Behind now** is ticks that are due but haven't printed yet, **late so far** is ticks that printed late, and **skipped so far** is ticks that will never print.
 
@@ -39,7 +41,7 @@ Node's tickers have no choice but to stop while the busy loop runs. The BEAM's t
 
 ## The ticker application in Node
 
-The slow math is the classic slow recursive Fibonacci: `fib(n)` calls itself twice, for every number down to 1. Asking for `fib(40)` makes about 331 million calls. That's our busy loop.
+The slow math is the classic slow recursive Fibonacci: `fib(n)` calls itself twice, for every number down to 1. Asking for `fib(40)` makes about 331 million calls. That's the CPU-bound busy loop.
 
 ```javascript
 // The slow way on purpose: about 330 million calls for fib(40)
@@ -156,7 +158,7 @@ end_at = elapsed.()
 # ticker, as ticker.mjs does. It's in ticker.exs.
 ```
 
-Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs). You don't need to. The simulation above shows the same thing in your browser.
+Both scripts are here if you want to run them yourself: [ticker.mjs](ticker.mjs) and [ticker.exs](ticker.exs).
 
 ## What happened
 
@@ -265,11 +267,11 @@ So it's not the extra cores that allows Elixir to be reliable here. Something el
 
 Node runs your JavaScript on one thread, in a loop called the **event loop**. Each time around, it takes the next callback that's ready and calls it. The function that's running lives on the **call stack**, and there's only one call stack.
 
-Once a callback starts, it runs until it returns. Node can't pause it halfway to let something else go. When a ticker's timer comes due during `fib(40)`, its callback just waits in line until the stack is empty. Node's own guide says it plainly: because a thread that's busy with one thing can't get to anything else, "the fair treatment of clients is thus the responsibility of your application."
+Once a callback starts, it runs until it returns. Node can't pause it halfway to let something else go. When a ticker's timer comes due during `fib(40)`, its callback has to wait in line until the stack is empty. Node's own guide says it plainly: because a thread that's busy with one thing can't get to anything else, "the fair treatment of clients is thus the responsibility of your application."
 
 That's called **cooperative scheduling**. The code that's running decides when to give the thread back, by returning, and nothing can take it away sooner. Everything else gets a turn only when the running code cooperates.
 
-That's by design, not a bug. Node is fast and simple because your code promises to hand the thread back quickly. If you need heavy math in Node, you split it into small pieces that each give the loop a turn, or you move it off the event loop entirely. (Page 8 comes back to that.)
+That's by design, not a bug. Node is fast and simple because your code promises to hand the thread back quickly. If you need heavy math in Node, you split it into small pieces that each give the loop a turn, or you move it off the event loop entirely.
 
 ## Why Elixir doesn't
 
@@ -277,17 +279,17 @@ The BEAM has a different design. Here are its parts, one at a time.
 
 A **scheduler** is a thread inside the BEAM whose whole job is running processes. By default you get one per logical processor, so 8 on my M1.
 
-Each scheduler has a **run queue**: a line of processes that are ready to run. The scheduler takes the process at the front and runs it.
+Each scheduler has a **run queue**: a line of processes that are ready to run. The scheduler takes the process at the front and runs it. The key is that the scheduler only allows the process to run for a certain number of **reductions** before another process gets to run.
 
-How long does it get to run? That's measured in **reductions**. A reduction is a small unit of work, roughly one function call. Each process gets a budget of 4,000 reductions per turn. (It was 2,000 before OTP 20, so older write-ups, including [one of mine](/leaflets/about-elixir/page-3/), say 2,000.) The BEAM checks the budget every time a function is called. When it runs out, the process goes to the back of the line and the next one gets a turn. A process that's waiting for a message, like a ticker between ticks, steps out of the line until one arrives.
+A reduction is a small unit of work, roughly one function call. Each process gets a budget of 4,000 reductions per turn (2,000 before OTP 20). The BEAM checks the budget every time a function is called. When it runs out, the process goes to the back of the line and the next one gets a turn. Additionally a process that's waiting for a message, like a ticker between ticks, takes itself out of the queue until a message arrives. There's no need to even get compute time if all you're doing is waiting for a message.
 
-Taking the CPU back like that, without the running code agreeing to it, is called **preemption**, and the BEAM's schedulers are **preemptive**. That's the whole difference on this page: Elixir's scheduling is preemptive, and Node's is cooperative. Your busy loop doesn't have to be polite. It just runs out of reductions.
+Taking the CPU back like that, without requiring the running code to return or yield, is called **preemption**, and the BEAM's schedulers are **preemptive schedulers**. That's the whole difference on this page: Elixir's scheduling is preemptive, and Node's is cooperative. The busy loop doesn't have to be polite or cleverly coded to efficiently allow shared work.
 
-And it can't dodge the count. Elixir has no `while` loop. To repeat something, a function calls itself, or calls something like `Enum.each` that does, and every one of those calls is counted. `fib(40)` makes 331 million calls, so it gets sent to the back of the line around 80,000 times before it's done.
+It also can't dodge the count. To repeat something, a function calls itself, or calls something like `Enum.each` that does, and every one of those calls is counted. `fib(40)` makes 331 million calls, so it gets sent to the back of the line around 80,000 times before it's done.
 
 How long is one turn? My busy loop made 331 million calls in about 0.8 seconds, so roughly 400 million a second. At that pace, 4,000 reductions take about 10 microseconds. A ticker that comes due mid-turn waits ten millionths of a second at most.
 
-One more piece. When a scheduler's run queue is empty, it doesn't sit idle while another scheduler has a line. It steals a process from that line, so work spreads across the cores without you arranging it. With 8 schedulers, the three tickers and the busy loop could each have one to themselves.
+When a scheduler's run queue is empty, it doesn't sit idle while another scheduler has a line. It steals a process from that line, so work naturally spreads across the cores without you arranging it. With 8 schedulers, the three tickers and the busy loop could end up each having one to themselves.
 
 ## Back to the simulation
 
