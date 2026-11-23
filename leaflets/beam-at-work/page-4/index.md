@@ -177,7 +177,7 @@ Two tickets, two sales, and the third buyer hears they're sold out. The times sh
 
 ## Why the BEAM sold two
 
-Nothing told the seller to take one request at a time. It's how a process works.
+Nothing told the seller to take one request at a time. It's simply how a process works.
 
 The number of tickets left is the seller's own data. No other process can read it or change it, so the only way to ask about it is to send the seller a message. Messages wait in its mailbox until it receives them, and it receives one at a time: each pass of the loop handles one request, start to finish, before the next `receive`.
 
@@ -382,9 +382,9 @@ ArrayBuffer of 16 MB, transferred:     24 µs, sender's now has 0 bytes
 SharedArrayBuffer of 16 MB, shared:     9 µs
 ```
 
-Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
+Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6 ms. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
 
-So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps, and monitors, which report a crash with a message.
+So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes per thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps, and monitors, which report a crash with a message.
 
 ## Where it gives ground
 
