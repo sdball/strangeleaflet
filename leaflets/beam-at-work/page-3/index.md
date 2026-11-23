@@ -162,34 +162,32 @@ send(builder, :go)
 ```text
 $ for i in 1 2 3; do elixir gc-alone.exs; done
 schedulers: 8, dirty CPU schedulers: 8
-builder's GCs: 68, 1089 ms in all, longest 290 ms
-ticks while the builder collected: 672, worst 0 ms late
-ticks the rest of the time: 1728, worst 0 ms late
+builder's GCs: 68, 701 ms in all, longest 142 ms
+ticks while the builder collected: 420, worst 0 ms late
+ticks the rest of the time: 1980, worst 1 ms late
 schedulers: 8, dirty CPU schedulers: 8
-builder's GCs: 68, 961 ms in all, longest 309 ms
-ticks while the builder collected: 594, worst 1 ms late
-ticks the rest of the time: 1806, worst 1 ms late
+builder's GCs: 68, 695 ms in all, longest 137 ms
+ticks while the builder collected: 420, worst 0 ms late
+ticks the rest of the time: 1980, worst 0 ms late
 schedulers: 8, dirty CPU schedulers: 8
-builder's GCs: 68, 899 ms in all, longest 300 ms
-ticks while the builder collected: 540, worst 0 ms late
-ticks the rest of the time: 1860, worst 3 ms late
+builder's GCs: 68, 694 ms in all, longest 137 ms
+ticks while the builder collected: 426, worst 0 ms late
+ticks the rest of the time: 1974, worst 0 ms late
 ```
 
-The builder spent about a second collecting, and its last collections took about a third of a second each, once its heaps held a few hundred megabytes. The tickers ticked right through them: hundreds of ticks while the builder collected, none more than a millisecond late. That's no worse than the rest of the run, where the worst tick was 3 ms late.
-
-Run it yourself and now and then you'll see a tick tens of milliseconds late outside the collections. The six tickers do that with no builder at all ([tickers-alone.exs](tickers-alone.exs)), so that's the machine, not the collector.
+The builder spent about 700 ms collecting, and its biggest collections, near the end, took over a tenth of a second each, once its heaps held a few hundred megabytes. The tickers ticked right through them: hundreds of ticks while the builder collected, none of them even a millisecond late, as on time as the rest of the run.
 
 You might guess the tickers were fine because there were eight schedulers and they ran on different ones. Here it is with one:
 
 ```text
 $ elixir --erl "+S 1" gc-alone.exs
 schedulers: 1, dirty CPU schedulers: 1
-builder's GCs: 68, 987 ms in all, longest 326 ms
-ticks while the builder collected: 594, worst 0 ms late
-ticks the rest of the time: 1806, worst 2 ms late
+builder's GCs: 68, 690 ms in all, longest 133 ms
+ticks while the builder collected: 396, worst 0 ms late
+ticks the rest of the time: 2004, worst 1 ms late
 ```
 
-Still nothing. Had that 326 ms collection run on the only scheduler, it would have had the scheduler's thread for 326 ms, and no ticker could have run. It didn't run there, because the BEAM saw it coming. Before collecting, it adds up how much it will have to go through, and if that's 128K words (a megabyte) or more, it hands the collection to a dirty CPU scheduler. Dirty schedulers are extra scheduler threads for work that can't be counted in reductions. The process waits there while it's collected, and its own scheduler goes on running everyone else.
+Still nothing. Had that 133 ms collection run on the only scheduler, it would have had the scheduler's thread for 133 ms, and no ticker could have run. It didn't run there, because the BEAM saw it coming. Before collecting, it adds up how much it will have to go through, and if that's 128K words (a megabyte) or more, it hands the collection to a dirty CPU scheduler. Dirty schedulers are extra scheduler threads for work that can't be counted in reductions. The process waits there while it's collected, and its own scheduler goes on running everyone else.
 
 ## And in Node?
 
@@ -230,25 +228,25 @@ for (let n = 10_000_000; n > 0; ) {
 
 ```text
 $ for i in 1 2 3; do node gc-pause.mjs; done
-node v25.9.0, heap used 465 MB, longest chunk of work 4 ms
-GCs: 14, 91 ms in all, longest 46 ms
-ticks while V8 collected: 9, worst 41 ms late
-ticks the rest of the time: 390, worst 8 ms late
-node v25.9.0, heap used 464 MB, longest chunk of work 2 ms
-GCs: 14, 115 ms in all, longest 57 ms
-ticks while V8 collected: 11, worst 50 ms late
-ticks the rest of the time: 389, worst 5 ms late
 node v25.9.0, heap used 464 MB, longest chunk of work 3 ms
-GCs: 14, 124 ms in all, longest 58 ms
-ticks while V8 collected: 11, worst 53 ms late
-ticks the rest of the time: 388, worst 6 ms late
+GCs: 13, 170 ms in all, longest 98 ms
+ticks while V8 collected: 17, worst 97 ms late
+ticks the rest of the time: 382, worst 7 ms late
+node v25.9.0, heap used 464 MB, longest chunk of work 3 ms
+GCs: 14, 123 ms in all, longest 56 ms
+ticks while V8 collected: 10, worst 51 ms late
+ticks the rest of the time: 389, worst 4 ms late
+node v25.9.0, heap used 464 MB, longest chunk of work 3 ms
+GCs: 14, 126 ms in all, longest 60 ms
+ticks while V8 collected: 12, worst 56 ms late
+ticks the rest of the time: 387, worst 4 ms late
 ```
 
-Be fair to V8 here: it's much faster at this job. It spent about a tenth of a second collecting where the BEAM spent a whole one, and its longest pause was a sixth as long. Copying 300 MB of live data, over and over, is exactly what a copying collector is worst at, and V8's mostly-concurrent marking doesn't have to.
+Be fair to V8 here: it's much faster at this job. It spent 120 to 170 ms collecting where the BEAM spent 700, and its longest pause was usually under half as long. Copying 300 MB of live data, over and over, is exactly what a copying collector is worst at, and V8's mostly-concurrent marking doesn't have to.
 
-But look at who waited. In Node the ticks that came due during a collection waited it out, and the worst of them was late by nearly the whole longest pause, every run, because the pause stopped all the JavaScript there was. The rest of the time the ticker was never more than a few milliseconds late. In the BEAM the builder waited a third of a second and nobody else waited at all. In a server, the ticker is every other request. One request building something big in Node makes every request wait for its garbage. In the BEAM it only slows down that one request.
+But look at who waited. In Node the ticks that came due during a collection waited it out, and the worst of them was late by nearly the whole longest pause, every run, because the pause stopped all the JavaScript there was. The rest of the time the ticker was never more than a few milliseconds late. In the BEAM the builder waited through 700 ms of collections and nobody else waited at all. In a server, the ticker is every other request. One request building something big in Node makes every request wait for its garbage. In the BEAM it only slows down that one request.
 
-The replay at the top is another run of the same job ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)), with three tickers that make a little garbage every tick, the way a small request would, so their heaps fill and get collected too. Its numbers aren't quite these. In it the BEAM builder's longest collection was 260 ms, and V8's longest pause was 80 ms, where the runs above had 46 to 58.
+The replay at the top is another run of the same job ([record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs)), with three tickers that make a little garbage every tick, the way a small request would, so their heaps fill and get collected too. Its numbers aren't quite these. In it the BEAM builder's longest collection was 260 ms, and V8's longest pause was 80 ms, where the runs above had 133 to 142 ms and 56 to 98.
 
 ## Most processes never collect at all
 
@@ -321,7 +319,7 @@ And one process with a huge heap is slow to collect, as the builder showed. The 
 
 ## Sources
 
-- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), [die-young.exs](die-young.exs), and [children-gcs.exs](children-gcs.exs), run 2026-11-12 (children-gcs.exs again 2026-11-23). The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [gc-pause.mjs](gc-pause.mjs), [die-young.exs](die-young.exs), and [children-gcs.exs](children-gcs.exs), run 2026-11-12 (gc-alone.exs, gc-pause.mjs, and children-gcs.exs again 2026-11-23). The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - The stack and heap in one block growing toward each other, a collection when they meet, the collector being a "per process generational semi-space copying collector", generations and the old heap, the full sweep, growth starting at 233 words in "a variation of the Fibonacci sequence" then by 20%, shrinking, and cost "proportional to the amount of live data on the heap": the ERTS docs, [Erlang Garbage Collector](https://www.erlang.org/doc/apps/erts/garbagecollection.html): [Overview](https://www.erlang.org/doc/apps/erts/garbagecollection.html#overview), [Generational Garbage Collection](https://www.erlang.org/doc/apps/erts/garbagecollection.html#generational-garbage-collection), and [Sizing the heap](https://www.erlang.org/doc/apps/erts/garbagecollection.html#sizing-the-heap). The same, from another angle: *The BEAM Book*, [The PCB](https://blog.stenmans.org/theBeamBook/#_the_pcb), [The Garbage Collector (GC)](https://blog.stenmans.org/theBeamBook/#_the_garbage_collector_gc), and [Copying Garbage Collection](https://blog.stenmans.org/theBeamBook/#_copying_garbage_collection) ("most terms die young").
 - Tracing collections and the sizes in each trace message, tracing every new process with `new_processes`, and sending the trace messages to another process with `{tracer, Tracer}`: `garbage_collection` in [`erlang:trace/3`](https://www.erlang.org/doc/apps/erts/erlang.html#trace/3). Counting them system-wide: `garbage_collection` in [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
 - Collections of 128K words or more going to a dirty CPU scheduler: `check_for_possibly_long_gc` in [erl_gc.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.c#L688-L716), with `ERTS_POTENTIALLY_LONG_GC_HSIZE` in [erl_gc.h](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.h#L30), and dirty system work going on the dirty CPU queue in [erl_process.c](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L6507-L6509).
