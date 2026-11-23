@@ -6,7 +6,7 @@ meta_description: Every BEAM process has its own heap and collects its own garba
 
 Elixir data is immutable: it cannot be changed. Add an item to a list and you get a new list, with the old one still there for anyone still using it. Programs with immutable data make a lot of garbage: old versions of things that nothing uses any more. Something has to find the garbage and take the memory back, and in the BEAM, as in Node, that's a garbage collector.
 
-Every garbage collector has the same problem. To tell what's garbage, it has to look at what the program is using, and that's hard to do while the program keeps changing it. So collectors stop the program, at least for a moment. The interesting question is: stop *what*, exactly?
+Garbage collectors in any language have the same problem. To tell what's garbage, they have to look at what the program is using, and that's hard to do while the program keeps changing it. So collectors stop the program, at least for a moment. The interesting question is: stop *what*, exactly?
 
 Here's a job that gives the collector a lot to do, replayed from real runs in the BEAM and in Node.
 
