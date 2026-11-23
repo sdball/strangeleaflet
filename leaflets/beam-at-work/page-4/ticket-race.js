@@ -8,8 +8,8 @@
 // the payment's reply matches, and only then looks at the next request. In
 // Node the seller is an object with an async buy(): each call checks what's
 // left, then awaits the payment, which hands the thread to the next buyer,
-// so all three check before any of them takes a ticket. "Node with a queue"
-// is wait-inside-queue.mjs, where each buy() waits for the one before it,
+// so all three check before any of them takes a ticket. The Node column's
+// "Add a queue" setting is wait-inside-queue.mjs, where each buy() waits for the one before it,
 // and matches the BEAM exactly.
 //
 // Each buyer shows what it saw when its request was checked, which is where
@@ -76,11 +76,8 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     border-color: var(--brass);
     font-weight: 700;
   }
-  ticket-race button[aria-pressed=true] {
-    border-color: var(--brass);
-    background: var(--tint);
-  }
-  ticket-race button:focus-visible {
+  ticket-race button:focus-visible,
+  ticket-race label.setting:has(:focus-visible) {
     outline: 2px solid var(--link);
     outline-offset: 2px;
   }
@@ -128,20 +125,37 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     font-size: 1rem;
     font-weight: 700;
   }
-  /* Every note a side can have, stacked in one spot sized to the longest,
-     so switching the queue on and off never moves anything */
   ticket-race .side-note {
-    display: grid;
     margin: .15rem 0 0;
     font-size: .85rem;
     color: var(--muted);
   }
-  ticket-race .side-note > span {
-    grid-area: 1 / 1;
-    visibility: hidden;
+  /* A setting of this side's seller, not an action: it lives in the column */
+  ticket-race label.setting {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    min-height: 44px;
+    margin-top: .5rem;
+    padding: .35rem .8rem;
+    font-family: var(--type);
+    font-size: .85rem;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
   }
-  ticket-race .side-note > span.on {
-    visibility: visible;
+  ticket-race label.setting input {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    accent-color: var(--brass);
+  }
+  ticket-race label.setting:has(:checked) {
+    border-color: var(--brass);
+    background: var(--tint);
   }
   /* The headline: how many tickets are left */
   ticket-race .left {
@@ -306,21 +320,19 @@ function sell(kind) {
   return buyers;
 }
 
-// Each side's notes: the first without the queue, the second with it
+// Each side's seller. Only Node's has a setting: the queue.
 const SIDES = {
   beam: {
     title: "BEAM: the seller is a process",
-    notes: ["Each request is a message in its mailbox, and it handles one at a time."],
+    note: "Each request is a message in its mailbox, and it handles one at a time.",
     paying: "waiting for the payment from",
     waiting: "in its mailbox",
     kind: () => "process",
   },
   node: {
     title: "Node: the seller is an object",
-    notes: [
-      "Its async buy() checks, awaits the payment, then takes a ticket.",
-      "Its async buy() checks, awaits the payment, then takes a ticket. A queue makes each buy() wait for the one before.",
-    ],
+    note: "Its async buy() checks, awaits the payment, then takes a ticket.",
+    setting: "Add a queue: each buy() waits for the one before",
     paying: "awaiting the payment from",
     waiting: "in the queue",
     kind: (queued) => (queued ? "queue" : "await"),
@@ -339,7 +351,10 @@ customElements.define("ticket-race", class extends HTMLElement {
     const side = (key) => `
       <section class="side" data-side="${key}" aria-labelledby="${id}-${key}">
         <h3 class="side-title" id="${id}-${key}">${SIDES[key].title}</h3>
-        <p class="side-note">${SIDES[key].notes.map((n) => `<span>${n}</span>`).join("")}</p>
+        <div class="about">
+          <p class="side-note">${SIDES[key].note}</p>
+          ${SIDES[key].setting ? `<label class="setting"><input type="checkbox" class="queue"> ${SIDES[key].setting}</label>` : ""}
+        </div>
         <p class="left"><span>tickets left</span><output></output></p>
         <div class="seller">
           <div class="paying-line"><span>${SIDES[key].paying}</span><span class="list"></span></div>
@@ -357,7 +372,6 @@ customElements.define("ticket-race", class extends HTMLElement {
       <p class="intro-text">Three people try to buy the last two tickets at the same moment, and each sale has to wait 100 ms for a card payment before it takes a ticket. Here's the same seller in the BEAM and in Node.</p>
       <div class="controls">
         <button type="button" class="go">Three buyers at once</button>
-        <button type="button" class="queue" aria-pressed="false">Node with a queue</button>
         <span class="clock">time <output></output></span>
       </div>
       <p class="note">A simulation of <a href="wait-inside.exs">wait-inside.exs</a> and <a href="wait-inside.mjs">wait-inside.mjs</a>, slowed down: a 100 ms payment takes a second and a half here.</p>
@@ -369,9 +383,8 @@ customElements.define("ticket-race", class extends HTMLElement {
     this.visible = false;
 
     this.$(".go").addEventListener("click", () => this.start());
-    this.$(".queue").addEventListener("click", (e) => {
-      this.queued = !this.queued;
-      e.currentTarget.setAttribute("aria-pressed", String(this.queued));
+    this.$(".queue").addEventListener("change", (e) => {
+      this.queued = e.currentTarget.checked;
       this.stop();
       this.t = null;
       this.plan();
@@ -438,13 +451,6 @@ customElements.define("ticket-race", class extends HTMLElement {
     for (const [key, s] of Object.entries(SIDES)) {
       const el = this.$(`[data-side="${key}"]`);
       const buyers = this.sales[key];
-      const notes = el.querySelectorAll(".side-note > span");
-      notes.forEach((n, i) => {
-        const on = i === Math.min(notes.length - 1, this.queued ? 1 : 0);
-        n.classList.toggle("on", on);
-        n.setAttribute("aria-hidden", String(!on));
-      });
-
       const sold = t === null ? 0 : buyers.filter((b) => b.pays && b.done <= t).length;
       const left = TICKETS - sold;
       el.querySelector(".left").classList.toggle("oversold", left < 0);

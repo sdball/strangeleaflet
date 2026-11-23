@@ -16,7 +16,7 @@ Pages 2 and 3 kept coming back to one rule: no process can get at another's memo
 
 <script type="module" src="ticket-race.js"></script>
 
-In Node all three buyers got a ticket, and there were only two. Look at what each one saw: all three checked while two were still left, because none of the payments had come back yet. In the BEAM each buyer saw what the sale before had left: two, then one, then none. Press **Node with a queue** and Node sells them one at a time too. The rest of this page is about why the BEAM does that without being asked, and what it costs.
+In Node all three buyers got a ticket, and there were only two. Look at what each one saw: all three checked while two were still left, because none of the payments had come back yet. In the BEAM each buyer saw what the sale before had left: two, then one, then none. Tick **Add a queue** in the Node column and Node sells them one at a time too. The rest of this page is about why the BEAM does that without an explicit design, and what it costs.
 
 ## Three buyers, two tickets
 
