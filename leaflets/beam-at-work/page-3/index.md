@@ -175,7 +175,7 @@ ticks while the builder collected: 540, worst 0 ms late
 ticks the rest of the time: 1860, worst 3 ms late
 ```
 
-The builder spent about a second collecting, and its last collections took about a third of a second each, once its heaps held a few hundred megabytes. The tickers ticked right through them: hundreds of ticks while the builder collected, none more than a millisecond late. That's the same as the rest of the run.
+The builder spent about a second collecting, and its last collections took about a third of a second each, once its heaps held a few hundred megabytes. The tickers ticked right through them: hundreds of ticks while the builder collected, none more than a millisecond late. That's no worse than the rest of the run, where the worst tick was 3 ms late.
 
 Run it yourself and now and then you'll see a tick tens of milliseconds late outside the collections. The six tickers do that with no builder at all ([tickers-alone.exs](tickers-alone.exs)), so that's the machine, not the collector.
 
