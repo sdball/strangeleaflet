@@ -273,7 +273,31 @@ $ for size in 50 100 1000 10000; do elixir die-young.exs $size; done
 100000 processes, each summing a list of 10000: 1500090 garbage collections
 ```
 
-With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. [children-gcs.exs](children-gcs.exs) runs the same thing while tracing every new process's collections, and it counts zero for the children, at both sizes. The 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
+With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. [children-gcs.exs](children-gcs.exs) runs the same thing while tracing every new process's collections, and counts them:
+
+```elixir
+counter = spawn(fn ->
+  loop = fn loop, n -> receive do
+    {:trace, _, :gc_minor_end, _} -> loop.(loop, n + 1)
+    {:trace, _, :gc_major_end, _} -> loop.(loop, n + 1)
+    {:trace, _, _, _} -> loop.(loop, n)
+    {:count, from} -> send(from, {:children, n})
+  end end
+  loop.(loop, 0)
+end)
+:erlang.trace(:new_processes, true, [:garbage_collection, {:tracer, counter}])
+
+# ...then the same 100,000 processes as die-young.exs, and print the
+# system's count of collections and the counter's
+```
+
+```text
+$ for size in 50 100; do elixir children-gcs.exs $size; done
+size 50: system 390, children's 0
+size 100: system 390, children's 0
+```
+
+With tracing on, the whole system did 390 collections, and the children still did none, at either size. So the 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
 
 That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
 
@@ -297,9 +321,9 @@ And one process with a huge heap is slow to collect, as the builder showed. The 
 
 ## Sources
 
-- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), [die-young.exs](die-young.exs), and [children-gcs.exs](children-gcs.exs), run 2026-11-12. The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [gc-steps.exs](gc-steps.exs), [gc-alone.exs](gc-alone.exs), [tickers-alone.exs](tickers-alone.exs), [gc-pause.mjs](gc-pause.mjs), [die-young.exs](die-young.exs), and [children-gcs.exs](children-gcs.exs), run 2026-11-12 (children-gcs.exs again 2026-11-23). The widget replays a run each of [record-gc.exs](record-gc.exs) and [record-gc.mjs](record-gc.mjs), saved as [beam-run.json](beam-run.json) and [node-run.json](node-run.json). All of them ran on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - The stack and heap in one block growing toward each other, a collection when they meet, the collector being a "per process generational semi-space copying collector", generations and the old heap, the full sweep, growth starting at 233 words in "a variation of the Fibonacci sequence" then by 20%, shrinking, and cost "proportional to the amount of live data on the heap": the ERTS docs, [Erlang Garbage Collector](https://www.erlang.org/doc/apps/erts/garbagecollection.html): [Overview](https://www.erlang.org/doc/apps/erts/garbagecollection.html#overview), [Generational Garbage Collection](https://www.erlang.org/doc/apps/erts/garbagecollection.html#generational-garbage-collection), and [Sizing the heap](https://www.erlang.org/doc/apps/erts/garbagecollection.html#sizing-the-heap). The same, from another angle: *The BEAM Book*, [The PCB](https://blog.stenmans.org/theBeamBook/#_the_pcb), [The Garbage Collector (GC)](https://blog.stenmans.org/theBeamBook/#_the_garbage_collector_gc), and [Copying Garbage Collection](https://blog.stenmans.org/theBeamBook/#_copying_garbage_collection) ("most terms die young").
-- Tracing collections and the sizes in each trace message: `garbage_collection` in [`erlang:trace/3`](https://www.erlang.org/doc/apps/erts/erlang.html#trace/3). Counting them system-wide: `garbage_collection` in [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
+- Tracing collections and the sizes in each trace message, tracing every new process with `new_processes`, and sending the trace messages to another process with `{tracer, Tracer}`: `garbage_collection` in [`erlang:trace/3`](https://www.erlang.org/doc/apps/erts/erlang.html#trace/3). Counting them system-wide: `garbage_collection` in [`erlang:statistics/1`](https://www.erlang.org/doc/apps/erts/erlang.html#statistics/1).
 - Collections of 128K words or more going to a dirty CPU scheduler: `check_for_possibly_long_gc` in [erl_gc.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.c#L688-L716), with `ERTS_POTENTIALLY_LONG_GC_HSIZE` in [erl_gc.h](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_gc.h#L30), and dirty system work going on the dirty CPU queue in [erl_process.c](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L6507-L6509).
 - A process's heaps freed whole when it ends: `delete_process` in [erl_process.c at OTP-28.4.2](https://github.com/erlang/otp/blob/OTP-28.4.2/erts/emulator/beam/erl_process.c#L13459-L13476).
 - Binaries over 64 bytes kept off the process heap and reference counted, a pointer on the heap, and only the reference copied when sent: the ERTS docs, [Binary heap](https://www.erlang.org/doc/apps/erts/garbagecollection.html#binary-heap); the efficiency guide, [Sending Messages](https://www.erlang.org/doc/system/eff_guide_processes.html#sending-messages). Lingering until the processes holding them collect: *The BEAM Book*, [Binaries](https://blog.stenmans.org/theBeamBook/#SS-Binaries).
