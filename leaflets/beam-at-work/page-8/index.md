@@ -319,8 +319,13 @@ The fix is for the producer to wait. `send` never waits, so the waiting is built
 
 ```elixir
 # The producer
-send(consumer, {:work, self(), payload})
-receive do: (:done -> :ok)
+case mode do
+  "send" ->
+    send(consumer, {:work, nil, payload})
+  "call" ->
+    send(consumer, {:work, self(), payload})
+    receive do: (:done -> :ok)
+end
 
 # The consumer
 receive do

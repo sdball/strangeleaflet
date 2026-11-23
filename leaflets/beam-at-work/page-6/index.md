@@ -267,6 +267,40 @@ const send = (socket, message) => socket.write(JSON.stringify(message) + "\n");
 
 The rest is down.exs again: close the connection and open another, pause the counter's process with `SIGSTOP` and send it `{ add: 1 }` twice, let it continue, and then tell it to exit:
 
+```js
+const child = spawn(process.execPath, [import.meta.filename, "counter"]);
+// ...wait for the counter to print its port
+
+let socket = await open();
+send(socket, { add: 5 });
+log(`counter in process ${child.pid}, at 5`);
+
+console.log("\nThe connection closes");
+socket.destroy();
+await wait(1000);
+socket = await open();
+send(socket, { get: true });
+await wait(1000);
+
+console.log("\nThe counter's process stops answering");
+child.kill("SIGSTOP");
+log("stopped the counter's process");
+send(socket, { add: 1 });
+send(socket, { add: 1 });
+log("sent { add: 1 } twice");
+await wait(6000);
+child.kill("SIGCONT");
+log("let the counter's process continue");
+send(socket, { get: true });
+await wait(1000);
+
+console.log("\nThe counter's process exits");
+send(socket, { exit: true });
+await wait(1000);
+send(socket, { get: true });
+await wait(3000);
+```
+
 ```text
 $ node remote.mjs
    44 ms  counter in process 31350, at 5
