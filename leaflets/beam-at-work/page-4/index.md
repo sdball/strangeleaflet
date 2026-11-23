@@ -4,7 +4,7 @@ publish: false
 meta_description: A BEAM process's data is its own, and the only way in is a message, read one at a time. So a process can stop and wait in the middle of a job, and nothing else gets in. What a send costs, and how receive picks a message.
 ---
 
-BEAM processes keep to one rule: no process can get at another's memory. That's what lets each one collect its own garbage on its own. But processes have to work together somehow, and if they can't share data, they have to send it. This page is about what that buys you, starting with a ticket sale.
+Pages 2 and 3 kept coming back to one rule: no process can get at another's memory. That's what lets each one collect its own garbage on its own. But processes have to work together somehow, and if they can't share data, they have to send it. This page is about what that buys you, starting with a ticket sale.
 
 <ticket-race>
 

@@ -4,7 +4,7 @@ publish: false
 meta_description: A supervisor is a restarter written as a GenServer. It starts processes, restarts them when they crash, and gives up when restarting isn't working, and supervisors of supervisors make a tree.
 ---
 
-The simplest restarter is a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after a few tries. A supervisor is OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
+[Page 5 of The BEAM at Work](/leaflets/beam-at-work/page-5/) ended with a restarter: a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after three tries. Page 1 was GenServer. A supervisor is both of those at once. It's OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
 
 "Let it crash" only works if something starts the crashed process again. This page is about the thing that does.
 

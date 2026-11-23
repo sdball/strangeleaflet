@@ -4,7 +4,7 @@ publish: false
 meta_description: GenServer, where most Elixir programs keep their state, isn't part of the BEAM. It's a small library built from sends, receives, references, and monitors, and every piece of it is there because of something that can go wrong.
 ---
 
-There are two ways for one BEAM process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
+[Page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/) showed two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
 
 GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from the BEAM's own pieces: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
 

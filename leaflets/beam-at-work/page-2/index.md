@@ -4,7 +4,7 @@ publish: false
 meta_description: What a BEAM process is (not an operating system process), what one costs, and how the schedulers share thousands of them out
 ---
 
-A ticker and a busy loop make two processes. Real Elixir programs run thousands. Cowboy, a web server Erlang and Elixir apps use, starts a process for every connection and another for every request. That only works if a process costs next to nothing. This page is about how little, and why.
+Page 1 had two processes, a ticker and a busy loop. Real Elixir programs run thousands. Cowboy, a web server Erlang and Elixir apps use, starts a process for every connection and another for every request. That only works if a process costs next to nothing. This page is about how little, and why.
 
 Here are three tickers and a busy loop, with a crowd of connections waiting alongside them, held three ways: a BEAM process each, a Node async function each, and a Node worker thread each. Pick how many, then add a busy loop.
 

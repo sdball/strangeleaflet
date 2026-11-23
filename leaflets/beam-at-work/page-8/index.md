@@ -45,7 +45,7 @@ static ErlNifFunc funcs[] = {
 ERL_NIF_INIT(Elixir.Fib, funcs, NULL, NULL, NULL, NULL)
 ```
 
-And here's a ticker that ticks every 100 ms, with a busy loop beside it calling one of them. The script compiles the C first, then loads it into a module whose functions it replaces ([nif.exs](nif.exs)):
+And here's page 1's ticker experiment again, with the busy loop calling one of them. The script compiles the C first, then loads it into a module whose functions it replaces ([nif.exs](nif.exs)):
 
 ```elixir
 include = Path.join([:code.root_dir(), "usr", "include"])
@@ -165,7 +165,7 @@ For this one job, the BEAM wasn't slower than Node: 0.78 s against 1.0. One recu
 
 ## One huge heap
 
-A builder process that kept 10 million pairs in its own heap spent much of its time collecting, a few hundred milliseconds at a time near the end. The BEAM kept that from holding up anyone else. It didn't make it any faster for the builder: a copying collector's work "is proportional to the amount of live data on the heap", and the builder's heap was nearly all live.
+Page 3's builder kept 10 million pairs in its own heap, and spent much of its time collecting, a few hundred milliseconds at a time near the end. The BEAM kept that from holding up anyone else. It didn't make it any faster for the builder: a copying collector's work "is proportional to the amount of live data on the heap", and the builder's heap was nearly all live.
 
 The usual answer is not to keep data like that in a process at all. ETS, Erlang term storage, is built into the BEAM, and its docs say it can "store very large quantities of data". A table isn't part of any process's heap: "every object insert and look-up operation results in a copy of the object", into the table or out of it. Here's the builder twice, once keeping the pairs in its heap and once putting each pair in a table ([big-data.exs](big-data.exs)):
 

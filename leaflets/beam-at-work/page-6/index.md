@@ -4,7 +4,7 @@ publish: false
 meta_description: A BEAM can connect to other BEAMs, and a send to a process on another machine looks just like a local one. What changes is what can go wrong, and what a monitor can and can't tell you when it does.
 ---
 
-One BEAM is one operating system process on one machine. If that process goes down, everything in it goes with it, and something outside has to start it again. Joe Armstrong's thesis on Erlang puts it plainly: "When we make a fault-tolerant system we need at least two physically separated computers. Using a single computer will not work, if it crashes, all is lost."
+Everything on the pages so far happened inside one BEAM, and one BEAM is one operating system process on one machine. Page 5 ended there: if that process goes down, everything in it goes with it, and something outside has to start it again. Joe Armstrong's thesis on Erlang puts it plainly: "When we make a fault-tolerant system we need at least two physically separated computers. Using a single computer will not work, if it crashes, all is lost."
 
 So a BEAM can connect to other BEAMs, on the same machine or on others, and processes on one can send messages to processes on another. Erlang's docs: "Message passing between processes at different nodes, as well as links and monitors, are transparent when pids are used." `send`, `receive`, links, and monitors work across machines the way they work inside one.
 
