@@ -20,17 +20,17 @@ Here's a job that gives the collector a lot to do, replayed from real runs in th
 
 <script type="module" src="beam-heaps.js"></script>
 
-In Node, every collection stops the tickers too, and the ticks they owed come out late in a bunch. In the BEAM, the builder spends much longer collecting, and the tickers don't notice. The difference is what a collection stops. In Node it's your JavaScript, all of it. In the BEAM it's one process, the one whose garbage it is. This page is about why.
+In Node, every collection stops the tickers, and the ticks they owed come out late in a bunch. In the BEAM, the builder spends much longer collecting, but the tickers don't notice. The difference is what a collection stops. In Node the garbage collector has to stop all of the JavaScript execution. In the BEAM each process has its own individual garbage collector so any garbage collection only needs to stop that individual process.
 
-## Each process has its own heap
+## Each BEAM process has its own heap
 
-Page 2 said a new process has a heap of 233 words, and that its stack lives in the same block. The Erlang docs put it this way: "Each Erlang process has its own stack and heap which are allocated in the same memory block and grow towards each other." The heap fills from one end, with lists, tuples, and everything else the process makes. The stack fills from the other, with the function calls it's in the middle of. "When the stack and the heap meet, the garbage collector is triggered."
+Each new BEAM process has a heap of 233 words and its stack lives in the same block. The Erlang docs put it this way: "Each Erlang process has its own stack and heap which are allocated in the same memory block and grow towards each other." The heap fills from one end, with lists, tuples, and everything else the process makes. The stack fills from the other, with the function calls it's in the middle of. "When the stack and the heap meet, the garbage collector is triggered."
 
 The collector copies. It starts from what the process can still reach (its stack, and what that points to), copies all of that into a fresh block, and throws the old block away whole. The garbage is never looked at. That makes a collection cost what the process still uses, not what it threw away. In the docs' words, the algorithm "is proportional to the amount of live data on the heap."
 
 It's also generational, because most data dies young. Data that has survived one collection gets copied to a second block on the next one, the old heap. The usual collection, a minor one, only copies what's new and still in use. Once the old heap is full, a major collection (the docs call it a full sweep) goes through both.
 
-Here's one process doing that, traced. It builds a list a number at a time, and at every step it also makes a short list it never uses again ([gc-steps.exs](gc-steps.exs)):
+Here's one process doing that. It builds a list a number at a time, and at every step it also makes a short list it never uses again ([gc-steps.exs](gc-steps.exs)):
 
 ```elixir
 defmodule Builder do
@@ -40,6 +40,20 @@ defmodule Builder do
     loop([n | acc], n - 1)
   end
 end
+
+n = String.to_integer(List.first(System.argv()) || "1000")
+me = self()
+pid = spawn(fn ->
+  receive do: (:go -> :ok)
+  list = Builder.loop([], n)
+  send(me, :done)
+  receive do: (:stop -> length(list))
+end)
+:erlang.trace(pid, true, [:garbage_collection])
+send(pid, :go)
+
+# ...then receive the trace messages until :done, pair each collection's
+# start with its end, and print a line for each
 ```
 
 `:erlang.trace/3` sends a message at the start and end of every garbage collection, with the sizes of the heaps. One line per collection:
