@@ -113,7 +113,7 @@ Read it a block at a time. The young heap fills to 216 of its 233 words, and eac
 
 The sizes go 233, 376, 610, 987, 1598, 2586: each is roughly the two before it added together. That's on purpose. The docs: "first a variation of the Fibonacci sequence is used starting at 233 words. Then at about 1 mega words the heap only grows in 20% increments." Heaps shrink too, when a collection finds them mostly empty.
 
-All of this happened inside one process, on its own memory. Nothing in it touched another process's heap, because nothing can: page 2's table says nothing in Elixir can point at another process's memory. So nothing else had to stop.
+All of this happened inside one process, on its own memory. Nothing in it touched another process's heap, because nothing can: nothing in Elixir can point at another process's memory. So nothing else had to stop.
 
 The replay at the top shows that for every process at once. Press **Show the heaps**: each BEAM process gets its own young and old heap, filling and collecting on its own, and Node's side gets its one heap.
 
@@ -189,7 +189,7 @@ ticks while the builder collected: 594, worst 0 ms late
 ticks the rest of the time: 1806, worst 2 ms late
 ```
 
-Still nothing. Had that 326 ms collection run on the only scheduler, it would have had the scheduler's thread for 326 ms, and no ticker could have run. It didn't run there, because the BEAM saw it coming. Before collecting, it adds up how much it will have to go through, and if that's 128K words (a megabyte) or more, it hands the collection to a dirty CPU scheduler. Page 2 met those: extra scheduler threads for work that can't be counted in reductions. The process waits there while it's collected, and its own scheduler goes on running everyone else.
+Still nothing. Had that 326 ms collection run on the only scheduler, it would have had the scheduler's thread for 326 ms, and no ticker could have run. It didn't run there, because the BEAM saw it coming. Before collecting, it adds up how much it will have to go through, and if that's 128K words (a megabyte) or more, it hands the collection to a dirty CPU scheduler. Dirty schedulers are extra scheduler threads for work that can't be counted in reductions. The process waits there while it's collected, and its own scheduler goes on running everyone else.
 
 ## And in Node?
 
@@ -197,7 +197,7 @@ Node has one heap for all of its JavaScript. Any object can point at any other, 
 
 V8 has worked hard on its pauses. Its young collections run in parallel on several threads. Most of the marking for a major collection happens on helper threads while your JavaScript keeps running. But the young collection still stops your JavaScript while it runs, and a major collection still ends with a pause on the main thread to finish the marking. While the collector has the main thread, no callback runs.
 
-Here's the same job in Node: a list of 10 million pairs, all kept, and a ticker every 10 ms ([gc-pause.mjs](gc-pause.mjs)). To keep page 1's problem out of it, the builder works in chunks of 10,000 and lets the ticker run between chunks, so the longest the ticker waits on the builder's own code is a chunk, 2 to 4 ms. `perf_hooks` reports each collection and how long it took.
+Here's the same job in Node: a list of 10 million pairs, all kept, and a ticker every 10 ms ([gc-pause.mjs](gc-pause.mjs)). So the ticker isn't stuck behind one long callback, the builder works in chunks of 10,000 and lets the ticker run between them: the longest the ticker waits on the builder's own code is a chunk, 2 to 4 ms. `perf_hooks` reports each collection and how long it took.
 
 ```javascript
 import { PerformanceObserver } from "node:perf_hooks";
@@ -317,7 +317,7 @@ Two things don't fit the picture of each process alone with its heap.
 
 Big binaries are shared. A binary (a string, a chunk of a file, a network packet) bigger than 64 bytes isn't kept on a process's heap. It's kept once, outside every heap, with a count of the processes using it, and each process holds a small reference to it. That makes sending one to another process cheap, since only the reference is copied. But the count only goes down when the processes holding a reference collect or exit, so a big binary can stay in memory well after it was last used, if a process holding it rarely collects.
 
-And one process with a huge heap is slow to collect, as the builder showed. The BEAM keeps that from holding anyone else up, but it doesn't make it fast. Page 8 comes back to that, and to what Elixir programs do instead of keeping hundreds of megabytes in one process.
+And one process with a huge heap is slow to collect, as the builder showed. The BEAM keeps that from holding anyone else up, but it doesn't make it fast.
 
 ## Sources
 

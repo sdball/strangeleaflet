@@ -4,9 +4,9 @@ publish: false
 meta_description: What a BEAM process is (not an operating system process), what one costs, and how the schedulers share thousands of them out
 ---
 
-Page 1 had two processes, a ticker and a busy loop. Real Elixir programs run thousands. Cowboy, a web server Erlang and Elixir apps use, starts a process for every connection and another for every request. That only works if a process costs next to nothing. This page is about how little, and why.
+A ticker and a busy loop make two processes. Real Elixir programs run thousands. Cowboy, a web server Erlang and Elixir apps use, starts a process for every connection and another for every request. That only works if a process costs next to nothing. This page is about how little, and why.
 
-Here's page 1's three tickers and busy loop again, with a crowd of connections waiting alongside them, held three ways: a BEAM process each, a Node async function each, and a Node worker thread each. Pick how many, then add a busy loop.
+Here are three tickers and a busy loop, with a crowd of connections waiting alongside them, held three ways: a BEAM process each, a Node async function each, and a Node worker thread each. Pick how many, then add a busy loop.
 
 <how-many>
 
@@ -18,7 +18,7 @@ Here's page 1's three tickers and busy loop again, with a crowd of connections w
 
 <script type="module" src="how-many.js"></script>
 
-Only the BEAM manages both. Node's async functions are cheaper than BEAM processes, but they share one thread, so the busy loop stops every ticker, as on page 1. A worker thread each keeps the tickers going, but at about 9 MB a worker they are exceedingly expensive to run. A million BEAM processes take about 2.5 GB, and none of them can hold up the rest. The rest of this page is about what a BEAM process is, what it costs, and where the BEAM runs it.
+Only the BEAM manages both. Node's async functions are cheaper than BEAM processes, but they share one thread, so the busy loop stops every ticker. A worker thread each keeps the tickers going, but at about 9 MB a worker they are exceedingly expensive to run. A million BEAM processes take about 2.5 GB, and none of them can hold up the rest. The rest of this page is about what a BEAM process is, what it costs, and where the BEAM runs it.
 
 ## Not that kind of process
 
@@ -91,14 +91,14 @@ Because they act like operating system processes in the ways that matter for wri
 | Has an id | `77690` | `#PID<0.115.0>` |
 | Its own memory | yes | yes, its own heap and stack |
 | What keeps others out | the operating system: it maps out what each process may touch, and the CPU checks every memory access against that map | the BEAM: none of its instructions can reach another process's memory, so no language that runs on it can either |
-| Talks to others by | pipes, sockets, signals | messages (page 4) |
+| Talks to others by | pipes, sockets, signals | messages |
 | Who decides when it runs | the operating system, preemptively | a BEAM scheduler, preemptively |
-| When it crashes | it ends, and its parent process can find out | it ends, and processes watching it are notified (page 5) |
+| When it crashes | it ends, and its parent process can find out | it ends, and processes watching it are notified |
 | Cost to start, on my M1 | about 1.4 ms and 830 KB | about 1 µs and 2.6 KB |
 
 BEAM processes aren't threads either. The book again: "Erlang processes are not like threads — they have no shared memory to modify, they can only communicate via messages". Threads in most languages share their memory with each other, so any thread can change data another thread is using. Data sent from one BEAM process to another is copied, so neither can change what the other is using.
 
-That's what makes page 1's preemption safe in the BEAM. In languages like Java or C++, threads get preempted too, and a thread paused halfway through changing shared data leaves it half-changed which could break other threads. That's why threads that share memory need locks. But when a BEAM process runs out of reductions any of its half-changed work is only its own data that no other process can manipulate or even see. The BEAM scheduler can safely pause any process at any function call.
+That's what makes preemption safe in the BEAM. In languages like Java or C++, threads get preempted too, and a thread paused halfway through changing shared data leaves it half-changed which could break other threads. That's why threads that share memory need locks. But when a BEAM process runs out of reductions any of its half-changed work is only its own data that no other process can manipulate or even see. The BEAM scheduler can safely pause any process at any function call.
 
 ## How cheap is cheap?
 
@@ -153,7 +153,7 @@ Here's what 2.6 KB looks like next to an operating system process. The top bar i
 
 What's the closest thing in Node? It depends which part of a BEAM process you want.
 
-If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system, and page 8 uses them to fix page 1's ticker. They're not cheap. Here's a script that starts 8 idle ones and waits until each is up ([worker-cost.mjs](worker-cost.mjs)):
+If you want something that runs on its own and can't be held up by a busy loop elsewhere, that's a worker thread. Worker threads are real threads, scheduled preemptively by the operating system. They're not cheap. Here's a script that starts 8 idle ones and waits until each is up ([worker-cost.mjs](worker-cost.mjs)):
 
 ```javascript
 // What does an idle worker thread cost? Start N, wait until each is up, measure.
@@ -241,7 +241,7 @@ $ for n in 1000 10000 100000 1000000; do node --expose-gc pending.mjs $n; done
 1000000 pending async functions: 0.50 µs each to start, 565 bytes each of V8 heap
 ```
 
-About as fast to start, and a fifth of the memory. But a paused async function isn't a process. They all share one thread and one heap, and when one of them wakes up it runs until it pauses again or returns, however long that takes. Page 1 showed where that leads. A BEAM process costs a few hundred bytes more and gets its own heap, its own turn in a run queue, preemptive scheduling, and crash isolation.
+About as fast to start, and a fifth of the memory. But a paused async function isn't a process. They all share one thread and one heap, and when one of them wakes up it runs until it pauses again or returns, however long that takes. That's how one busy loop stops every ticker. A BEAM process costs a few hundred bytes more and gets its own heap, its own turn in a run queue, preemptive scheduling, and crash isolation.
 
 ## Where a new BEAM process runs
 
@@ -306,7 +306,7 @@ Right after spawning, all sixteen were waiting in scheduler 1's queue, the paren
 
 Balancing looks at how much is waiting in each run queue, not at what any one process costs. And when there isn't enough work to keep every scheduler busy, it does the opposite of spreading out: it packs the work onto as few schedulers as it can keep fully loaded, so the rest can sleep. The docs call that scheduler compaction of load, and it's on by default.
 
-Here's page 1's kind of busy loop among six tickers that tick every 10 ms ([busy-alone.exs](busy-alone.exs)). Every tick notes which scheduler it ran on, and so does the busy loop after each chunk of its work:
+Here's a CPU-bound busy loop among six tickers that tick every 10 ms ([busy-alone.exs](busy-alone.exs)). Every tick notes which scheduler it ran on, and so does the busy loop after each chunk of its work:
 
 ```text
 $ elixir busy-alone.exs

@@ -4,9 +4,9 @@ publish: false
 meta_description: GenServer, where most Elixir programs keep their state, isn't part of the BEAM. It's a small library built from sends, receives, references, and monitors, and every piece of it is there because of something that can go wrong.
 ---
 
-[Page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/) showed two ways for one process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
+There are two ways for one BEAM process to talk to another: send a message and move on, or send one and wait for the reply. Most Elixir code that does either goes through GenServer, and most of the state in an Elixir program lives in one.
 
-GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from what The BEAM at Work's pages 4 and 5 covered: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
+GenServer isn't part of the BEAM. It's a module in Elixir's standard library, a thin layer over Erlang's `gen_server`, and it's built from the BEAM's own pieces: `send`, `receive`, references, and monitors. This page writes a small server by hand, then writes it again as a GenServer, and then looks more deeply at how GenServers operate.
 
 (If you haven't met GenServer before, page 6 of the [About Elixir leaflet](/leaflets/about-elixir/page-6/) also talks about them.)
 
@@ -60,7 +60,7 @@ buyer 3: :sold_out
 
 That loop is how a process keeps state. Nothing in Elixir changes in place, so the number of tickets left is an argument, and each new call of the loop gets the new number. The loop can go on forever because calling itself is the last thing it does. The Erlang docs say a call in that position uses no stack, so "an infinite loop using tail-recursive calls will not exhaust the call stack".
 
-The `Tickets.buy/1` function uses the approach from The BEAM at Work's page 4: make a reference, send it with the request, and receive only the reply that carries it.
+The `Tickets.buy/1` function uses the BEAM's usual approach for a request with a reply: make a reference, send it with the request, and receive only the reply that carries it.
 
 ## The same server as a GenServer
 
@@ -170,7 +170,7 @@ buy a ticket     3 → 2      handle_call(:buy, from, 3) returns {:reply, :ok, 2
 
 A server handles one message, start to finish, before it looks at the next. Each `handle_call` returns before the loop's next `receive`. So the state never needs a lock: only the server can touch it, and it only works on one request at a time.
 
-That holds even when handling a request means waiting. Here's the ticket sale from [page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/), with the seller as a GenServer: three buyers ask at the same moment for the last two tickets, and `handle_call` waits 100 ms on a payment process in the middle of each sale ([wait-inside.exs](wait-inside.exs)):
+That holds even when handling a request means waiting. Here's a ticket sale with the seller as a GenServer: three buyers ask at the same moment for the last two tickets, and `handle_call` waits 100 ms on a payment process in the middle of each sale ([wait-inside.exs](wait-inside.exs)):
 
 ```elixir
 def handle_call(:buy, _from, {0, payments}), do: {:reply, :sold_out, {0, payments}}
@@ -258,16 +258,16 @@ do_call(Process, Label, Request, Timeout) when is_atom(Process) =:= false ->
     end.
 ```
 
-It's Erlang, not Elixir, but it's made of the shapes from The BEAM at Work's page 4: a send, then a receive with patterns.
+It's Erlang, not Elixir, but it's made of the same plain shapes: a send, then a receive with patterns.
 
 The pieces:
 
-- `erlang:monitor` is the monitor from The BEAM at Work's page 5: the caller gets a `'DOWN'` message if the server dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets the fast receive from The BEAM at Work's page 4, which looks only at messages that arrived after the reference was made.
+- `erlang:monitor` sets up a monitor: the caller gets a `'DOWN'` message if the server dies, or right away if it's already dead. It returns a reference, and since a reference is unique, the call uses it as the reply's tag. That gets the BEAM's fast receive, which looks only at messages that arrived after the reference was made.
 - `{alias,demonitor}` makes that reference an *alias* as well: an address the reply can be sent to, which reaches the caller only until the monitor is removed.
 - The request goes to the server as `{:"$gen_call", {caller, tag}, request}`. The server's loop knows `:"$gen_call"` means a call, passes `{caller, tag}` to `handle_call` as `from`, and sends the reply to the alias.
 - Then the caller waits for one of three things: the reply, a `'DOWN'`, or the timeout which defaults to 5,000 ms.
 
-The fast receive works here too, with the reference inside `[alias | Mref]`. Here's a call from a process with a mailbox full of messages it's not looking to receive, as The BEAM at Work's page 4 timed a plain receive ([call-scan.exs](call-scan.exs)):
+The fast receive works here too, with the reference inside `[alias | Mref]`. Here's a call from a process with a mailbox full of messages it's not looking to receive ([call-scan.exs](call-scan.exs)):
 
 ```text
 $ elixir call-scan.exs
@@ -333,7 +333,7 @@ still waiting after 5 seconds
 
 The first call fails with the server's own error, and the second with `:noproc`, no such process, at once. That's the monitor. A send to a process that's gone never fails so without a monitor nothing tells the caller, and the call by hand would wait forever if its `after` didn't give up.
 
-When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and The BEAM at Work's page 5 showed what happens then: anything linked to the caller dies too, unless it traps exits. Page 2 is about the processes that do.
+When a call fails, the caller exits, the same as an error in its own code. The script catches the exit so it can print it. A real program usually doesn't, and then anything linked to the caller dies too, unless it traps exits.
 
 ### The caller gives up
 
@@ -397,7 +397,7 @@ The third thing `call` gives you is backpressure. The caller waits for each repl
 
 ## Casts and other messages
 
-A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's a plain `send`, as on The BEAM at Work's page 4: no monitor, no timeout, no backpressure, and a mailbox that can grow, as its page 8 shows.
+A cast has none of that. `GenServer.cast` returns `:ok` "regardless of whether the destination `server` (or node) exists", because it doesn't wait to find out. That's a plain `send`: no monitor, no timeout, no backpressure, and a mailbox that can grow without limit.
 
 Every other message sent to a GenServer: a plain `send`, a timer's message from `Process.send_after`, a monitor's `'DOWN'`, etc. goes to `handle_info`.
 
@@ -452,11 +452,11 @@ resumed: the buyer got :ok
 
 `:sys.get_state` reads the server's state, `:sys.trace` prints every request, reply, and new state as they happen, `:sys.statistics` counts them, and `:sys.replace_state` sets the state from outside. `:sys.suspend` makes the server answer only system messages, so a buy waited in its mailbox until `:sys.resume`. (The buy runs in a separate process, started with `Task.async`, because a call would block the script until the reply came.) All of that works on a server while it runs, without changing or restarting it.
 
-Two more things come with it that later pages need. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server (page 2). And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded" (The BEAM at Work's page 7).
+Two more things come with it. `use GenServer` writes a `child_spec/1` function, which tells a supervisor how to start the server. And a `code_change` callback is "invoked to change the state of the `GenServer` when a different version of a module is loaded".
 
 ## And in Node?
 
-[Page 4 of The BEAM at Work](/leaflets/beam-at-work/page-4/) has this sale in Node, with the tickets as an object and an async `buy()`. All three buyers got a ticket, because `await` handed the thread back while each payment was out and the other buyers checked in the meantime, until a queue made each sale wait for the one before it. A GenServer, like any process, takes one request at a time without being asked.
+[The same sale in Node](/leaflets/beam-at-work/page-4/), with the tickets as an object and an async `buy()`, gave all three buyers a ticket, because `await` handed the thread back while each payment was out and the other buyers checked in the meantime, until a queue made each sale wait for the one before it. A GenServer, like any process, takes one request at a time without being asked.
 
 Between threads, Node has messages, and a call to a worker thread is something you have to build. Here's a call written by hand on top of `postMessage`, with what `do_call` has: an id on each request, a timeout, late replies dropped, and calls failed when the worker dies, run through the same cases as above ([call-by-hand.mjs](call-by-hand.mjs)):
 
@@ -520,7 +520,7 @@ It works, and at 41 lines it's about the size of `do_call`, whose three clauses 
 
 And it has been through a lot. `gen_server` is part of OTP, which Ericsson started in 1996 for the AXD301, a telecom switch built for "carrier-class" non-stop operation. In a 2001 snapshot of the AXD301's code, over a million lines of Erlang, 122 of its 191 standard OTP processes were gen_servers. Discord built its chat service on Elixir from its first prototype: when it wrote up how it reached nearly five million users connected at once, in 2017, each connected user had a session process, "a GenServer", and each Discord server was a GenServer too.
 
-And Node's is per worker, at megabytes a thread (The BEAM at Work's page 2), where the BEAM's works with any process.
+And Node's is per worker, at megabytes a thread, where the BEAM's works with any process.
 
 ## Where it gives ground
 

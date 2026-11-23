@@ -4,7 +4,7 @@ publish: false
 meta_description: A supervisor is a restarter written as a GenServer. It starts processes, restarts them when they crash, and gives up when restarting isn't working, and supervisors of supervisors make a tree.
 ---
 
-[Page 5 of The BEAM at Work](/leaflets/beam-at-work/page-5/) ended with a restarter: a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after three tries. Page 1 was GenServer. A supervisor is both of those at once. It's OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
+The simplest restarter is a process that traps exits, starts a worker linked to it, and starts a new worker whenever the old one crashes, giving up after a few tries. A supervisor is OTP's restarter, and it's written as a GenServer: Erlang's `supervisor` module declares `-behaviour(gen_server)`, and the first thing it does when it starts is turn on trapping exits.
 
 "Let it crash" only works if something starts the crashed process again. This page is about the thing that does.
 
@@ -84,7 +84,7 @@ It behaves like the restarter. Each crash gets a new worker, with a new pid, cou
 
 ## What a supervisor needs to know
 
-A supervisor starts its children from a *child specification*, a map that says how to start the child and what to do when it exits. Page 1 said `use GenServer` writes a `child_spec/1` function for you. Here's page 1's ticket server, given to a supervisor, along with the spec it wrote ([tickets.exs](tickets.exs)):
+A supervisor starts its children from a *child specification*, a map that says how to start the child and what to do when it exits. `use GenServer` writes a `child_spec/1` function for you. Here's a ticket server, given to a supervisor, along with the spec it wrote ([tickets.exs](tickets.exs)):
 
 ```elixir
 defmodule Tickets do
@@ -127,7 +127,7 @@ bought 3, added 5: Tickets is #PID<0.109.0>, 12 left
 added "5": Tickets is #PID<0.110.0>, 10 left
 ```
 
-`{Tickets, 10}` in the list of children means "ask `Tickets` for its child spec, passing 10". The spec has an `id` the supervisor knows the child by, and a `start`: a module, a function, and its arguments. To start the child, the supervisor calls `Tickets.start_link(10)`. It's `start_link` and not page 1's `start` because the server has to be linked to the supervisor, so the supervisor gets its `{:EXIT, ...}` message when it dies. Anything the spec leaves out has a default:
+`{Tickets, 10}` in the list of children means "ask `Tickets` for its child spec, passing 10". The spec has an `id` the supervisor knows the child by, and a `start`: a module, a function, and its arguments. To start the child, the supervisor calls `Tickets.start_link(10)`. It's `start_link` and not `start` because the server has to be linked to the supervisor, so the supervisor gets its `{:EXIT, ...}` message when it dies. Anything the spec leaves out has a default:
 
 - `restart: :permanent`: always restart it. The other choices are `:transient`, restart it only if it crashed, and `:temporary`, never restart it.
 - `shutdown: 5000`: when the supervisor stops it, how many milliseconds to give it before killing it.
@@ -135,7 +135,7 @@ added "5": Tickets is #PID<0.110.0>, 10 left
 
 Then a bad request crashed the server. `left + "5"` raises an error, so `handle_cast` never returned, and the server died. The supervisor started a new one at once, and the next call worked. Nobody else had to know anything had happened. The new server has a new pid, but callers don't hold the pid; they use the name `Tickets`, which the new server registered as it started. A name is how a process that's restarted stays findable.
 
-It has 10 tickets, not 12. As The BEAM at Work's page 5 said, a restart can only bring a process back to how it started, and how it started is whatever `init/1` returns. The 3 sold and the 5 added were lost along with the request that crashed it. Losing the bad request is the point. Losing the good state with it is the price.
+It has 10 tickets, not 12. A restart can only bring a process back to how it started, and how it started is whatever `init/1` returns. The 3 sold and the 5 added were lost along with the request that crashed it. Losing the bad request is the point. Losing the good state with it is the price.
 
 ## When one child dies
 
@@ -229,7 +229,7 @@ stopping the supervisor:
 
 Armstrong's thesis describes the first two as "OR" and "AND" supervisors: "AND supervision is used for dependent, or co-ordinated processes", and in an OR tree "the failure of one child has no consequence for the other children".
 
-The run also shows the order. A supervisor starts its children in the order they're listed, each one's `init/1` finishing before the next starts, and stops them in reverse. Stopping a child is the `Process.exit(pid, :shutdown)` from The BEAM at Work's page 5. A child that isn't trapping exits dies of it at once. One that is trapping exits, like these, gets to run its `terminate/2` callback and clean up, and the supervisor waits for it, 5 seconds by default, before sending `:kill`.
+The run also shows the order. A supervisor starts its children in the order they're listed, each one's `init/1` finishing before the next starts, and stops them in reverse. Stopping a child means sending it an exit signal, `Process.exit(pid, :shutdown)`. A child that isn't trapping exits dies of it at once. One that is trapping exits, like these, gets to run its `terminate/2` callback and clean up, and the supervisor waits for it, 5 seconds by default, before sending `:kill`.
 
 ## Too many restarts
 
@@ -385,7 +385,7 @@ That's how a supervision tree handles a failure. It's tried as close to where it
 
 The OTP docs point out that the tries multiply as they go up. If each level allows 10 restarts, "a crashing child below that level will be restarted 100 times, which is probably excessive."
 
-At the top of every Elixir program is a supervisor. An application's `start/2` callback starts its supervision tree, and Elixir's docs say it "has to spawn and link a supervisor". If that top supervisor gives up, the application stops. In a release, a program packaged by Mix to be deployed, applications are started `:permanent` by default, which means "the node shuts down if the application terminates". At that point the whole BEAM exits, and as The BEAM at Work's page 5 said, something outside it has to start it again.
+At the top of every Elixir program is a supervisor. An application's `start/2` callback starts its supervision tree, and Elixir's docs say it "has to spawn and link a supervisor". If that top supervisor gives up, the application stops. In a release, a program packaged by Mix to be deployed, applications are started `:permanent` by default, which means "the node shuts down if the application terminates". At that point the whole BEAM exits, and something outside it has to start it again.
 
 ## And in Node?
 
@@ -466,7 +466,7 @@ exit code 0
 
 The threads don't print their crashes, but each new thread id is a restart. When it gives up, it ends the whole program with an error code, for an outside monitor to restart, which is what a release does when its top supervisor gives up.
 
-That's about twenty lines, and it works. It's also one strategy for one child. The rest of what a supervisor does is yours to write: several children, and what one dying means for the others; starting them in order and stopping them in reverse, waiting a while for each and then forcing it; a way for the rest of the program to find the new worker, since anything holding the old `Worker` object is holding a dead thread; and supervisors of supervisors. And The BEAM at Work's page 2 measurements still apply. A worker thread is about 9 MB and a BEAM process about 2.6 KB, so a Node program supervises a few threads where an Elixir program can supervise a process for every connection.
+That's about twenty lines, and it works. It's also one strategy for one child. The rest of what a supervisor does is yours to write: several children, and what one dying means for the others; starting them in order and stopping them in reverse, waiting a while for each and then forcing it; a way for the rest of the program to find the new worker, since anything holding the old `Worker` object is holding a dead thread; and supervisors of supervisors. And the costs are very different. A worker thread is about 9 MB and a BEAM process about 2.6 KB, so a Node program supervises a few threads where an Elixir program can supervise a process for every connection.
 
 ## Watch it happen
 

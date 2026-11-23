@@ -4,9 +4,9 @@ publish: false
 meta_description: A BEAM can connect to other BEAMs, and a send to a process on another machine looks just like a local one. What changes is what can go wrong, and what a monitor can and can't tell you when it does.
 ---
 
-Everything on the pages so far happened inside one BEAM, and one BEAM is one operating system process on one machine. Page 5 ended there: if that process goes down, everything in it goes with it, and something outside has to start it again. Joe Armstrong's thesis on Erlang puts it plainly: "When we make a fault-tolerant system we need at least two physically separated computers. Using a single computer will not work, if it crashes, all is lost."
+One BEAM is one operating system process on one machine. If that process goes down, everything in it goes with it, and something outside has to start it again. Joe Armstrong's thesis on Erlang puts it plainly: "When we make a fault-tolerant system we need at least two physically separated computers. Using a single computer will not work, if it crashes, all is lost."
 
-So a BEAM can connect to other BEAMs, on the same machine or on others, and processes on one can send messages to processes on another. Erlang's docs: "Message passing between processes at different nodes, as well as links and monitors, are transparent when pids are used." The `send`, `receive`, links, and monitors from pages 4 and 5 work across machines the way they work inside one.
+So a BEAM can connect to other BEAMs, on the same machine or on others, and processes on one can send messages to processes on another. Erlang's docs: "Message passing between processes at different nodes, as well as links and monitors, are transparent when pids are used." `send`, `receive`, links, and monitors work across machines the way they work inside one.
 
 What changes is what can go wrong. Here's a program on one machine keeping a count on another, and then something happening to the other machine.
 
@@ -129,11 +129,11 @@ The `hello` line was printed by a process running on `b`, but it came out here, 
 
 When `c` started, it connected to `a`, and then to `b` by itself. Erlang's docs: "Connections are by default transitive. If a node A connects to node B, and node B has a connection to node C, then node A also tries to connect to node C." Every node ends up connected to every other one.
 
-The last two lines are where the transparency stops. A message to a process on the same node is copied from one process's memory to the other's, as page 4 showed. A message to a process on another node is encoded into bytes, sent over a TCP connection, and decoded on the other side, and the reply goes back the same way. There and back took 2 µs on one node, and 27 µs between two nodes on the same machine. Between two machines the network adds its own time on top.
+The last two lines are where the transparency stops. A message to a process on the same node is copied from one process's memory to the other's. A message to a process on another node is encoded into bytes, sent over a TCP connection, and decoded on the other side, and the reply goes back the same way. There and back took 2 µs on one node, and 27 µs between two nodes on the same machine. Between two machines the network adds its own time on top.
 
 ## When a node goes away
 
-Inside one BEAM, page 5's monitors only ever tell you one thing: the process has stopped, and here's why. Across nodes there's another reason a `:DOWN` message can carry. The docs list it with the others: "`noconnection` (no connection to the node where the monitored process resides)." Links get it too. A link to a process on another node sends an exit signal with the reason `:noconnection` if "the connection between linked processes on different nodes is lost or cannot be established".
+Inside one BEAM, a monitor only ever tells you one thing: the process has stopped, and here's why. Across nodes there's another reason a `:DOWN` message can carry. The docs list it with the others: "`noconnection` (no connection to the node where the monitored process resides)." Links get it too. A link to a process on another node sends an exit signal with the reason `:noconnection` if "the connection between linked processes on different nodes is lost or cannot be established".
 
 The connection can go in different ways, and this script tries three of them on a counter on node `b`. It watches the counter with a monitor, and watches node `b` itself with `:net_kernel.monitor_nodes(true)`, which sends a `{:nodedown, node}` message whenever a connection to a node is lost and a `{:nodeup, node}` message whenever one is made. `listen.(ms)` prints every message that arrives in the next `ms` milliseconds ([down.exs](down.exs)):
 
@@ -215,7 +215,7 @@ b halts
 
 But `b` wasn't down. Once it carried on, the counter answered with 7: both `{:add, 1}` messages, sent while `b` was paused, had arrived, after `a` had given up on it. They could just as easily have been lost. The docs: "When communicating over the distribution, signals can be lost if the distribution channel goes down." All `a` can know is that it doesn't know.
 
-**`b` halts.** This time the `:DOWN` message came at once. When a node's operating system process ends, the operating system closes its connections, and the other end sees that right away: "Normally, a terminating node is detected immediately by the transport protocol (like TCP/IP)." And the last `{:get, self()}` went nowhere, without an error. As page 4 said, sending to a pid never fails, even if there's nothing there to receive it.
+**`b` halts.** This time the `:DOWN` message came at once. When a node's operating system process ends, the operating system closes its connections, and the other end sees that right away: "Normally, a terminating node is detected immediately by the transport protocol (like TCP/IP)." And the last `{:get, self()}` went nowhere, without an error. Sending to a pid never fails, even if there's nothing there to receive it.
 
 So across nodes, `:noconnection` doesn't mean the process has stopped. It means this node can't reach it. The docs for monitors: "If the connection to it is lost, we do not know if it still exists." The process may have stopped, or may be carrying on without us, and the messages sent around that time may or may not have got there. A process watching one on another node has to decide for itself what to do when it can't tell.
 
@@ -327,7 +327,7 @@ The counter's process exits
 
 When the connection closed, and when the other process exited, Node said so at once, with a `close` event, just as the BEAM did. When the other process stopped answering, Node said nothing at all, for all 6 seconds, and would have gone on saying nothing. Node's docs: "By default `net.Socket` do not have a timeout." `socket.setTimeout()` adds one, and then the socket gets a `'timeout'` event after a quiet spell "but the connection will not be severed". Deciding how long is too long, and what to do then, is the program's job. Here that's a request timeout or a heartbeat of your own, the job the BEAM's ticks do for every connection.
 
-Everything else is the program's job too. The counter's address is a port, not a pid, and anything that wants to talk to it needs a connection, a way of splitting the stream into messages (lines, here), and a way of encoding them (JSON, which has no pids, no tuples, and no atoms). A request with a reply needs a way to match them up, as page 4's request did with a reference. A library can take care of that, but it's one the program has to choose and wire in. The BEAM has it built in, for every process.
+Everything else is the program's job too. The counter's address is a port, not a pid, and anything that wants to talk to it needs a connection, a way of splitting the stream into messages (lines, here), and a way of encoding them (JSON, which has no pids, no tuples, and no atoms). A request with a reply needs a way to match the two up, like the reference a BEAM process sends with its request. A library can take care of that, but it's one the program has to choose and wire in. The BEAM has it built in, for every process.
 
 What neither can do is the hard part. A Node process whose socket goes quiet is in the same spot as a BEAM node that gets `:noconnection`: it can't tell a stopped process from a slow one, or know which of its last messages arrived.
 

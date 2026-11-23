@@ -40,7 +40,7 @@ const OS_PARTS = [
 const BEAM_PARTS = [
   {
     id: "beam-heap", name: "Heap and stack", bytes: 233 * 8, color: "--code-string",
-    about: "233 words where the process keeps its data. The stack shares the same block, and a new process's stack is 1 word. Both grow when the process needs more (page 3).",
+    about: "233 words where the process keeps its data. The stack shares the same block, and a new process's stack is 1 word. Both grow when the process needs more.",
   },
   {
     id: "beam-record", name: "The BEAM's record of it", bytes: 94 * 8, color: "--code-keyword",

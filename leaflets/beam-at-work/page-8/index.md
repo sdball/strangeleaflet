@@ -6,23 +6,23 @@ meta_description: Where the BEAM doesn't help. Native code it calls can hold a s
 
 <!-- Draft, complete 2026-11-19 apart from review: the opener, native code, raw speed, one huge heap, what Node needs, and the slow consumer (moved from page 4). -->
 
-The pages so far have been about what the BEAM does that Node can't. This one is about where it doesn't help, starting with page 1's busy loop, written in C.
+The BEAM does a lot that Node can't. This page is about where it doesn't help, starting with a CPU-bound busy loop written in C.
 
 <native-code>
 
 ![The simulation just after the busy loops, four lanes. BEAM, the busy loop in Elixir: the strip has even ticks right through the shaded stretch where the busy loop ran. Took 0.78 s, and the ticker kept ticking. BEAM, the busy loop in C, as a NIF: a short shaded stretch with no ticks in it, then four red late ticks at once at its end, marked ×4. Took 0.31 s, and the ticker stopped. Its missed ticks all came at once. BEAM, the same NIF, marked dirty: even ticks through its short shaded stretch. Took 0.31 s on a dirty scheduler, and the ticker kept ticking. Node, the busy loop in JavaScript: a long shaded stretch with no ticks, then one red late tick. Took 1.00 s, and the ticker stopped. One late tick; the rest skipped.](native-code.webp)
 
-*The live version of this needs JavaScript. In it, you can start page 1's busy loop in Elixir, in C as a NIF and as a dirty NIF, and in Node, and watch each one's ticker.*
+*The live version of this needs JavaScript. In it, you can start a slow Fibonacci busy loop in Elixir, in C as a NIF and as a dirty NIF, and in Node, and watch each one's ticker.*
 
 </native-code>
 
 <script type="module" src="native-code.js"></script>
 
-Written in C, the busy loop was two and a half times as fast as in Elixir, and it stopped the BEAM's ticker as completely as Node's busy loop stopped Node's. Everything page 1 said about preemption is about code the BEAM runs itself. Code it calls out to, in C or Rust or anything else compiled to native code, runs until it returns, and the scheduler running it can't take it back. Marked dirty, the same C code ran just as fast, somewhere the ticker didn't need.
+Written in C, the busy loop was two and a half times as fast as in Elixir, and it stopped the BEAM's ticker as completely as Node's busy loop stopped Node's. The BEAM's preemption only covers code the BEAM runs itself. Code it calls out to, in C or Rust or anything else compiled to native code, runs until it returns, and the scheduler running it can't take it back. Marked dirty, the same C code ran just as fast, somewhere the ticker didn't need.
 
 ## Native code
 
-A NIF is a native implemented function: a function written in C, or in another language compiled to native code, that's "called like any other functions without any difference to the caller". Here's page 1's `fib` as one, twice: once ordinary, and once marked as dirty CPU-bound work ([fib_nif.c](fib_nif.c)):
+A NIF is a native implemented function: a function written in C, or in another language compiled to native code, that's "called like any other functions without any difference to the caller". Here's the slow recursive `fib` as one, twice: once ordinary, and once marked as dirty CPU-bound work ([fib_nif.c](fib_nif.c)):
 
 ```c
 #include <erl_nif.h>
@@ -45,7 +45,7 @@ static ErlNifFunc funcs[] = {
 ERL_NIF_INIT(Elixir.Fib, funcs, NULL, NULL, NULL, NULL)
 ```
 
-And here's page 1's ticker experiment again, with the busy loop calling one of them. The script compiles the C first, then loads it into a module whose functions it replaces ([nif.exs](nif.exs)):
+And here's a ticker that ticks every 100 ms, with a busy loop beside it calling one of them. The script compiles the C first, then loads it into a module whose functions it replaces ([nif.exs](nif.exs)):
 
 ```elixir
 include = Path.join([:code.root_dir(), "usr", "include"])
@@ -58,11 +58,11 @@ defmodule Fib do
   def dirty_fib(_n), do: :erlang.nif_error(:not_loaded)
 end
 
-# ...then page 1's ticker, and at 350 ms a process that calls
+# ...then a ticker every 100 ms, and at 350 ms a process that calls
 # Fib.fib(44) or Fib.dirty_fib(44)
 ```
 
-It's `fib(44)` here, because in C `fib(40)` is over too quickly to see much. With one scheduler, as in page 1's `+S 1` run:
+It's `fib(44)` here, because in C `fib(40)` is over too quickly to see much. With one scheduler (`+S 1`), so the ticker and the busy loop have to share it:
 
 ```text
 $ elixir --erl "+S 1" nif.exs fib
@@ -99,7 +99,7 @@ $ elixir --erl "+S 1" nif.exs fib
 2820 ms  tick 28 (28 due)
 ```
 
-For two seconds, nothing: the same silence as Node's on page 1. Then the BEAM's difference shows in a different way. Every tick that came due was delivered once the scheduler was free, all twenty of them in a millisecond, and the ticker went back to its beat. None were skipped, as they were in Node. They were just very late.
+For two seconds, nothing: the same silence as Node's while its busy loop runs. Then the BEAM's difference shows in a different way. Every tick that came due was delivered once the scheduler was free, all twenty of them in a millisecond, and the ticker went back to its beat. None were skipped, as they were in Node. They were just very late.
 
 The same function, marked dirty:
 
@@ -138,11 +138,11 @@ $ elixir --erl "+S 1" nif.exs dirty_fib
 2802 ms  tick 28 (28 due)
 ```
 
-Every tick on time. A dirty NIF runs on one of the dirty schedulers page 2 counted among the BEAM's threads, not on the scheduler that runs the ticker.
+Every tick on time. A dirty NIF runs on one of the dirty schedulers, extra threads the BEAM keeps for work like this, not on the scheduler that runs the ticker.
 
 More schedulers don't make the ordinary NIF safe. With all eight, in another run, the ticker still went quiet from the moment the NIF started at 351 ms until it returned at 2561 ms, and then printed tick 4 with 25 due. The dirty one, with eight, ticked on time throughout.
 
-The NIF docs are direct about all of this. They start with a warning: "The VM _cannot_ provide the same services as provided when executing Erlang code, such as pre-emptive scheduling or memory protection. If the native function does not behave well, the whole VM will misbehave." Then: "A native function that crashes will crash the whole VM", which is page 5's isolation gone too. And a native function should "return to its caller within 1 millisecond". Work that can't be split up that small "is called a 'dirty NIF'", and runs "on a separate set of schedulers called dirty schedulers", which is what `ERL_NIF_DIRTY_JOB_CPU_BOUND` asks for.
+The NIF docs are direct about all of this. They start with a warning: "The VM _cannot_ provide the same services as provided when executing Erlang code, such as pre-emptive scheduling or memory protection. If the native function does not behave well, the whole VM will misbehave." Then: "A native function that crashes will crash the whole VM", so a crash isn't contained to one process either. And a native function should "return to its caller within 1 millisecond". Work that can't be split up that small "is called a 'dirty NIF'", and runs "on a separate set of schedulers called dirty schedulers", which is what `ERL_NIF_DIRTY_JOB_CPU_BOUND` asks for.
 
 Most Elixir programmers never write a NIF, but they may well call one. Erlang's own `crypto` module, for one, loads a NIF library when it starts, and its functions are native code. Wherever there's a NIF, the BEAM's guarantees stop at its edge.
 
@@ -165,9 +165,9 @@ For this one job, the BEAM wasn't slower than Node: 0.78 s against 1.0. One recu
 
 ## One huge heap
 
-Page 3's builder kept 10 million pairs in its own heap, and spent much of its time collecting, a few hundred milliseconds at a time near the end. The BEAM kept that from holding up anyone else. It didn't make it any faster for the builder: a copying collector's work "is proportional to the amount of live data on the heap", and the builder's heap was nearly all live.
+A builder process that kept 10 million pairs in its own heap spent much of its time collecting, a few hundred milliseconds at a time near the end. The BEAM kept that from holding up anyone else. It didn't make it any faster for the builder: a copying collector's work "is proportional to the amount of live data on the heap", and the builder's heap was nearly all live.
 
-The usual answer is not to keep data like that in a process at all. ETS, Erlang term storage, is built into the BEAM, and its docs say it can "store very large quantities of data". A table isn't part of any process's heap: "every object insert and look-up operation results in a copy of the object", into the table or out of it. Here's the builder twice, once as on page 3 and once putting each pair in a table ([big-data.exs](big-data.exs)):
+The usual answer is not to keep data like that in a process at all. ETS, Erlang term storage, is built into the BEAM, and its docs say it can "store very large quantities of data". A table isn't part of any process's heap: "every object insert and look-up operation results in a copy of the object", into the table or out of it. Here's the builder twice, once keeping the pairs in its heap and once putting each pair in a table ([big-data.exs](big-data.exs)):
 
 ```elixir
 defmodule Build do
@@ -182,7 +182,7 @@ defmodule Build do
 end
 
 # ...a builder process runs one of them on 10 million pairs, traced
-# with :erlang.trace/3 as on page 3, and reports how long it took
+# with :erlang.trace/3, and reports how long it took
 ```
 
 ```text
@@ -201,7 +201,7 @@ For data that's read all the time and hardly ever changes, like configuration, t
 
 ## What Node needs to match the BEAM
 
-Page 1 left Node's tickers with two problems. While the busy loop ran, they couldn't tick at all. And afterwards each was on a new beat, nine ticks behind for good, and every interval that came due during the busy loop was locked to that new beat from then on. Here's what it takes to fix both in Node ([fixed.mjs](fixed.mjs)).
+A busy loop on Node's main thread leaves its `setInterval` tickers with two problems. While it runs, they can't tick at all. And afterwards each is on a new beat, behind for good, and every interval that came due during the busy loop is locked to that new beat from then on. Here's what it takes to fix both in Node ([fixed.mjs](fixed.mjs)).
 
 The second is the smaller job. `setInterval` counts each tick from when the last one ran. A steady interval counts from the start, and runs the ticks it missed:
 
@@ -221,7 +221,7 @@ const steadyInterval = (period, onTick) => {
 };
 ```
 
-Here's one of page 1's tickers with it, and the busy loop still on the main thread:
+Here's a ticker every 100 ms with it, and the busy loop still on the main thread:
 
 ```text
 $ node fixed.mjs main
@@ -245,7 +245,7 @@ $ node fixed.mjs main
 1600 ms  tick 16 (16 due)
 ```
 
-Still nothing while the busy loop ran, but afterwards every tick that came due, and then back on the beat at 1401 ms. That's what the BEAM did with the ordinary NIF at the top of this page. And here are four intervals, each made steady: A, B, and D every 100 ms, starting 0, 40, and 90 ms in, and C every 150 ms, starting 20 ms in, with a short busy loop at 500 ms and a longer one at 1000 ms. With plain `setInterval`, each busy loop would lock the intervals that came due during it onto one beat, as page 1's three tickers were:
+Still nothing while the busy loop ran, but afterwards every tick that came due, and then back on the beat at 1401 ms. That's what the BEAM did with the ordinary NIF at the top of this page. And here are four intervals, each made steady: A, B, and D every 100 ms, starting 0, 40, and 90 ms in, and C every 150 ms, starting 20 ms in, with a short busy loop at 500 ms and a longer one at 1000 ms. With plain `setInterval`, each busy loop would lock the intervals that came due during it onto one beat:
 
 ```text
 $ node fixed.mjs intervals
@@ -292,11 +292,11 @@ $ node fixed.mjs worker
 1700 ms  tick 17 (17 due)
 ```
 
-Every tick on time. So Node can do it: a dozen lines of steady interval, and a worker for the busy loop. What that asks of the programmer is the same kind of list as page 4's queue. Knowing the problem exists. Knowing ahead of time which code is CPU-bound, since only that goes to a worker. And each worker's costs: about 9 MB (page 2), an entry point of its own, data copied in and out (page 4), and its errors and exits handled by hand (page 5). In the BEAM, every process is all of that already.
+Every tick on time. So Node can do it: a dozen lines of steady interval, and a worker for the busy loop. What that asks of the programmer is a list of things to get right. Knowing the problem exists. Knowing ahead of time which code is CPU-bound, since only that goes to a worker. And each worker's costs: about 9 MB, an entry point of its own, data copied in and out, and its errors and exits handled by hand. In the BEAM, every process is all of that already.
 
 ## When messages come in faster than they go out
 
-The BEAM has its own version of page 1's problem, though. It never skips a tick: a tick that comes due is a message, and it waits in the ticker's mailbox until the ticker gets to it. When there's more work than CPU for long enough, that's where the extra goes.
+The BEAM has its own version of the busy-loop problem, though. It never skips a tick: a tick that comes due is a message, and it waits in the ticker's mailbox until the ticker gets to it. When there's more work than CPU for long enough, that's where the extra goes.
 
 Nothing limits how many messages a mailbox can hold, and nothing slows a sender down when the receiver falls behind. Here's a producer sending 1,000 messages a second to a consumer that works on each one for 2 ms, so it can only handle 500 a second. Every second the producer reports how many it's sent, how many the consumer has handled, how many are waiting in the consumer's mailbox, and the consumer's size ([slow-consumer.exs](slow-consumer.exs)):
 
@@ -313,7 +313,7 @@ mode: send
 
 The mailbox grows by 500 messages a second, and it would go on growing until the machine ran out of memory. The consumer grows with it, because messages waiting in a mailbox are the consumer's data. They sit on its heap, and its collector copies them along with everything else, since as far as the collector can tell they're all still in use. *The BEAM Book*: "If the receiver is backed up and is receiving more messages than it has time to handle, it might actually start using more memory". For a process that may pile up messages, the docs recommend setting its `message_queue_data` flag to `off_heap`, which keeps them out of its heap and out of its collections.
 
-That's a common way for an Elixir system to get into trouble. Page 1's BEAM never skipped a tick: under load, work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
+That's a common way for an Elixir system to get into trouble. Under load, the BEAM's work waits in mailboxes instead of being dropped. That's good until the load doesn't let up.
 
 The fix is for the producer to wait. `send` never waits, so the waiting is built from a second message going the other way. The producer puts its own address, `self()`, in each message and goes straight into a `receive`. The consumer sends `:done` back to that address when it's finished. Until `:done` arrives, the producer's `receive` has nothing to match, so it waits:
 
@@ -350,7 +350,7 @@ mode: call
 6000 ms: sent 2997, handled 2997, waiting    0, consumer 20 KB
 ```
 
-The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't. Elixir at Work comes back to both.
+The producer now goes at the consumer's pace, 500 a second, and nothing piles up. That's backpressure: a slow receiver slows the sender down. GenServer has a function for each of these two ways to send: one that waits for the reply, and so gives you backpressure, and one that sends and moves on, which doesn't.
 
 Node's worker threads fall behind the same way. Here's the slow consumer again, with the main thread posting 1,000 messages a second to a worker that works on each one for 2 ms ([slow-worker.mjs](slow-worker.mjs)). The waiting works the same way as in the BEAM: the worker posts `"done"` back when it's asked to, and the main thread waits for it:
 

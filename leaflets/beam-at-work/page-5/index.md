@@ -292,7 +292,7 @@ received {:DOWN, #Reference<0.2306361067.576454663.233754>, :process, #PID<0.109
 
 A crash, a normal exit, and an exit with a reason of the process's own choosing (`exit(:done)`) all came as `:DOWN` messages with their reasons. Monitoring a process that was already gone got a `:DOWN` at once, with the reason `:noproc`, no such process, so there's no gap between checking whether a process is alive and starting to watch it. Each monitor is separate, with its own reference, and each sends its own `:DOWN`. And a monitor only goes one way: the watcher crashing did nothing to the process it was watching.
 
-The reference is how the watcher tells its `:DOWN` messages apart, and it's a reference like page 4's `make_ref()`: new and unique. Elixir at Work, the next leaflet, shows `GenServer.call` using that. It monitors the server it's calling, so if the server dies before it replies, the caller gets a `:DOWN` instead of waiting forever, and it uses the monitor's reference to tag the reply.
+The reference is how the watcher tells its `:DOWN` messages apart, and it's a reference like the ones `make_ref()` makes: new and unique. `GenServer.call` uses that. It monitors the server it's calling, so if the server dies before it replies, the caller gets a `:DOWN` instead of waiting forever, and it uses the monitor's reference to tag the reply.
 
 So the two fit different jobs:
 
@@ -403,11 +403,11 @@ The worker has no error handling at all. It does its job, and when something goe
 
 That's what makes giving up necessary. A worker that fails because of something passing, like a dropped connection, will probably work the second time. One that fails because of a bug will fail every time, and restarting it forever only hides that. So the restarter stops after a few tries and exits, and since it's an ordinary process, something linked to it can find out and decide what to do next.
 
-This is a small, hand-written version of a supervisor, which we'll see for real in the next leaflet, Elixir at Work. A real supervisor handles more: several workers, what to do with the rest when one dies, how many restarts in how long count as too many. But it's built from these same pieces. A supervisor is a process that traps exits, links to the processes it starts, and restarts them when their `{:EXIT, ...}` messages arrive. It's written as a GenServer, which is where Elixir at Work starts.
+This is a small, hand-written version of a supervisor. A real supervisor handles more: several workers, what to do with the rest when one dies, how many restarts in how long count as too many. But it's built from these same pieces. A supervisor is a process that traps exits, links to the processes it starts, and restarts them when their `{:EXIT, ...}` messages arrive. It's written as a GenServer.
 
 ## And in Node?
 
-In Node, a whole program runs in one process, and its callbacks share one heap. That's page 1's event loop and page 3's heap. Here's alone.exs again, as three intervals ([uncaught.mjs](uncaught.mjs)):
+In Node, a whole program runs in one process, and its callbacks share one heap. Here's alone.exs again, as three intervals ([uncaught.mjs](uncaught.mjs)):
 
 ```javascript
 const mode = process.argv[2] ?? "default";
@@ -516,7 +516,7 @@ main: 4
 main: 5
 ```
 
-That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost what we measured on page 2, about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
+That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
 
 ## Links and monitors together
 
@@ -547,7 +547,7 @@ A crash in the BEAM is contained to its process, and that's only as good as the 
 
 Links spread failures intentionally, which means a careless link spreads them by accident. Link a short-lived helper to a long-lived process that isn't trapping exits, and the helper's crash takes the long-lived process with it.
 
-The BEAM itself is one operating system process. Everything on this page happens inside it. If the whole thing goes down then something external has to restart it, just as with Node. Page 6's distribution, more than one BEAM on more than one machine, is the BEAM's answer to that: Armstrong's thesis puts workers and supervisors "on different physical machines".
+The BEAM itself is one operating system process. Everything on this page happens inside it. If the whole thing goes down then something external has to restart it, just as with Node. Distribution, more than one BEAM on more than one machine, is the BEAM's answer to that: Armstrong's thesis puts workers and supervisors "on different physical machines".
 
 ## Sources
 

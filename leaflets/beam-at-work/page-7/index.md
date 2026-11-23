@@ -115,7 +115,7 @@ A module can only have two versions. The manual again: "If a third instance of t
 
 The tickers were in version 2 by then, so they survived. Had version 3 come within a tick of version 2, while they were still sleeping in version 1's `loop`, they would have been killed too. (The simulation above does that if you deploy twice quickly.)
 
-So a process that's going to be around for a while has to be written to move: to make a fully qualified call now and then, as the tickers do, so it's never left behind in old code. OTP's processes, like a GenServer, can be sent a system message that "Tells the process to change code", and GenServer has a callback, `code_change`, "Invoked to change the state of the `GenServer` when a different version of a module is loaded". Elixir at Work comes back to GenServer. The [`code` module](https://www.erlang.org/doc/apps/kernel/code.html) also has a gentler purge, `:code.soft_purge`, which leaves the old code alone if any process is still in it.
+So a process that's going to be around for a while has to be written to move: to make a fully qualified call now and then, as the tickers do, so it's never left behind in old code. OTP's processes, like a GenServer, can be sent a system message that "Tells the process to change code", and GenServer has a callback, `code_change`, "Invoked to change the state of the `GenServer` when a different version of a module is loaded". The [`code` module](https://www.erlang.org/doc/apps/kernel/code.html) also has a gentler purge, `:code.soft_purge`, which leaves the old code alone if any process is still in it.
 
 ## And in Node?
 
@@ -191,7 +191,7 @@ Elixir's own release tool doesn't do hot upgrades, and its docs say why: "Erlang
 
 The tickers here were easy: their state is a number, and versions 2 and 3 used it the same way. The docs' example is a counter whose new version keeps its state as a pair instead of a number. Loaded as is, the new code would crash on the old state, and the old kind of message might still be waiting in the mailbox, so the new code has to handle both. Doing it properly takes a `code_change` callback for each process whose state changes, a recipe for each application that changed (an `.appup` file) "telling exactly how the application changed between versions", and, in the docs' words, "extensive testing".
 
-What's always there, though, is the mechanism this page used: load a module into a running node. The `code` module's docs give the example of loading one "on a remote node in a distributed system", and with page 6's distribution, that's a fix you can put into a running system without restarting it, carefully.
+What's always there, though, is the mechanism this page used: load a module into a running node. The `code` module's docs give the example of loading one "on a remote node in a distributed system", and with distribution, that's a fix you can put into a running system without restarting it, carefully.
 
 ## Sources
 

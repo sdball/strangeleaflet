@@ -182,8 +182,8 @@ customElements.define("native-code", class extends HTMLElement {
     const id = `native-code-${++ids}`;
 
     this.innerHTML = `
-      <p class="intro-title">Page 1's busy loop, four ways</p>
-      <p class="intro-text">A ticker ticks every 100 ms, and a busy loop starts beside it: page 1's slow Fibonacci, fib(40). In Elixir it's preempted, as page 1 showed. Here it is in C as well, called from Elixir as native code, and in Node. Each busy loop takes as long as it took on this M1.</p>
+      <p class="intro-title">One busy loop, four ways</p>
+      <p class="intro-text">A ticker ticks every 100 ms, and a busy loop starts beside it: the slow recursive Fibonacci, fib(40). In Elixir it's preempted. Here it is in C as well, called from Elixir as native code, and in Node. Each busy loop takes as long as it took on this M1.</p>
       <div class="controls">
         <button type="button" class="busy">Add a busy loop</button>
       </div>

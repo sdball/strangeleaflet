@@ -4,7 +4,7 @@ publish: false
 meta_description: A BEAM process's data is its own, and the only way in is a message, read one at a time. So a process can stop and wait in the middle of a job, and nothing else gets in. What a send costs, and how receive picks a message.
 ---
 
-Pages 2 and 3 kept coming back to one rule: no process can get at another's memory. That's what lets each one collect its own garbage on its own. But processes have to work together somehow, and if they can't share data, they have to send it. This page is about what that buys you, starting with a ticket sale.
+BEAM processes keep to one rule: no process can get at another's memory. That's what lets each one collect its own garbage on its own. But processes have to work together somehow, and if they can't share data, they have to send it. This page is about what that buys you, starting with a ticket sale.
 
 <ticket-race>
 
@@ -74,7 +74,7 @@ tickets left: -1
 
 Three tickets sold out of two, every time. `await` hands the thread back while the payment is out, so the second buyer's `buy()` ran its check right then, and so did the third's, before the first sale had taken its ticket.
 
-That isn't a bug in Node. Without the `await`, the same class would be fine: one callback runs at a time (page 1), so a method that doesn't wait runs to the end before anything else can touch the object. The trouble is the waiting in the middle.
+That isn't a bug in Node. Without the `await`, the same class would be fine: one callback runs at a time, so a method that doesn't wait runs to the end before anything else can touch the object. The trouble is the waiting in the middle.
 
 Here's the same sale in Elixir, with the seller as a process ([wait-inside.exs](wait-inside.exs)). It's a loop: receive a request, check what's left, charge the card, reply, and call itself with what's left now. Nothing in Elixir changes in place, so the number of tickets left is the loop's argument, and each pass gets the new number. `buy` and `left` send the seller a request with a fresh reference and wait for the reply that carries it:
 
@@ -183,7 +183,7 @@ The number of tickets left is the seller's own data. No other process can read i
 
 While it waits for a payment, the seller is inside `Payments.charge`, in a `receive` that only the payment's reply matches. The buyers' requests are in its mailbox too, and they stay there until the sale in progress is done. (The mailbox section below shows how a `receive` picks one message and leaves the rest.)
 
-And the seller can afford to wait, because waiting only stops the seller. A process waiting in a `receive` isn't holding a thread. It's out of the run queue (page 1) and costs only its memory (page 2), while the buyers, the payment process, and everything else carry on. Node can't let a function wait like that, because its one thread would wait with it, so it hands the thread back at `await`, and that's where the other buyers got in.
+And the seller can afford to wait, because waiting only stops the seller. A process waiting in a `receive` isn't holding a thread. It's out of the run queue and costs only its memory, while the buyers, the payment process, and everything else carry on. Node can't let a function wait like that, because its one thread would wait with it, so it hands the thread back at `await`, and that's where the other buyers got in.
 
 ## Node with a queue
 
@@ -255,9 +255,9 @@ binary of 16 MB: send took 3 µs, receiver grew 88 bytes
 messages waiting: 5
 ```
 
-Ten times the data, ten times as long, and the receiver grew by exactly the size of what was sent. The sender pays for the copy, and the receiver ends up with its own: the sender works out the message's size, makes room for it in the receiver's memory (on its heap, or in a separate fragment if it can't get at the heap right then), and copies it there. From then on the receiver's copy is part of the receiver, and each process's garbage collector (page 3) only ever has to look and only _can_ look at its own process's memory.
+Ten times the data, ten times as long, and the receiver grew by exactly the size of what was sent. The sender pays for the copy, and the receiver ends up with its own: the sender works out the message's size, makes room for it in the receiver's memory (on its heap, or in a separate fragment if it can't get at the heap right then), and copies it there. From then on the receiver's copy is part of the receiver, and each process's garbage collector only ever has to look and only _can_ look at its own process's memory.
 
-The last 16 MB binary line in the output above is the first exception. A binary bigger than 64 bytes (a string, a chunk of a file) is kept outside every process's heap, as page 3 said, and sending one copies only a small reference to it: 3 µs for 16 MB, and 88 bytes. That's safe to share because nothing in Elixir can change a binary once it's made. The other exception is literals, constants written into the code, which are kept with their module, outside every process.
+The last 16 MB binary line in the output above is the first exception. A binary bigger than 64 bytes (a string, a chunk of a file) is kept outside every process's heap, and sending one copies only a small reference to it: 3 µs for 16 MB, and 88 bytes. That's safe to share because nothing in Elixir can change a binary once it's made. The other exception is literals, constants written into the code, which are kept with their module, outside every process.
 
 The BEAM also ensures message delivery order. If a process sends two messages to the same process they arrive in the order they were sent. Messages from different senders can arrive in any order.
 
@@ -331,13 +331,13 @@ receive do
 end
 ```
 
-0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it. Elixir at Work, the leaflet after this one, starts with GenServer.
+0.2 µs, however full the mailbox. Elixir programmers rarely write that directly. Most processes that answer requests are written with GenServer, a part of Elixir's standard library, and its function for asking a process something and waiting for the answer already does it.
 
 ## And in Node?
 
 Inside one Node thread there's nothing to send. Pass an object to a function, or to an event listener, and the other end gets the same object, not a copy. That's fast and it's free, and it's safe for as long as nobody waits halfway through using it, as the tickets showed. Even an `EventEmitter`, the closest thing in plain Node to a message, isn't a mailbox. `emit` calls every listener right away, "synchronously," before it returns.
 
-Node does have messages, between threads. A worker thread (page 2's 9 MB thread) and the main thread talk with `postMessage`, and like a BEAM send, it copies: the value is cloned "in a way which is compatible with the HTML structured clone algorithm," and "The message object is cloned immediately, and can be modified after posting without having side effects." Here's what that costs, measured the way copy.exs did, with a worker that never reads its messages ([post-copy.mjs](post-copy.mjs)):
+Node does have messages, between threads. A worker thread (about 9 MB each) and the main thread talk with `postMessage`, and like a BEAM send, it copies: the value is cloned "in a way which is compatible with the HTML structured clone algorithm," and "The message object is cloned immediately, and can be modified after posting without having side effects." Here's what that costs, measured the way copy.exs did, with a worker that never reads its messages ([post-copy.mjs](post-copy.mjs)):
 
 ```javascript
 const worker = new Worker("setInterval(() => {}, 60_000);", { eval: true }); // stays up, never reads its messages
@@ -384,13 +384,13 @@ SharedArrayBuffer of 16 MB, shared:     9 µs
 
 Much the same as the BEAM: a million numbers took about 7 ms to post where the BEAM's send took about 6. Node's ways around the copy are different, though. A transferred buffer moves to the worker, and the sender's copy is left empty. A `SharedArrayBuffer` isn't copied at all: both threads use the same memory, and either one can change it while the other is reading. That's the kind of sharing the BEAM leaves out, and the reason it can share big binaries is that nobody can change them.
 
-So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps of page 3, and page 5's monitors, which report a crash with a message.
+So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes a thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps, and monitors, which report a crash with a message.
 
 ## Where it gives ground
 
-One at a time is also a queue, and a busy process is a bottleneck. The third buyer waited 200 ms to hear the tickets were gone. With a thousand tickets and a thousand buyers at once, the last buyer would wait for the 999 payments ahead of theirs, a hundred seconds. Elixir at Work comes back to what Elixir programs do about that.
+One at a time is also a queue, and a busy process is a bottleneck. The third buyer waited 200 ms to hear the tickets were gone. With a thousand tickets and a thousand buyers at once, the last buyer would wait for the 999 payments ahead of theirs, a hundred seconds.
 
-And nothing limits a mailbox. A send never waits, so a process that gets messages faster than it can handle them just falls further behind, holding on to every one. Page 8 is about that.
+And nothing limits a mailbox. A send never waits, so a process that gets messages faster than it can handle them just falls further behind, holding on to every one.
 
 ## Sources
 

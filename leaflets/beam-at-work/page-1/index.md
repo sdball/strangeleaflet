@@ -328,7 +328,7 @@ In Node, one late callback stands in for all the ticks its interval missed. The 
 
 That new beat has a side effect when there's more than one interval. Node's three tickers started a third of a beat apart. But then all three came due during the busy loop and all three ran the moment it ended. From that point onward Node counts each one's next tick from that same moment. At that point all of the intervals tick together and application level code would be required to enforce their timing differential.
 
-A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. Page 8 will come back to this and also cover the BEAM's version of the problem. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
+A long-running Node process that now and then hits some CPU-bound work can slowly gather its same-period intervals into one burst. The BEAM never skips a tick, so when there's more work than CPU, the extra work piles up in mailboxes instead of being dropped.
 
 Want to generate CPU loops at runtime for each of these approaches on your own machine? [ticker-live.exs](ticker-live.exs) and [ticker-live.mjs](ticker-live.mjs) have one ticker each, so you can read along as they tick. When you press "Enter" that will start a `fib(40)` busy loop. `q` will quit.
 
