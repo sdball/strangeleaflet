@@ -297,7 +297,7 @@ size 50: system 390, children's 0
 size 100: system 390, children's 0
 ```
 
-With tracing on, the whole system did 390 collections, and the children still did none, at either size. So the 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
+The script's own process collected more often this time, 390 in all, but the children still did none, at either size. The 90 in die-young.exs were nearly all the script's own process too, running the loop that spawns the children. The children's lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
 
 That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
 
