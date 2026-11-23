@@ -14,7 +14,7 @@ Here's a job that gives the collector a lot to do, replayed from real runs in th
 
 ![The replay 640 ms into both runs, side by side. On the BEAM side the collecting badge is lit: when the builder collects, it's on a dirty CPU scheduler, and the tickers run on. The longest a tick has waited so far is 1 ms. The builder is collecting, and the three tickers are ticking, their strips evenly spaced: 189 ticks so far, 39 of them while the builder was collecting, the worst 1 ms late. On the Node side the collecting badge is lit too: when V8 collects, no JavaScript runs, not even a ticker. The longest a tick has waited so far is 40 ms, and climbing: the builder and all three tickers are paused, and each ticker's strip ends in a red bar for a tick that's still waiting.](beam-heaps.webp)
 
-*The live version of this needs JavaScript. In it, you can play the replay or drag through it, show each process's heaps, and spawn short-lived processes that never collect at all.*
+*The live version of this needs JavaScript. In it, you can play the replay or drag through it, and show each process's heaps.*
 
 </beam-heaps>
 
@@ -261,7 +261,17 @@ $ for size in 50 100 1000 10000; do elixir die-young.exs $size; done
 
 With lists of 50 or 100, the whole system did 90 collections, and none of them were the children's. [children-gcs.exs](children-gcs.exs) runs the same thing while tracing every new process's collections, and it counts zero for the children, at both sizes. The 90 were other processes'. Their lists fit in a 233-word heap, so each one did its work and was freed whole. With lists of 1,000 the heap fills and each process collects 8 times. That's still cheap (each collection copies only that one process's small heap), but it's no longer free.
 
-That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once. The replay at the top can spawn some of these: press **Spawn 12 short-lived processes** under it. Each fills a little of its heap and is gone, and none of them collects.
+That's the shape of a lot of Elixir programs: a process per request or per job, short-lived, making garbage nobody ever collects. Generational collectors, V8's included, are built on the idea that most data dies young. A BEAM process can make that true for a whole heap at once.
+
+Here are some of them, slowed down. Each fills a little of its heap and is gone, and none of them collects.
+
+<short-lived>
+
+*The live version of this needs JavaScript. In it, you can spawn short-lived processes, a dozen at a time, and watch each fill a little of its first heap and exit.*
+
+</short-lived>
+
+<script type="module" src="short-lived.js"></script>
 
 ## Where it gives ground
 

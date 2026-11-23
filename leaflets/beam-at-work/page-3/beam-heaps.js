@@ -1,9 +1,10 @@
 // <beam-heaps>: page 3's widget. A slowed-down replay of two real runs,
 // record-gc.exs and record-gc.mjs: one builder keeping a list of 10 million
 // pairs, and three tickers that tick every 10 ms and make a little garbage
-// each time, like small requests. Nothing here is simulated except the
-// short-lived processes at the bottom: every tick, every collection, and
-// every heap size is from the recordings (beam-run.json, node-run.json).
+// each time, like small requests. Nothing here is simulated: every tick,
+// every collection, and every heap size is from the recordings
+// (beam-run.json, node-run.json). The short-lived processes further down the
+// page are their own widget, short-lived.js.
 //
 // It opens page 3, so it leads with what anyone can read: each ticker's
 // strip, and a headline per side, the longest any tick has waited so far
@@ -43,12 +44,6 @@ const STEP = 5_000; // µs per press of Step
 // 500 ms. The slider still goes back to 0.
 const START = 300_000;
 const LOG_LINES = 7; // tall enough for a few wrapped lines
-
-// The short-lived processes, after die-young.exs: each sums a list of 50
-// numbers (100 words, plus a little) in its 233-word heap and exits.
-const SHORT_BATCH = 12;
-const SHORT_USED = 110; // words, about
-const SHORT_LIFE = 900; // ms on screen, not to scale: really a few µs
 
 const number = (n) => n.toLocaleString("en-US");
 // "1.2 / 4.8 KB": used and size in the size's unit, KB at the least
@@ -410,11 +405,6 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   beam-heaps .readout thead th {
     color: var(--muted);
   }
-  beam-heaps .short-count {
-    margin: .4rem 0 0;
-    font-family: var(--type);
-    font-size: .85rem;
-  }
   beam-heaps .key {
     display: flex;
     flex-wrap: wrap;
@@ -434,35 +424,6 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     background: var(--swatch);
     border-radius: 2px;
   }
-  beam-heaps .short {
-    margin-top: 1rem;
-  }
-  beam-heaps .tiles {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .35rem;
-    height: 4.6rem; /* two rows of tiles, filled or not */
-    overflow: hidden;
-    align-content: flex-start;
-    margin-top: .5rem;
-  }
-  beam-heaps .tile {
-    width: 3.2rem;
-    padding: .2rem;
-    font-family: var(--code);
-    font-size: .7rem;
-    text-align: center;
-    border: 1.5px solid var(--line);
-    border-radius: 4px;
-    transition: opacity .3s;
-  }
-  beam-heaps .tile .bar {
-    height: .5rem;
-    margin-top: .15rem;
-  }
-  beam-heaps .tile.gone {
-    opacity: 0;
-  }
   /* A fixed height that scrolls to the newest line */
   beam-heaps .log {
     margin: 1rem 0 0;
@@ -480,7 +441,6 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     white-space: pre-wrap;
   }
   @media (prefers-reduced-motion: reduce) {
-    beam-heaps .tile,
     beam-heaps .badge,
     beam-heaps .states > span {
       transition: none;
@@ -627,14 +587,6 @@ customElements.define("beam-heaps", class extends HTMLElement {
         <span style="--swatch: var(--code-error)">a late tick, and how long it waited</span>
       </div>
 
-      <section class="side short" aria-label="Short-lived processes">
-        <p class="side-title">Processes that never collect</p>
-        <p class="side-note">Each one sums a list of 50 numbers, which fits in a new process's first heap of 233 words, and exits before the heap fills. Not to scale: each really lives a few microseconds.</p>
-        <button type="button" class="spawn">Spawn ${SHORT_BATCH} short-lived processes</button>
-        <div class="tiles" aria-hidden="true"></div>
-        <p class="short-count" aria-live="polite"></p>
-      </section>
-
       <div class="log" role="log" aria-live="polite" aria-label="What happened, newest last"></div>`;
 
     this.$ = (selector) => this.querySelector(selector);
@@ -642,8 +594,6 @@ customElements.define("beam-heaps", class extends HTMLElement {
     this.playing = !reducedMotion.matches;
     this.visible = false;
     this.t = 0;
-    this.shortDone = 0;
-    this.shortNext = 1;
     this.logged = -1;
 
     this.$(".play").addEventListener("click", () => {
@@ -664,7 +614,6 @@ customElements.define("beam-heaps", class extends HTMLElement {
     this.$(".settings").addEventListener("change", (e) => {
       this.speed = SPEEDS[e.target.value];
     });
-    this.$(".spawn").addEventListener("click", () => this.spawnShort());
     this.onMotion = () => reducedMotion.matches && this.setPlaying(false);
     reducedMotion.addEventListener("change", this.onMotion);
 
@@ -674,7 +623,6 @@ customElements.define("beam-heaps", class extends HTMLElement {
     });
     this.observer.observe(this);
 
-    this.renderShort();
     this.seek(START);
     this.setPlaying(this.playing);
   }
@@ -870,11 +818,6 @@ customElements.define("beam-heaps", class extends HTMLElement {
     }
   }
 
-  text(selector, text) {
-    const el = this.$(selector);
-    if (el.textContent !== text) el.textContent = text;
-  }
-
   // A ticker's last WINDOW of the run: collections shaded, each tick a mark
   // where it happened, and a late one's wait drawn from when it was due.
   strip(row, ticks, gcs) {
@@ -901,45 +844,5 @@ customElements.define("beam-heaps", class extends HTMLElement {
     }
     const html = parts.join("");
     if (strip.innerHTML !== html) strip.innerHTML = html;
-  }
-
-  // A batch at a time. A finished tile fades but keeps its place until the
-  // whole batch is done, so the others don't shift.
-  spawnShort() {
-    const tiles = this.$(".tiles");
-    const button = this.$(".spawn");
-    const instant = reducedMotion.matches;
-    button.disabled = true;
-    let left = SHORT_BATCH;
-    for (let i = 0; i < SHORT_BATCH; i++) {
-      const tile = document.createElement("span");
-      tile.className = "tile";
-      tile.innerHTML = `P${number(this.shortNext++)}<span class="bar young"><i></i></span>`;
-      tiles.append(tile);
-      const fill = tile.querySelector("i");
-      const finish = () => {
-        tile.classList.add("gone");
-        this.shortDone++;
-        this.renderShort();
-        if (--left === 0) {
-          setTimeout(() => {
-            tiles.replaceChildren();
-            button.disabled = false;
-          }, instant ? 0 : 300);
-        }
-      };
-      if (instant) {
-        fill.style.width = `${(SHORT_USED / FIRST_HEAP) * 100}%`;
-        setTimeout(finish, 600);
-      } else {
-        const delay = i * 60;
-        fill.animate([{ width: "0%" }, { width: `${(SHORT_USED / FIRST_HEAP) * 100}%` }], { duration: SHORT_LIFE * 0.7, delay, fill: "forwards", easing: "linear" });
-        setTimeout(finish, delay + SHORT_LIFE);
-      }
-    }
-  }
-
-  renderShort() {
-    this.text(".short-count", `Finished: ${number(this.shortDone)}. Garbage collections: 0. Each heap is freed whole when its process ends.`);
   }
 });
