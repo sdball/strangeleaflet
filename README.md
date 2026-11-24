@@ -178,4 +178,6 @@ line of its own:
 - a redirect page at each alias
 
 Every page includes the GoatCounter snippet from the layout, and the deploy
-checks for it.
+checks for it. The snippet sets `no_onload` and counts the page only once
+someone moves a pointer, touches, wheels, or types, which leaves out the
+scrapers that run pages in a real Chrome; the deploy checks for that too.

@@ -37,6 +37,13 @@ jobs:
             echo "$missing"
             exit 1
           fi
+          # the layout counts once someone interacts, so count.js mustn't on load
+          counting=$(grep -rL --include='*.html' 'no_onload: true' public | xargs -r grep -L 'http-equiv="refresh"' || true)
+          if [ -n "$counting" ]; then
+            echo "::error::These pages are missing no_onload: true in window.goatcounter, so they'd count bots and count people twice:"
+            echo "$counting"
+            exit 1
+          fi
       - uses: actions/upload-pages-artifact@v5
         if: github.event_name != 'pull_request'
         with:

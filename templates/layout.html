@@ -72,9 +72,24 @@
   })();
 </script>
 <script>
+  // Count the page once someone moves a pointer, touches, wheels, or types.
+  // Scrapers run pages in a real Chrome, so GoatCounter can't tell them from
+  // people, but they load a page and leave without doing any of that.
+  // Not scroll, since a page can scroll itself.
   window.goatcounter = {
+    no_onload: true,
     path: function(p) { return location.host + p }
   }
+  ;(function() {
+    var events = ["pointermove", "pointerdown", "touchstart", "wheel", "keydown"]
+    function count() { if (window.goatcounter.count) window.goatcounter.count() }
+    function human() {
+      events.forEach(function(type) { removeEventListener(type, human, true) })
+      if (window.goatcounter.count || document.readyState === "complete") count()
+      else addEventListener("load", count, { once: true })
+    }
+    events.forEach(function(type) { addEventListener(type, human, { capture: true, passive: true }) })
+  })()
 </script>
 <script data-goatcounter="https://sdball.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
