@@ -28,9 +28,11 @@
 //   which are callbacks in it, not processes: by default one counter's error
 //   ends the frame and every counter in it; with the handler the others
 //   carry on, in what Node's docs call an undefined state.
-// - scenes="node-worker", worker-exit.mjs: a main thread and a worker
-//   thread in one process. The worker throws and ends; 'error' and 'exit'
-//   events travel to the main thread, which carries on counting.
+// - scenes="node-worker", worker-exit.mjs: a main thread listening to a
+//   worker thread's events, in one process, laid out like the restart cards.
+//   The worker counts and throws at 3; 'error' and 'exit' events travel back
+//   along the listener's arrow, and the main thread's 'exit' handler starts
+//   a new worker, with a new thread id, which counts to 5 and exits with 0.
 //
 // The processes are boxes with their links drawn between them; a process
 // that traps exits has a brass border. When a process exits, a dot carries
@@ -75,10 +77,12 @@ const REASONS = {
   stopped: "stopped",
   error: "'error'",
   exit: "'exit'",
+  code0: "exit code 0",
+  code1: "exit code 1",
 };
 
 // The reasons a box outlines in red
-const VIOLENT = new Set(["crash", "killed", "threw", "rejected"]);
+const VIOLENT = new Set(["crash", "killed", "threw", "rejected", "code1"]);
 
 const exitMessage = (from, reason) => `{:EXIT, ${from}, ${REASONS[reason]}}`;
 const downMessage = (ref, from, reason) => `{:DOWN, ${ref}, :process, ${from}, ${REASONS[reason]}}`;
@@ -451,36 +455,48 @@ const SETS = {
     ],
   },
   "node-worker": {
-    key: ["event"],
+    key: ["listen", "event"],
     scenes: [
       {
-        title: "A worker thread throws",
-        procs: ["main", "worker"],
-        frame: "one node process, two threads",
+        title: "Main restarts a worker",
+        procs: ["main", "w1", "w2"],
+        frame: "one node process",
         roomy: true,
+        columns: "minmax(0, 1.25fr) minmax(0, 1fr)",
+        place: { main: "2 / 1", w1: "2 / 2", w2: "3 / 2" },
+        labels: { w1: "worker", w2: "worker" },
+        unborn: ["w2"],
+        monitors: [["main", "w1"]],
+        notes: { main: `restarts 0/${TRIES}` },
         lines: (p) => p.name === "main"
-          ? [`count ${p.count}`, "running"]
-          : p.alive ? ["running", ""] : ["threw", "exit code 1"],
+          ? ["running", p.note]
+          : [`thread ${p.name.slice(1)}`, `count ${p.count}`, p.alive ? "running" : REASONS[p.reason]],
+        statusLines: 3,
         mailbox: "main",
         mailboxLabel: "events on main:",
-        summary: "A main thread and a worker thread in one Node process. The worker throws and ends. The main thread gets an 'error' event and an 'exit' event, and carries on counting.",
+        summary: "A main thread listening to a worker thread's events, in one Node process. The worker counts, and throws at 3. The main thread gets an 'error' event and an 'exit' event with code 1, and its exit handler starts a new worker, thread 2, which counts from 1 to 5 and exits with code 0.",
         async play(s) {
           for (let n = 1; n <= 2; n++) {
             await s.wait(COUNT_EVERY);
-            s.count("main", n);
+            s.count("w1", n);
           }
-          await s.wait(COUNT_EVERY / 2);
-          s.die("worker", "threw");
-          await s.travel("worker", "main", "down", "error");
-          s.message("main", "'error': oops");
-          s.count("main", 3);
-          await s.travel("worker", "main", "down", "exit");
-          s.message("main", "'exit': code 1");
-          for (let n = 4; n <= 5; n++) {
+          await s.wait(COUNT_EVERY);
+          s.die("w1", "threw");
+          await s.event("w1", "main", "error", "'error': failed at 3");
+          s.die("w1", "code1");
+          await s.event("w1", "main", "exit", "'exit': code 1", { last: true });
+          s.note("main", `restarts 1/${TRIES}`);
+          await s.wait(RESTART_AFTER);
+          s.spawn("w2");
+          s.monitor("main", "w2");
+          s.say("Main's <code>'exit'</code> handler starts a new worker: a new thread, counting from 1.");
+          for (let n = 1; n <= 5; n++) {
             await s.wait(COUNT_EVERY);
-            s.count("main", n);
+            s.count("w2", n);
           }
-          s.say("Like a monitor: one way, a notification, and the main thread carries on.");
+          s.die("w2", "code0");
+          await s.event("w2", "main", "exit", "'exit': code 0", { last: true });
+          s.say("Main's <code>'exit'</code> handler starts a new worker: a new thread, counting from 1. The restart is code we wrote.");
         },
       },
     ],
@@ -495,6 +511,7 @@ const KEY = {
   monitor: `<span><i class="monitor-line"></i>monitor</span>`,
   down: `<span><i class="down-dot"></i><code>:DOWN</code> message</span>`,
   event: `<span><i class="down-dot"></i>event</span>`,
+  listen: `<span><i class="monitor-line"></i>listens for its events</span>`,
 };
 
 let ids = 0;
@@ -609,6 +626,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   }
   link-scenes .frame {
     grid-column: 1 / -1;
+    grid-row: 1;
     margin: 0 0 .5rem;
     font-family: var(--code);
     font-size: .8rem;
@@ -805,7 +823,7 @@ class Scene {
     for (const name of scene.procs) {
       const box = document.createElement("div");
       box.className = "proc";
-      const lines = scene.pids?.[name] ? 3 : 2;
+      const lines = scene.statusLines ?? (scene.pids?.[name] ? 3 : 2);
       box.innerHTML = `<span class="name">${scene.labels?.[name] ?? name}</span>${'<span class="status"></span>'.repeat(lines)}`;
       if (scene.place?.[name]) box.style.gridArea = scene.place[name];
       this.stage.insertBefore(box, this.dots);
@@ -935,6 +953,15 @@ class Scene {
     this.message(watcher, downMessage(m.ref, watched, reason));
   }
 
+  // A worker's event, travelling back along the main thread's arrow to it,
+  // then listed on the main thread. After the last ('exit'), the arrow goes.
+  async event(from, to, kind, text, { last = false } = {}) {
+    const m = this.monitors.find((x) => x.from === to && x.to === from);
+    await this.travel(from, to, "down", kind, m ? this.offset(m) : 0);
+    if (last) this.monitors = this.monitors.filter((x) => x !== m);
+    this.message(to, text);
+  }
+
   // How far a monitor's line sits from the middle, when there's more than one
   offset(m) {
     const pair = this.monitors.filter((x) => x.from === m.from && x.to === m.to);
@@ -1000,7 +1027,7 @@ class Scene {
       p.el.classList.toggle("dead", !p.alive);
       p.el.classList.toggle("trapping", p.alive && p.trap);
       p.el.classList.toggle("crashed", !p.alive && VIOLENT.has(p.reason));
-      p.el.querySelectorAll(".status").forEach((el, i) => (el.textContent = lines[i]));
+      p.el.querySelectorAll(".status").forEach((el, i) => (el.textContent = lines[i] ?? ""));
     }
     if (this.mailboxEl) {
       const owner = this.scene.mailbox;

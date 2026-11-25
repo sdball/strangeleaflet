@@ -531,43 +531,63 @@ With a handler, the other two carried on. But the docs are blunt about that: "Un
 
 What the Node docs recommend instead is the BEAM's idea but external to the language or application: "To restart a crashed application in a more reliable way, whether `'uncaughtException'` is emitted or not, an external monitor should be employed in a separate process to detect application failures and recover or restart as needed." Let it crash, and have something else restart it, where the thing that crashes is an entire operating system process, with every connection and every piece of work it had going down entirely.
 
-Inside a NodeJS process, worker threads are the closest thing to BEAM processes. A worker that throws ends only itself, and the main thread hears about it through the worker's `'error'` and `'exit'` events ([worker-exit.mjs](worker-exit.mjs)):
+Inside a NodeJS process, worker threads are the closest thing to BEAM processes. A worker that throws ends only itself, and the main thread hears about it through the worker's `'error'` and `'exit'` events. Restarting it is up to us. Here the main thread's `'exit'` handler does what restart.exs's restarter does, starting a new worker when one exits with any code but 0, up to three times. The first worker fails at 3 ([worker-exit.mjs](worker-exit.mjs)):
 
 <link-scenes scenes="node-worker">
 
 ```javascript
-const worker = new Worker(
-  `setTimeout(() => { throw new Error("oops"); }, 250);`,
-  { eval: true },
-);
-worker.on("error", (err) => console.log(`worker error: ${err.message}`));
-worker.on("exit", (code) => console.log(`worker exit, code ${code}`));
+// A worker that counts to 5, once every 100 ms, unless it fails first
+const work = `
+  const { threadId, workerData } = require("node:worker_threads");
+  let n = 0;
+  const timer = setInterval(() => {
+    n += 1;
+    if (n === workerData.failAt) throw new Error(\`failed at \${n}\`);
+    console.log(\`worker \${threadId}: \${n}\`);
+    if (n === 5) clearInterval(timer);
+  }, 100);
+`;
 
-let n = 0;
-const timer = setInterval(() => {
-  n += 1;
-  console.log(`main: ${n}`);
-  if (n === 5) clearInterval(timer);
-}, 100);
+let tries = 3;
+
+const start = (failAt) => {
+  const worker = new Worker(work, { eval: true, workerData: { failAt } });
+  const id = worker.threadId; // -1 once the worker has stopped
+  worker.on("error", (err) => console.log(`main: worker ${id} error: ${err.message}`));
+  worker.on("exit", (code) => {
+    console.log(`main: worker ${id} exit, code ${code}`);
+    if (code === 0) return;
+    if (tries === 0) return console.log("main: giving up");
+    tries -= 1;
+    console.log("main: starting a new worker");
+    start(null);
+  });
+};
+
+start(3);
 ```
 
 ```text
 $ node worker-exit.mjs
 node v25.9.0
-main: 1
-main: 2
-worker error: oops
-worker exit, code 1
-main: 3
-main: 4
-main: 5
+worker 1: 1
+worker 1: 2
+main: worker 1 error: failed at 3
+main: worker 1 exit, code 1
+main: starting a new worker
+worker 2: 1
+worker 2: 2
+worker 2: 3
+worker 2: 4
+worker 2: 5
+main: worker 2 exit, code 0
 ```
 
-*The live version of this needs JavaScript. In it, the worker throws on a loop, and its events travel to the main thread.*
+*The live version of this needs JavaScript. In it, the first worker throws, its events travel to the main thread, and the main thread starts a new worker, on a loop.*
 
 </link-scenes>
 
-That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
+That's a monitor: one way, a notification, and the main thread carries on, here to start a new worker with a new thread id, counting from 1. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
 
 ## Links and monitors together
 
@@ -602,7 +622,7 @@ The BEAM itself is one operating system process. Everything on this page happens
 
 ## Sources
 
-- The scripts and their runs: [alone.exs](alone.exs), [link.exs](link.exs), [trap.exs](trap.exs), [monitor.exs](monitor.exs), [restart.exs](restart.exs), [uncaught.mjs](uncaught.mjs), and [worker-exit.mjs](worker-exit.mjs), run 2026-11-15 on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
+- The scripts and their runs: [alone.exs](alone.exs), [link.exs](link.exs), [trap.exs](trap.exs), [monitor.exs](monitor.exs), [restart.exs](restart.exs), [uncaught.mjs](uncaught.mjs), and [worker-exit.mjs](worker-exit.mjs), run 2026-11-15 (link.exs and worker-exit.mjs again 2026-11-25, after changes) on an Apple M1 (8 cores) with Elixir 1.19.5 on Erlang/OTP 28.4.2 (erts 16.3.1) and Node v25.9.0.
 - Share-nothing processes "to limit the consequences of a software error", and "providing mechanisms for monitoring and restarting these processes": Joe Armstrong, [*Making reliable distributed systems in the presence of software errors*](https://erlang.org/download/armstrong_thesis_2003.pdf) (2003), page 19 (section 2.3). The slogans, "Let some other process fix the error", the `{'EXIT',Pid1,Why}` message, "it is Pid2's job to correct the error", workers and supervisors on "different physical machines", and "Let it crash": pages 104–107 (sections 4.3 to 4.4).
 - Exit reasons, `normal` for a process with no more code to run, links being bidirectional with only one between two processes, exit signals carrying the exit reason, and what a process does with one (dropped if `normal` and not trapping, terminated if not trapping, turned into `{'EXIT', SenderID, Reason}` if trapping, `kill` untrappable and turned into `killed`): the Erlang reference manual, [Processes](https://www.erlang.org/doc/system/ref_man_processes.html): [Process Termination](https://www.erlang.org/doc/system/ref_man_processes.html#process-termination), [Links](https://www.erlang.org/doc/system/ref_man_processes.html#links), [Sending Exit Signals](https://www.erlang.org/doc/system/ref_man_processes.html#sending_exit_signals), and [Receiving Exit Signals](https://www.erlang.org/doc/system/ref_man_processes.html#receiving_exit_signals). Monitors being unidirectional, the `'DOWN'` message, `noproc` at once for a process that doesn't exist, and each call creating an independent monitor: [Monitors](https://www.erlang.org/doc/system/ref_man_processes.html#monitors).
 - `exit/2`, and `kill` becoming `killed` "to hint to linked processes that the killed process got killed": [`erlang:exit/2`](https://www.erlang.org/doc/apps/erts/erlang.html#exit/2). `trap_exit`: [`process_flag/2`](https://www.erlang.org/doc/apps/erts/erlang.html#process_flag_trap_exit). [`link/1`](https://www.erlang.org/doc/apps/erts/erlang.html#link/1), [`monitor/2`](https://www.erlang.org/doc/apps/erts/erlang.html#monitor/2). Elixir's wrappers: [Process](https://hexdocs.pm/elixir/1.19.5/Process.html).
