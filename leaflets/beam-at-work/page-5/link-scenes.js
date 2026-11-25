@@ -778,7 +778,12 @@ customElements.define("link-scenes", class extends HTMLElement {
     this.replay = this.querySelector(".replay");
     this.replay.addEventListener("click", () => this.playOnce());
 
-    this.resizer = new ResizeObserver(() => this.scenes.forEach((s) => s.draw()));
+    // A new width can rewrap the mailbox and summary lines, so their heights
+    // are measured again; other size changes only move the lines and dots
+    this.resizer = new ResizeObserver(() => {
+      this.scenes.forEach((s) => s.draw());
+      if (this.offsetWidth !== this.measuredWidth) this.remeasure();
+    });
     this.resizer.observe(this);
 
     this.visible = false;
@@ -791,7 +796,7 @@ customElements.define("link-scenes", class extends HTMLElement {
     this.onMotion = () => this.start();
     reducedMotion.addEventListener("change", this.onMotion);
 
-    this.start();
+    document.fonts?.ready.then(() => this.remeasure());
   }
 
   disconnectedCallback() {
@@ -799,6 +804,27 @@ customElements.define("link-scenes", class extends HTMLElement {
     this.observer?.disconnect();
     reducedMotion.removeEventListener("change", this.onMotion);
     this.scenes?.forEach((s) => s.cancel());
+  }
+
+  // A card is at its tallest at the end of its scene, with every message in
+  // its mailbox and its summary showing. Those heights are kept for the
+  // mailbox and summary lines, so no card grows or shrinks as a scene plays.
+  async measure() {
+    this.measuredWidth = this.offsetWidth;
+    for (const s of this.scenes) {
+      s.cancel();
+      for (const el of [s.mailboxEl, s.sayEl]) if (el) el.style.minHeight = "";
+    }
+    await Promise.all(this.scenes.map((s) => s.play({ instant: true })));
+    for (const s of this.scenes) {
+      for (const el of [s.mailboxEl, s.sayEl]) if (el) el.style.minHeight = `${el.offsetHeight}px`;
+    }
+  }
+
+  async remeasure() {
+    const run = (this.measuring = (this.measuring ?? 0) + 1);
+    await this.measure();
+    if (run === this.measuring) this.start();
   }
 
   // Each scene as it ends
