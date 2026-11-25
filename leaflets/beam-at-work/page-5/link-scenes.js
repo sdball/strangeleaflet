@@ -60,7 +60,7 @@ const SCENES = [
     },
   },
   {
-    title: "Child finishes",
+    title: "Child finishes normally",
     procs: ["parent", "child"],
     links: [["parent", "child"]],
     summary: "A parent and a child, linked. The child runs out of code and exits with the reason :normal. The parent gets the exit signal, drops it, and carries on.",
