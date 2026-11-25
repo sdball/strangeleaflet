@@ -11,9 +11,9 @@ Here's a server with twelve connections, once in the BEAM and once in Node. Send
 
 <one-bad-message>
 
-![The simulation just after #6's message hit a bug, side by side. On the BEAM side, where each connection is a process, 11 of 12 are still connected: #6's tile is outlined in red and its count has stopped, and the other eleven are still counting. Under them: #6's process crashed, and nothing noticed. The rest carry on. On the Node side, where every connection is in one process, 0 of 12 are still connected, in red: every tile is outlined in red with its count stopped, and under them: The process exited, and everyone went with it, not just #6.](one-bad-message.webp)
+![The simulation just after #6's message hit a bug, side by side. On the BEAM side, 12 processes, 1 per connection, 11 of 12 are still connected: #6's tile is outlined in red and its count has stopped, and the other eleven are still counting. Under them: #6's process crashed, and nothing noticed. The rest carry on. On the Node side, 1 process for all 12 connections, 0 of 12 are still connected, in red: every tile is outlined in red with its count stopped, and under them: The process exited, and everyone went with it, not just #6.](one-bad-message.webp)
 
-*The live version of this needs JavaScript. In it, you can send the server a message that hits a bug, in the BEAM and in Node side by side, and restart Node's server afterwards.*
+*The live version of this needs JavaScript. In it, you can send the server a message that hits a bug, in the BEAM and in Node side by side.*
 
 </one-bad-message>
 

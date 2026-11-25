@@ -9,10 +9,8 @@
 // are how something can). In Node every connection is callbacks in one
 // process, and an uncaught exception ends the process by default, so every
 // connection goes with it (uncaught.mjs; Node's docs: it prints the stack
-// trace "and exiting with code 1"). "Restart Node's server" is what an
-// external monitor would do, as Node's docs recommend: everyone back, with
-// every count started again from 0, since what the process held went with
-// it.
+// trace "and exiting with code 1"). There's no restart button on either
+// side: the page's prose covers restarting, and Reset puts both back.
 //
 // It's a model of that one rule, not of either runtime's timing: each
 // connection handles a message every second or two, on the same schedule on
@@ -204,11 +202,11 @@ const handled = (i, ms) => (ms < phase(i) ? 0 : Math.floor((ms - phase(i)) / per
 
 const SIDES = {
   beam: {
-    title: "BEAM: a process for each connection",
+    title: "BEAM: 12 processes, 1 per connection",
     note: "The bug ends the process it happens in.",
   },
   node: {
-    title: "Node: one process for every connection",
+    title: "Node: 1 process for all 12 connections",
     note: "An error nothing catches ends the process, by default.",
   },
 };
@@ -236,15 +234,13 @@ customElements.define("one-bad-message", class extends HTMLElement {
       <p class="intro-text">Twelve people are connected to a server, and each connection counts the messages it has handled. Then someone sends a message that hits a bug, an error that nothing catches. Here's the same server in the BEAM and in Node.</p>
       <div class="controls">
         <button type="button" class="bad">Send a message that hits a bug</button>
-        <button type="button" class="restart" disabled>Restart Node's server</button>
         <button type="button" class="reset">Reset</button>
       </div>
-      <p class="note">A simulation of the rule in <a href="alone.exs">alone.exs</a> and <a href="uncaught.mjs">uncaught.mjs</a>, with twelve counters instead of three. Node's docs recommend restarting a crashed program from outside it, which is what the restart button stands for.</p>
+      <p class="note">A simulation of the rule in <a href="alone.exs">alone.exs</a> and <a href="uncaught.mjs">uncaught.mjs</a>, with twelve counters instead of three.</p>
       <div class="sides">${side("beam")}${side("node")}</div>`;
 
     this.$ = (selector) => this.querySelector(selector);
     this.$(".bad").addEventListener("click", () => this.bug());
-    this.$(".restart").addEventListener("click", () => this.restartNode());
     this.$(".reset").addEventListener("click", () => this.reset());
 
     this.observer = new IntersectionObserver(([entry]) => {
@@ -270,8 +266,7 @@ customElements.define("one-bad-message", class extends HTMLElement {
       beam: { since: now, gone: Array(PEOPLE).fill(null), hit: new Set(), down: false },
       node: { since: now, gone: Array(PEOPLE).fill(null), hit: new Set(), down: false },
     };
-    this.shown = { beam: [], node: [] };
-    this.$(".restart").disabled = true;
+    this.$(".bad").disabled = false;
     this.render(now);
   }
 
@@ -293,17 +288,9 @@ customElements.define("one-bad-message", class extends HTMLElement {
       node.down = true;
       node.hit = new Set([who]);
       node.gone = node.gone.map((g) => g ?? now);
-      this.$(".restart").disabled = false;
     }
-    this.render(now);
-  }
-
-  // Everyone back, with nothing of what the old process held
-  restartNode() {
-    const now = performance.now();
-    this.sides.node = { since: now, gone: Array(PEOPLE).fill(null), hit: new Set(), down: false };
-    this.shown.node = [];
-    this.$(".restart").disabled = true;
+    // Nobody left to send one
+    this.$(".bad").disabled = beam.gone.every((g) => g !== null);
     this.render(now);
   }
 
@@ -355,7 +342,11 @@ customElements.define("one-bad-message", class extends HTMLElement {
       let text = "";
       if (key === "beam" && hits.length) {
         // A count past one, so the line never outgrows its two lines
-        text = `${hits.length === 1 ? `${hits[0]}'s process` : `${hits.length} processes`} crashed, and nothing noticed. The rest carry on.`;
+        const left = PEOPLE - hits.length;
+        const who = hits.length === 1 ? `${hits[0]}'s process`
+          : left === 0 ? `All ${PEOPLE} processes` : `${hits.length} processes`;
+        const rest = left === 0 ? "" : left === 1 ? " The last one carries on." : " The rest carry on.";
+        text = `${who} crashed, and nothing noticed.${rest}`;
       } else if (key === "node" && s.down) {
         text = `The process exited, and everyone went with it, not just ${hits[0]}.`;
       }
