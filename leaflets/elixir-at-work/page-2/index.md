@@ -492,7 +492,7 @@ Click a process to pick it. The controls under the boxes act on whichever one is
 
 <script type="module" src="supervision-tree.js"></script>
 
-## Where it gives ground
+## Tradeoffs
 
 A supervisor restarts a process from the beginning, so whatever the process held is gone, as the ticket server's 12 tickets were. Anything that has to survive a crash needs to be kept somewhere else: in another process, or a database, or on disk.
 

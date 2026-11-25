@@ -386,7 +386,7 @@ Much the same as the BEAM: a million numbers took about 7 ms to post where the B
 
 So messages work much the same in both. The difference is how much they're used. In Node, messages are what you reach for once you've moved work onto a worker thread, at megabytes per thread. In the BEAM they're how everything talks to everything else, between processes that cost a couple of kilobytes, and the rest of the runtime is built around them: the per-process heaps, and monitors, which report a crash with a message.
 
-## Where it gives ground
+## Tradeoffs
 
 One at a time is also a queue, and a busy process is a bottleneck. The third buyer waited 200 ms to hear the tickets were gone. With a thousand tickets and a thousand buyers at once, the last buyer would wait for the 999 payments ahead of theirs, a hundred seconds.
 

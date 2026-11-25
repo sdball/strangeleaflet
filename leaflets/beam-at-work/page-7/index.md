@@ -185,7 +185,7 @@ Stopping first left 187 ms between version 1's last tick and version 2's first, 
 
 That's not peculiar to Node. Elixir's own docs name the usual ways to deploy, blue/green, canary, and rolling deployments, and each of them starts new processes with the new code rather than changing the code of running ones. Which brings us to the BEAM's catch.
 
-## Where it gives ground
+## Tradeoffs
 
 Elixir's own release tool doesn't do hot upgrades, and its docs say why: "Erlang and Elixir are sometimes known for the capability of upgrading a node that is running in production without shutting down that node. However, this feature is not supported out of the box by Elixir releases." Then: "they are very complicated to perform in practice, as they require careful coding of your processes and applications as well as extensive testing. Given most teams can use other techniques that are language agnostic to upgrade their systems, such as Blue/Green deployments, Canary deployments, Rolling deployments, and others, hot upgrades are rarely a viable option."
 

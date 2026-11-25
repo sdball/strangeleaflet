@@ -354,7 +354,7 @@ It waits at the start until you press Play. Then try these:
 
 <script type="module" src="beam-nodes.js"></script>
 
-## Where it gives ground
+## Tradeoffs
 
 Distribution isn't secure out of the box. The cookie keeps nodes from connecting by mistake, not attackers out. Erlang's docs: "'Security' here does *not* mean cryptographically secure", and "the communication between nodes is per default in clear text." A node can call any function on the nodes it's connected to, which is what `:erpc.call` does, so the docs warn that a node started without TLS is exposed "to attacks that may give the attacker complete access to the node and in extension the cluster." Distribution can run over TLS, and otherwise belongs on a network nobody else can reach.
 

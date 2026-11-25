@@ -309,7 +309,7 @@ Here are some of them, slowed down. Each fills a little of its heap and is gone,
 
 <script type="module" src="short-lived.js"></script>
 
-## Where it gives ground
+## Tradeoffs
 
 Two things don't fit the picture of each process alone with its heap.
 

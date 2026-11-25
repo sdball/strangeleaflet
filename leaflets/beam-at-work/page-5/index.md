@@ -541,7 +541,7 @@ Click a process to pick it. The buttons under the boxes act on whichever one is 
 
 <script type="module" src="beam-links.js"></script>
 
-## Where it gives ground
+## Tradeoffs
 
 A crash in the BEAM is contained to its process, and that's only as good as the way the processes are split up. A process holding something important, like a cache that took minutes to fill, loses all of it when it crashes, and its restart starts from empty. Anything that has to survive a crash has to live somewhere durable: another process, a database, a disk.
 

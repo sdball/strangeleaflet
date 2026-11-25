@@ -522,7 +522,7 @@ And it has been through a lot. `gen_server` is part of OTP, which Ericsson start
 
 And Node's is per worker, at megabytes a thread, where the BEAM's works with any process.
 
-## Where it gives ground
+## Tradeoffs
 
 One GenServer is one process, so it works on one request at a time, on one scheduler. Here's a server that does about 1 ms of work for each call, with more and more callers, and then the same callers doing the work themselves, with no server ([bottleneck.exs](bottleneck.exs)):
 
