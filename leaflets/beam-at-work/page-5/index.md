@@ -169,7 +169,9 @@ Why would you want a crash to spread? Because processes that work on one job tog
 
 ## Trapping exits
 
-Dying together is the default, but a process can opt out. `Process.flag(:trap_exit, true)` tells the BEAM to turn exit signals arriving at that process into ordinary messages, `{:EXIT, pid, reason}`, put on the end of its mailbox like any other. The process doesn't die; it reads the message whenever it gets to it, and decides what to do ([trap.exs](trap.exs)):
+Dying together is the default, but a process can opt out. `Process.flag(:trap_exit, true)` tells the BEAM to turn exit signals arriving at that process into ordinary messages, `{:EXIT, pid, reason}`, put on the end of its mailbox like any other. The process doesn't die; it reads the message whenever it gets to it, and decides what to do. Here are three scenes with trapping, from [trap.exs](trap.exs):
+
+<link-scenes scenes="trap">
 
 ```elixir
 IO.puts("## Trapping exits")
@@ -232,11 +234,15 @@ stubborn alive? false
 me: received {:EXIT, #PID<0.109.0>, :killed}
 ```
 
-The script's own process trapped exits, so both of its children's exits arrived as messages: the crash, with the error and where it happened, and the normal exit too, which a process that traps exits does get told about.
+*The live version of this needs JavaScript. In it, the three scenes play on a loop, with their exit signals travelling along the links and arriving as messages.*
+
+</link-scenes>
+
+The parent trapped exits, so both of its children's exits arrived as messages: the crash, with the error and where it happened, and the normal exit too, which a process that traps exits does get told about.
 
 In the chain, `b` trapping exits stopped the crash from spreading. It got a message, and `a`, on the far side of it, never heard a thing.
 
-`Process.exit(pid, reason)` sends an exit signal by hand, as if a linked process had died with that reason. One reason is special. `:kill` can't be trapped, so the process dies however it's set up, with the reason `:killed`. That's the way to stop a process that's stuck, or that's trapping exits and not stopping when asked. The reason changes from `:kill` to `:killed` to tell the processes linked to it that it was killed. Here the script's process, trapping exits, got a `:killed` message and carried on.
+`Process.exit(pid, reason)` sends an exit signal by hand, as if a linked process had died with that reason. One reason is special. `:kill` can't be trapped, so the process dies however it's set up, with the reason `:killed`. That's the way to stop a process that's stuck, or that's trapping exits and not stopping when asked. The reason changes from `:kill` to `:killed` to tell the processes linked to it that it was killed. Here the parent, trapping exits, got a `:killed` message and carried on.
 
 ## Monitors: watch without being tied
 
