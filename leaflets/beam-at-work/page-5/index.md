@@ -78,20 +78,7 @@ That's the isolation Armstrong was after, but not the monitoring. Nothing observ
 
 A link ties two processes together. When either one dies, the BEAM sends the other an *exit signal* carrying the reason it died, and by default a process that gets an exit signal dies too, with the same reason. `spawn_link` starts a process already linked to the one that started it, and `Process.link` links two that are already running.
 
-Here are four scenes from a script, [link.exs](link.exs). Each starts some processes, gives them 200 ms, and checks which are still alive. They share two helpers:
-
-```elixir
-# A process that sleeps until it's killed
-idle = fn -> Process.sleep(:infinity) end
-
-# Each scene starts its processes from here, and checks on them after
-# they've had 200 ms to die.
-check = fn pids ->
-  Process.sleep(200)
-  Enum.map_join(pids, ", ", fn {name, pid} -> "#{name} alive? #{Process.alive?(pid)}" end)
-  |> IO.puts()
-end
-```
+Here are four ways linked processes can end. [link.exs](link.exs) runs the same four scenes and checks which processes are still alive afterwards.
 
 <link-scenes>
 
@@ -166,7 +153,7 @@ parent alive? true
 a alive? false, b alive? false, c alive? false
 ```
 
-*The live version of this needs JavaScript. In it, each scene plays out step by step, with its exit signals travelling along the links.*
+*The live version of this needs JavaScript. In it, the four scenes play on a loop, with their exit signals travelling along the links.*
 
 </link-scenes>
 

@@ -1,263 +1,142 @@
-// <link-scenes>: the four scenes of link.exs, animated. Each scene shows its
-// code from link.exs, with the line that's running marked, and the processes
-// it starts as boxes, with their links drawn between them. When a process
-// exits, a dot carries its exit signal along each of its links, labelled with
-// the reason, and the process at the other end does what the BEAM does with
-// it: dies of it with the same reason, or drops it if the reason is :normal
-// (nothing here traps exits). At 200 ms the scene ends with the line the
-// script printed for it, copied from the run on the page.
+// <link-scenes>: four small animations of what a link does, one per scene of
+// link.exs, each on a loop: the child crashes, the parent crashes, the child
+// finishes, and a chain of three where the end one crashes. The processes are
+// boxes with their links drawn between them. When a process exits, a dot
+// carries its exit signal along each of its links, labelled with the reason,
+// and the process at the other end does what the BEAM does with it: dies of
+// it with the same reason, or drops it if the reason is :normal (nothing here
+// traps exits). A line under each scene sums up what happened.
 //
 // The rules are the Erlang reference manual's (Links, Receiving Exit
-// Signals), as on the page. Times are the script's (sleep 100 ms, check at
-// 200 ms), slowed down so each step can be read; in the BEAM a signal takes
-// microseconds.
+// Signals), as on the page, and each scene ends as link.exs's does. It's
+// slowed down so it can be followed; in the BEAM a signal takes microseconds.
 //
 // It holds a static fallback (link.exs and its output: what feed readers and
-// no-JS visitors see) and replaces it once this module runs. The first scene
-// plays when the widget scrolls into view, unless the reader prefers reduced
-// motion; then nothing plays until it's asked to, and the dots don't travel,
-// but the same things happen in the same order.
+// no-JS visitors see) and replaces it once this module runs. The scenes loop
+// while the widget is on screen. A reader who prefers reduced motion sees
+// each scene's end instead, with a button that plays them once, without the
+// dots travelling.
 
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
 const HOP = 1100; // ms an exit signal takes along a link
 const HOP_REDUCED = 300;
-const READ_MS = 38; // ms per character of a step's caption, to read it
-const MIN_STEP = 1400;
-const MAX_STEP = 4200;
+const STAGGER = 700; // ms between the scenes' starts, so they don't all fire at once
+const HOLD = 3000; // ms the end of a scene stays up before it starts again
 
 const REASONS = {
-  crash: { label: "RuntimeError", status: "RuntimeError" },
-  normal: { label: ":normal", status: ":normal" },
+  crash: "RuntimeError",
+  normal: ":normal",
 };
 
-// Each scene's code is link.exs's, without the IO.puts that names it. A step
-// marks a line (or lines) of it, sets the clock, does something, and says
-// what happened; the scene's processes are placed left to right.
+// Each scene's processes, left to right, and what happens to them
 const SCENES = [
   {
-    title: "The child crashes",
+    title: "Child crashes",
     procs: ["parent", "child"],
-    output: "parent alive? false",
-    code: `parent =
-  spawn(fn ->
-    spawn_link(fn ->
-      Process.sleep(100)
-      raise "oops"
-    end)
-
-    idle.()
-  end)
-
-check.(parent: parent)`,
+    links: [["parent", "child"]],
+    summary: "A parent and a child, linked. The child crashes, its exit signal reaches the parent, and the parent dies too, with the same reason.",
     async play(s) {
-      await s.step({ lines: [0, 1], t: 0, say: "The script spawns `parent`.", run: () => s.spawn("parent") });
-      await s.step({ lines: [2], say: "`parent` spawns `child` with `spawn_link`, so the two start out linked.", run: () => { s.spawn("child"); s.link("parent", "child"); } });
-      await s.step({ lines: [3, 7], say: "`child` sleeps for 100 ms. `parent` waits forever.", run: () => { s.status("child", "sleeping"); s.status("parent", "waiting"); } });
-      await s.step({ lines: [4], t: 100, say: "`child` raises. It exits with the error as its reason, and its link carries an exit signal with that reason to `parent`.", run: () => s.die("child", "crash") });
+      await s.wait(1600);
+      s.die("child", "crash");
+      await s.wait(600);
       await s.signal("child", "parent", "crash");
-      await s.step({ lines: [4], say: "`parent` isn't trapping exits, so the signal kills it, with the same reason.", run: () => s.die("parent", "crash") });
-      await s.step({ lines: [10], t: 200, say: "At 200 ms the script checks on `parent`. It's dead, killed by its child's crash.", run: () => s.print() });
+      s.die("parent", "crash");
+      s.say("The child's crash kills its parent.");
     },
   },
   {
-    title: "The parent crashes",
+    title: "Parent crashes",
     procs: ["parent", "child"],
-    output: "parent alive? false, child alive? false",
-    code: `me = self()
-
-parent =
-  spawn(fn ->
-    send(me, {:child, spawn_link(idle)})
-    Process.sleep(100)
-    raise "oops"
-  end)
-
-child = receive do: ({:child, pid} -> pid)
-check.(parent: parent, child: child)`,
+    links: [["parent", "child"]],
+    summary: "A parent and a child, linked. The parent crashes, its exit signal reaches the child, and the child dies too. A link works both ways.",
     async play(s) {
-      await s.step({ lines: [0], t: 0, say: "The script keeps its own pid as `me`, so `parent` can send it `child`'s." });
-      await s.step({ lines: [2, 3], say: "The script spawns `parent`.", run: () => s.spawn("parent") });
-      await s.step({ lines: [4], say: "`parent` spawns `child`, linked, which waits forever. `parent` sends its pid back to the script.", run: () => { s.spawn("child", "waiting"); s.link("parent", "child"); } });
-      await s.step({ lines: [9], say: "The script receives `child`'s pid, to check on it later." });
-      await s.step({ lines: [5], say: "`parent` sleeps for 100 ms.", run: () => s.status("parent", "sleeping") });
-      await s.step({ lines: [6], t: 100, say: "This time `parent` raises, and its link carries the exit signal to `child`.", run: () => s.die("parent", "crash") });
+      await s.wait(1600);
+      s.die("parent", "crash");
+      await s.wait(600);
       await s.signal("parent", "child", "crash");
-      await s.step({ lines: [6], say: "`child` isn't trapping exits either, so it dies too. A link works both ways, whichever process made it.", run: () => s.die("child", "crash") });
-      await s.step({ lines: [10], t: 200, say: "At 200 ms the script checks: both are dead.", run: () => s.print() });
+      s.die("child", "crash");
+      s.say("Links work both ways: the child dies too.");
     },
   },
   {
-    title: "The child finishes",
+    title: "Child finishes",
     procs: ["parent", "child"],
-    output: "parent alive? true",
-    code: `parent =
-  spawn(fn ->
-    spawn_link(fn -> Process.sleep(100) end)
-    idle.()
-  end)
-
-check.(parent: parent)`,
+    links: [["parent", "child"]],
+    summary: "A parent and a child, linked. The child runs out of code and exits with the reason :normal. The parent gets the exit signal, drops it, and carries on.",
     async play(s) {
-      await s.step({ lines: [0, 1], t: 0, say: "The script spawns `parent`.", run: () => s.spawn("parent") });
-      await s.step({ lines: [2], say: "`parent` spawns `child`, linked. `child` sleeps for 100 ms, and then it has no more code to run.", run: () => { s.spawn("child", "sleeping"); s.link("parent", "child"); } });
-      await s.step({ lines: [3], say: "`parent` waits forever.", run: () => s.status("parent", "waiting") });
-      await s.step({ lines: [2], t: 100, say: "`child` finishes. It exits with the reason `:normal`, and its link carries that to `parent`.", run: () => s.die("child", "normal") });
+      await s.wait(1600);
+      s.die("child", "normal");
+      await s.wait(600);
       await s.signal("child", "parent", "normal");
-      await s.step({ lines: [3], say: "A process that isn't trapping exits drops an exit signal with the reason `:normal`. `parent` carries on waiting, linked to nothing now.", run: () => s.flash("parent") });
-      await s.step({ lines: [6], t: 200, say: "At 200 ms the script checks: `parent` is still alive.", run: () => s.print() });
+      s.flash("parent");
+      s.say("A <code>:normal</code> exit kills nothing. The parent carries on.");
     },
   },
   {
-    title: "A chain of three",
+    title: "A chain",
     procs: ["a", "b", "c"],
-    output: "a alive? false, b alive? false, c alive? false",
-    code: `a = spawn(idle)
-
-b =
-  spawn(fn ->
-    Process.link(a)
-    idle.()
-  end)
-
-c =
-  spawn(fn ->
-    Process.link(b)
-    Process.sleep(100)
-    raise "oops"
-  end)
-
-check.(a: a, b: b, c: c)`,
+    links: [["a", "b"], ["b", "c"]],
+    summary: "a is linked to b, and b to c. c crashes. Its exit signal kills b, b's kills a, and all three die, though a was never linked to c.",
     async play(s) {
-      await s.step({ lines: [0], t: 0, say: "The script spawns `a`, which waits forever.", run: () => s.spawn("a", "waiting") });
-      await s.step({ lines: [2, 3, 4, 5], say: "It spawns `b`, which links itself to `a` and waits forever.", run: () => { s.spawn("b", "waiting"); s.link("a", "b"); } });
-      await s.step({ lines: [8, 9, 10, 11], say: "It spawns `c`, which links itself to `b` and sleeps for 100 ms. `c` isn't linked to `a`.", run: () => { s.spawn("c", "sleeping"); s.link("b", "c"); } });
-      await s.step({ lines: [12], t: 100, say: "`c` raises. Its only link carries the exit signal to `b`.", run: () => s.die("c", "crash") });
+      await s.wait(1600);
+      s.die("c", "crash");
+      await s.wait(600);
       await s.signal("c", "b", "crash");
-      await s.step({ lines: [5], say: "`b` isn't trapping exits, so it dies with the same reason, and its own link carries a signal on to `a`.", run: () => s.die("b", "crash") });
+      s.die("b", "crash");
+      await s.wait(500);
       await s.signal("b", "a", "crash");
-      await s.step({ lines: [0], say: "`a` dies too. It was never linked to `c`, but the crash came along the chain.", run: () => s.die("a", "crash") });
-      await s.step({ lines: [15], t: 200, say: "At 200 ms the script checks: all three are dead.", run: () => s.print() });
+      s.die("a", "crash");
+      s.say("The crash travels the chain, to <code>a</code> as well.");
     },
   },
 ];
 
-const STATUS = {
-  running: ["running", ""],
-  sleeping: ["sleeping", "100 ms"],
-  waiting: ["waiting", "forever"],
-};
-
-const escape = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-// A caption's `code` as <code>
-const inline = (s) => escape(s).replace(/`([^`]+)`/g, "<code>$1</code>");
-
-// Just enough of an Elixir highlighter for these lines, with the classes
-// Pygments gives the same tokens, so the theme colours them as it does the
-// page's code blocks.
-const TOKENS = /("[^"]*")|(:\w+)|(\w+)(?=: )|\b(fn|do|end|raise|receive)\b|\b([A-Z]\w*)\b|(\d+)|(->|=|\.)|([(){},;:])|(\w+)/g;
-const CLASSES = ["s2", "ss", "ss", "k", "nc", "mi", "o", "p", "n"];
-const highlight = (line) => {
-  let html = "";
-  let at = 0;
-  for (const m of line.matchAll(TOKENS)) {
-    const kind = CLASSES[m.slice(1).findIndex((g) => g !== undefined)];
-    html += escape(line.slice(at, m.index)) + `<span class="${kind}">${escape(m[0])}</span>`;
-    at = m.index + m[0].length;
-  }
-  return html + escape(line.slice(at));
-};
-
-let ids = 0;
-
 document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes:defined {
-    display: block;
+    display: grid;
+    gap: 1rem;
     margin: 1.75rem 0;
-    padding: 1rem;
-    border: 1.5px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--bg);
     container: link-scenes / inline-size;
-  }
-  link-scenes .note {
-    margin: 0 0 .9rem;
-    font-size: .9rem;
-    color: var(--muted);
   }
   link-scenes .scenes {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .4rem;
-    margin: 0 0 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .75rem;
   }
-  @container link-scenes (min-width: 40rem) {
-    link-scenes .scenes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  @container link-scenes (min-width: 36rem) {
+    link-scenes .scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  link-scenes button {
-    min-height: 44px;
-    padding: .35rem .7rem;
-    font: inherit;
-    font-family: var(--type);
-    font-size: .88rem;
-    line-height: 1.2;
-    color: var(--ink);
-    background: var(--bg);
+  link-scenes .scene {
+    margin: 0;
+    padding: .8rem clamp(.6rem, 3cqi, .9rem) .7rem;
     border: 1.5px solid var(--line);
     border-radius: var(--radius);
-    cursor: pointer;
+    background: var(--bg);
+    container: link-scene / inline-size;
   }
-  link-scenes .scenes button {
-    text-align: left;
-  }
-  link-scenes .scenes button[aria-pressed="true"] {
-    border-color: var(--brass);
-    background: var(--tint);
-  }
-  link-scenes button:focus-visible {
-    outline: 2px solid var(--link);
-    outline-offset: 2px;
-  }
-  link-scenes .highlight {
+  link-scenes .title {
     margin: 0;
-  }
-  link-scenes .highlight pre {
-    margin: 0;
-    font-size: clamp(.68rem, 2.6cqi, .85rem);
-  }
-  link-scenes .highlight .line {
-    display: inline-block;
-    min-width: 100%;
-    margin: 0 -.5rem;
-    padding: 0 .5rem;
-    border-left: 3px solid transparent;
-    transition: background-color .25s;
-  }
-  link-scenes .highlight .line.on {
-    background: var(--code-mark);
-    border-left-color: var(--brass);
+    font-family: var(--type);
+    font-weight: 700;
+    font-size: .95rem;
   }
   link-scenes .stage {
     position: relative;
     display: grid;
     grid-template-columns: repeat(var(--procs), minmax(0, 1fr));
-    column-gap: clamp(2.25rem, 14cqi, 6rem);
-    max-width: 32rem;
-    margin: 2.25rem auto 0;
+    column-gap: clamp(2rem, 18cqi, 4.5rem);
+    margin: .9rem 0 0;
   }
+  /* Three boxes in a card a third of a phone wide: "RuntimeError" has to fit */
   link-scenes .stage.three {
-    column-gap: clamp(1.5rem, 10cqi, 4.5rem);
+    column-gap: clamp(1rem, 8cqi, 3rem);
   }
   link-scenes .stage.three .proc {
-    padding-inline: .4rem;
+    padding-inline: .35rem;
   }
-  link-scenes .clock {
-    position: absolute;
-    top: -1.75rem;
-    right: 0;
-    font-family: var(--code);
-    font-size: .8rem;
-    color: var(--muted);
+  link-scenes .stage.three .status {
+    font-size: clamp(.5rem, 2.75cqi, .76rem);
   }
   link-scenes .lines,
   link-scenes .dots {
@@ -278,15 +157,11 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     display: grid;
     gap: .1rem;
     min-width: 0;
-    padding: .45rem .5rem;
+    padding: .4rem .45rem;
     color: var(--ink);
     background: var(--bg);
     border: 2px solid var(--ink);
     border-radius: var(--radius);
-    transition: opacity .3s;
-  }
-  link-scenes .proc.unborn {
-    opacity: 0;
   }
   link-scenes .proc.dead {
     color: var(--muted);
@@ -305,7 +180,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes .proc .name {
     font-family: var(--code);
     font-weight: 700;
-    font-size: .95rem;
+    font-size: .9rem;
     line-height: 1.25;
   }
   link-scenes .proc .status {
@@ -314,7 +189,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     text-overflow: ellipsis;
     min-height: 1.35em;
     font-family: var(--code);
-    font-size: clamp(.55rem, 2.7cqi, .78rem);
+    font-size: clamp(.55rem, 3.6cqi, .76rem);
     line-height: 1.35;
     color: var(--muted);
   }
@@ -350,12 +225,22 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     background: var(--bg);
     border-radius: 3px;
   }
+  link-scenes .say {
+    min-height: 2.9em;
+    margin: 1.7rem 0 0;
+    font-size: .92rem;
+    line-height: 1.45;
+    transition: opacity .3s;
+  }
+  link-scenes .say:empty {
+    opacity: 0;
+  }
   link-scenes .key {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: .3rem 1.1rem;
-    margin: 1.9rem 0 0;
+    margin: 0;
     font-size: .85rem;
     color: var(--muted);
   }
@@ -371,42 +256,36 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes .key .crash-dot,
   link-scenes .key .normal-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--code-error); }
   link-scenes .key .normal-dot { background: none; border: 2.5px solid var(--ink); }
-  link-scenes .say {
-    min-height: 4.4em;
-    margin: 1rem 0 0;
-    font-size: .95rem;
+  link-scenes .replay {
+    justify-self: center;
+    min-height: 44px;
+    padding: .35rem .9rem;
+    font: inherit;
+    font-family: var(--type);
+    font-size: .9rem;
+    color: var(--ink);
+    background: var(--bg);
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
   }
-  link-scenes .output {
-    margin: .5rem 0 0;
+  link-scenes .replay:focus-visible {
+    outline: 2px solid var(--link);
+    outline-offset: 2px;
   }
-  link-scenes .output pre {
-    min-height: 1.5em;
-    color: var(--code-ink);
-  }
-  link-scenes .output .waiting {
-    color: var(--code-comment);
-    font-style: italic;
-  }
-  link-scenes .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin: .8rem 0 0;
-  }
-  link-scenes .controls .next {
-    margin-left: auto;
-  }
-  link-scenes button:disabled {
+  link-scenes .replay:disabled {
     cursor: default;
     opacity: .45;
+  }
+  link-scenes [hidden] {
+    display: none !important;
   }
   link-scenes code {
     font-size: .92em;
   }
   @media (prefers-reduced-motion: reduce) {
-    link-scenes .proc,
     link-scenes .proc.hit,
-    link-scenes .highlight .line {
+    link-scenes .say {
       transition: none;
       animation: none;
     }
@@ -415,71 +294,29 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 
 class Cancelled extends Error {}
 
-customElements.define("link-scenes", class extends HTMLElement {
-  connectedCallback() {
-    if (this.built) return;
-    this.built = true;
-    this.uid = `link-scenes-${++ids}`;
-
-    this.innerHTML = `
-      <p class="note">The four scenes from link.exs, slowed down so you can follow each exit signal. In the BEAM, a signal takes microseconds.</p>
-      <div class="scenes" role="group" aria-label="Scenes">
-        ${SCENES.map((scene, i) => `<button type="button" data-scene="${i}" aria-pressed="false">${i + 1}. ${scene.title}</button>`).join("")}
-      </div>
-      <div class="highlight code"><pre></pre></div>
-      <div class="stage">
-        <span class="clock"></span>
-        <svg class="lines" aria-hidden="true"></svg>
-        <div class="dots" aria-hidden="true"></div>
-      </div>
-      <p class="key" aria-hidden="true">
-        <span><i class="link-line"></i>link</span>
-        <span><i class="crash-dot"></i>exit signal: a crash</span>
-        <span><i class="normal-dot"></i>exit signal: <code>:normal</code></span>
-      </p>
-      <p class="say" aria-live="polite"></p>
-      <div class="highlight output" aria-label="What the script printed"><pre></pre></div>
-      <div class="controls">
-        <button type="button" class="play">Play</button>
-        <button type="button" class="next">Next scene</button>
-      </div>`;
-
-    this.$ = (selector) => this.querySelector(selector);
-    this.stage = this.$(".stage");
-    this.lines = this.$(".lines");
-    this.dots = this.$(".dots");
+// One scene: its boxes and links, and a run of its play() that a new run,
+// or the widget leaving the screen, cancels
+class Scene {
+  constructor(el, scene) {
+    this.el = el;
+    this.scene = scene;
+    this.stage = el.querySelector(".stage");
+    this.lines = el.querySelector(".lines");
+    this.dots = el.querySelector(".dots");
+    this.sayEl = el.querySelector(".say");
     this.timers = new Map(); // timeout -> its promise's reject
-    this.run = 0;
-
-    this.$(".scenes").addEventListener("click", (e) => {
-      const button = e.target.closest("[data-scene]");
-      if (button) this.play(Number(button.dataset.scene));
-    });
-    this.$(".play").addEventListener("click", () => this.play(this.scene));
-    this.$(".next").addEventListener("click", () => this.play((this.scene + 1) % SCENES.length));
-
-    this.resizer = new ResizeObserver(() => this.draw());
-    this.resizer.observe(this.stage);
-
-    this.load(0);
-
-    // Play the first scene once, when the widget comes into view
-    this.observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) return;
-      this.observer.disconnect();
-      if (!reducedMotion.matches && !this.played) this.play(0);
-    }, { threshold: 0.5 });
-    this.observer.observe(this);
-  }
-
-  disconnectedCallback() {
-    this.resizer?.disconnect();
-    this.observer?.disconnect();
-    this.cancel();
+    this.procs = {};
+    for (const name of scene.procs) {
+      const box = document.createElement("div");
+      box.className = "proc";
+      box.innerHTML = `<span class="name">${name}</span><span class="status"></span><span class="status"></span>`;
+      this.stage.insertBefore(box, this.dots);
+      this.procs[name] = { el: box };
+    }
+    this.stage.classList.toggle("three", scene.procs.length === 3);
   }
 
   cancel() {
-    this.run += 1;
     for (const [t, reject] of this.timers) {
       clearTimeout(t);
       reject(new Cancelled());
@@ -489,8 +326,36 @@ customElements.define("link-scenes", class extends HTMLElement {
     this.dots.replaceChildren();
   }
 
-  // Waits ms, or throws Cancelled if another scene starts first
+  reset() {
+    this.cancel();
+    for (const p of Object.values(this.procs)) Object.assign(p, { alive: true, reason: null });
+    this.links = new Set(this.scene.links.map((pair) => pair.join("-")));
+    this.sayEl.innerHTML = "";
+    this.render();
+  }
+
+  // Plays the scene once; with instant, jumps to its end
+  async play({ instant = false } = {}) {
+    this.instant = instant;
+    this.reset();
+    await this.scene.play(this);
+  }
+
+  // Plays it over and over, after a delay, until cancelled
+  async loop(delay) {
+    try {
+      await this.wait(delay);
+      for (;;) {
+        await this.play();
+        await this.wait(HOLD);
+      }
+    } catch (e) {
+      if (!(e instanceof Cancelled)) throw e;
+    }
+  }
+
   wait(ms) {
+    if (this.instant) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => {
         this.timers.delete(t);
@@ -500,95 +365,29 @@ customElements.define("link-scenes", class extends HTMLElement {
     });
   }
 
-  // A scene, set out as it is before it runs
-  load(i) {
-    this.cancel();
-    this.scene = i;
-    const scene = SCENES[i];
-    for (const b of this.querySelectorAll("[data-scene]")) b.setAttribute("aria-pressed", String(Number(b.dataset.scene) === i));
-
-    this.$(".code pre").innerHTML = scene.code.split("\n").map((line) => `<span class="line">${highlight(line) || " "}</span>`).join("\n");
-    this.codeLines = [...this.querySelectorAll(".code .line")];
-
-    for (const el of this.stage.querySelectorAll(".proc")) el.remove();
-    this.stage.style.setProperty("--procs", scene.procs.length);
-    this.stage.classList.toggle("three", scene.procs.length === 3);
-    this.procs = {};
-    for (const name of scene.procs) {
-      const el = document.createElement("div");
-      el.className = "proc unborn";
-      el.innerHTML = `<span class="name">${name}</span><span class="status"></span><span class="status"></span>`;
-      this.stage.insertBefore(el, this.dots);
-      this.procs[name] = { name, el, alive: false, born: false, state: "running", reason: null };
-    }
-    this.links = new Set();
-
-    this.$(".clock").textContent = "";
-    this.$(".say").textContent = "";
-    this.$(".output pre").innerHTML = `<span class="waiting">(the output goes here)</span>`;
-    this.$(".play").textContent = "Play";
+  die(name, reason) {
+    Object.assign(this.procs[name], { alive: false, reason });
+    this.flash(name);
     this.render();
   }
 
-  async play(i) {
-    this.played = true;
-    this.load(i);
-    const run = this.run;
-    this.$(".play").textContent = "Play again";
-    try {
-      await SCENES[i].play(this.api());
-    } catch (e) {
-      if (!(e instanceof Cancelled)) throw e;
-      return;
-    }
-    if (run !== this.run) return;
-    this.mark([]);
+  say(html) {
+    this.sayEl.innerHTML = html;
   }
 
-  // What a scene's play() can do
-  api() {
-    return {
-      step: async ({ lines, t, say, run }) => {
-        run?.();
-        this.mark(lines);
-        if (t !== undefined) this.$(".clock").textContent = `t = ${t} ms`;
-        this.$(".say").innerHTML = inline(say);
-        this.render();
-        const chars = say.replace(/`/g, "").length;
-        await this.wait(Math.min(MAX_STEP, Math.max(MIN_STEP, chars * READ_MS)));
-      },
-      spawn: (name, state = "running") => {
-        Object.assign(this.procs[name], { alive: true, born: true, state });
-        this.flash(name);
-      },
-      status: (name, state) => {
-        this.procs[name].state = state;
-      },
-      link: (a, b) => this.links.add(`${a}-${b}`),
-      die: (name, reason) => {
-        Object.assign(this.procs[name], { alive: false, reason });
-        this.flash(name);
-      },
-      flash: (name) => this.flash(name),
-      signal: (from, to, reason) => this.signal(from, to, reason),
-      print: () => {
-        this.$(".output pre").textContent = SCENES[this.scene].output;
-      },
-    };
-  }
-
-  mark(lines) {
-    this.codeLines.forEach((el, n) => el.classList.toggle("on", lines.includes(n)));
+  flash(name) {
+    if (this.instant) return;
+    const el = this.procs[name].el;
+    el.classList.remove("hit");
+    void el.offsetWidth;
+    el.classList.add("hit");
   }
 
   render() {
     for (const p of Object.values(this.procs)) {
-      const [one, two] = p.alive
-        ? STATUS[p.state]
-        : p.born ? ["exited:", REASONS[p.reason].status] : ["", ""];
-      p.el.classList.toggle("unborn", !p.born);
-      p.el.classList.toggle("dead", p.born && !p.alive);
-      p.el.classList.toggle("crashed", p.born && !p.alive && p.reason === "crash");
+      const [one, two] = p.alive ? ["running", ""] : ["exited:", REASONS[p.reason]];
+      p.el.classList.toggle("dead", !p.alive);
+      p.el.classList.toggle("crashed", !p.alive && p.reason === "crash");
       const [a, b] = p.el.querySelectorAll(".status");
       a.textContent = one;
       b.textContent = two;
@@ -621,31 +420,112 @@ customElements.define("link-scenes", class extends HTMLElement {
   // An exit signal travelling along the link from one process to the other.
   // It's gone once it arrives, and so is the link.
   async signal(from, to, reason) {
-    const hop = reducedMotion.matches ? HOP_REDUCED : HOP;
-    if (!reducedMotion.matches) {
-      const [p, q] = this.ends(from, to);
-      const dot = document.createElement("div");
-      dot.className = `dot ${reason}`;
-      dot.innerHTML = `<span>${REASONS[reason].label}</span>`;
-      dot.style.setProperty("--below", `${this.box(from).hh + 4}px`);
-      this.dots.append(dot);
-      const anim = dot.animate(
-        [{ transform: `translate(${p.x}px, ${p.y}px)` }, { transform: `translate(${q.x}px, ${q.y}px)` }],
-        { duration: hop, easing: "ease-in-out", fill: "forwards" },
-      );
-      anim.finished.then(() => dot.remove(), () => dot.remove());
+    if (!this.instant) {
+      const hop = reducedMotion.matches ? HOP_REDUCED : HOP;
+      if (!reducedMotion.matches) {
+        const [p, q] = this.ends(from, to);
+        const dot = document.createElement("div");
+        dot.className = `dot ${reason}`;
+        dot.innerHTML = `<span>${REASONS[reason]}</span>`;
+        dot.style.setProperty("--below", `${this.box(from).hh + 4}px`);
+        this.dots.append(dot);
+        const anim = dot.animate(
+          [{ transform: `translate(${p.x}px, ${p.y}px)` }, { transform: `translate(${q.x}px, ${q.y}px)` }],
+          { duration: hop, easing: "ease-in-out", fill: "forwards" },
+        );
+        anim.finished.then(() => dot.remove(), () => dot.remove());
+      }
+      await this.wait(hop);
     }
-    await this.wait(hop);
     this.links.delete(`${from}-${to}`);
     this.links.delete(`${to}-${from}`);
     this.flash(to);
     this.draw();
   }
+}
 
-  flash(name) {
-    const el = this.procs[name].el;
-    el.classList.remove("hit");
-    void el.offsetWidth;
-    el.classList.add("hit");
+customElements.define("link-scenes", class extends HTMLElement {
+  connectedCallback() {
+    if (this.built) return;
+    this.built = true;
+
+    this.innerHTML = `
+      <div class="scenes">
+        ${SCENES.map((scene) => `
+          <figure class="scene" role="img" aria-label="${scene.title}. ${scene.summary}">
+            <p class="title" aria-hidden="true">${scene.title}</p>
+            <div class="stage" aria-hidden="true" style="--procs: ${scene.procs.length}">
+              <svg class="lines"></svg>
+              <div class="dots"></div>
+            </div>
+            <p class="say" aria-hidden="true"></p>
+          </figure>`).join("")}
+      </div>
+      <p class="key" aria-hidden="true">
+        <span><i class="link-line"></i>link</span>
+        <span><i class="crash-dot"></i>exit signal: a crash</span>
+        <span><i class="normal-dot"></i>exit signal: <code>:normal</code></span>
+      </p>
+      <button type="button" class="replay" hidden>Play the four scenes</button>`;
+
+    const figures = [...this.querySelectorAll(".scene")];
+    this.scenes = SCENES.map((scene, i) => new Scene(figures[i], scene));
+
+    this.replay = this.querySelector(".replay");
+    this.replay.addEventListener("click", () => this.playOnce());
+
+    this.resizer = new ResizeObserver(() => this.scenes.forEach((s) => s.draw()));
+    this.resizer.observe(this);
+
+    this.visible = false;
+    this.observer = new IntersectionObserver(([entry]) => {
+      this.visible = entry.isIntersecting;
+      this.start();
+    }, { threshold: 0.2 });
+    this.observer.observe(this);
+
+    this.onMotion = () => this.start();
+    reducedMotion.addEventListener("change", this.onMotion);
+
+    this.start();
+  }
+
+  disconnectedCallback() {
+    this.resizer?.disconnect();
+    this.observer?.disconnect();
+    reducedMotion.removeEventListener("change", this.onMotion);
+    this.scenes?.forEach((s) => s.cancel());
+  }
+
+  // Each scene as it ends
+  showEnds() {
+    for (const s of this.scenes) s.play({ instant: true });
+  }
+
+  // Loops while on screen. Off screen, and under reduced motion, each scene
+  // shows its end; reduced motion also gets a button to play them once.
+  start() {
+    this.replay.hidden = !reducedMotion.matches;
+    for (const s of this.scenes) s.cancel();
+    if (reducedMotion.matches || !this.visible) {
+      this.replay.disabled = false;
+      this.showEnds();
+      return;
+    }
+    this.scenes.forEach((s, i) => {
+      s.reset();
+      s.loop(i * STAGGER);
+    });
+  }
+
+  // Under reduced motion: each scene once, side by side, then their ends stay
+  async playOnce() {
+    this.replay.disabled = true;
+    try {
+      await Promise.all(this.scenes.map((s) => s.play()));
+    } catch (e) {
+      if (!(e instanceof Cancelled)) throw e;
+    }
+    this.replay.disabled = false;
   }
 });
