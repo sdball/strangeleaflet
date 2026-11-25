@@ -19,7 +19,7 @@ Here's a server with twelve connections, once in the BEAM and once in Node. Send
 
 <script type="module" src="one-bad-message.js"></script>
 
-In Node, one bad message ended every connection. An error that nothing catches ends the whole process by default, and everything the process held goes with it. Restart it and everyone is back, every count at 0. In the BEAM it ended one connection, and the other eleven carried on. But nothing noticed that one go, either, and nothing started it again.
+In Node, one bad message ended every connection. An error that nothing catches ends the whole process by default, and everything the process held goes with it. In the BEAM it ended one connection, and the other eleven carried on. But nothing noticed that one crash, either, and nothing started it again.
 
 Joe Armstrong, one of Erlang's creators, wrote that processes "should share no data, and only communicate by message passing. This is to limit the consequences of a software error." And went on: "the only realistic way to build large reliable systems is by partitioning the system into independent parallel processes, and by providing mechanisms for monitoring and restarting these processes."
 
@@ -72,7 +72,7 @@ a alive? true, b alive? false, c alive? true
 
 `b` died, the error was logged, and `a` and `c` carried on counting. Nothing of `b`'s was shared with them, so nothing of theirs could be left half-changed by its crash. Its heap, its stack, and its mailbox went with it. (The same three counters in Node, further down, end together.)
 
-That's the isolation Armstrong was after. But it's also a problem: nobody else noticed. If `a` and `c` had been waiting for `b` to send them something, they'd wait forever. A process that dies needs a way to tell the processes that depend on it.
+That's the isolation Armstrong was after, but not the monitoring. Nothing observed `b` die and reacted to that event. If `a` and `c` had been waiting for `b` to send them something, they'd wait forever. A process that dies needs a way to tell the processes that depend on it.
 
 ## Links: die together
 
