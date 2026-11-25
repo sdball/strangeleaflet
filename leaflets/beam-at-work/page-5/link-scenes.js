@@ -13,6 +13,15 @@
 //   :shutdown. A monitor is a dashed arrow from the watcher; when the watched
 //   process exits, a :DOWN message travels back along it, and the monitor is
 //   gone. Nothing dies of a :DOWN, and nothing travels the other way.
+// - scenes="restart", two runs of restart.exs's restarter, which traps exits
+//   and starts a new worker whenever its worker exits with any reason but
+//   :normal, up to three times. In one the worker crashes once and the new
+//   one finishes; in the other it keeps crashing and the restarter gives up
+//   with :too_many_restarts. Each worker gets a box of its own, in a column
+//   beside the restarter, showing its pid and its count; a crashed worker's
+//   box stays, and each restart adds a new process below it, starting from
+//   1. restart.exs's worker fails at random; these runs are fixed so each
+//   makes its point.
 //
 // The processes are boxes with their links drawn between them; a process
 // that traps exits has a brass border. When a process exits, a dot carries
@@ -51,6 +60,7 @@ const REASONS = {
   noproc: ":noproc",
   done: ":done",
   shutdown: ":shutdown",
+  too_many_restarts: ":too_many_restarts",
 };
 
 // The reasons a box outlines in red
@@ -58,6 +68,67 @@ const VIOLENT = new Set(["crash", "killed"]);
 
 const exitMessage = (from, reason) => `{:EXIT, ${from}, ${REASONS[reason]}}`;
 const downMessage = (ref, from, reason) => `{:DOWN, ${ref}, :process, ${from}, ${REASONS[reason]}}`;
+
+const COUNT_EVERY = 450; // ms between a worker's counts
+const RESTART_AFTER = 500; // ms from the restarter's {:EXIT} to the new worker
+const TRIES = 3; // restarts before the restarter gives up, as in restart.exs
+
+// A run of restart.exs's restarter. Each number is how far a worker counts
+// before it crashes; a worker without one counts to 5 and finishes. Worker
+// n is box wn. onRestart runs as each new worker starts.
+async function restarts(s, crashes, onRestart = () => {}) {
+  let tries = TRIES;
+  for (let life = 0; ; life++) {
+    const worker = `w${life + 1}`;
+    const crashAt = crashes[life];
+    for (let n = 1; n <= (crashAt ?? 5); n++) {
+      await s.wait(COUNT_EVERY);
+      if (n === crashAt) break;
+      s.count(worker, n);
+    }
+    if (crashAt === undefined) {
+      s.die(worker, "normal");
+      await s.signal(worker, "restarter", "normal");
+      s.note("restarter", "worker finished");
+      await s.wait(700);
+      s.die("restarter", "normal");
+      return;
+    }
+    s.die(worker, "crash");
+    await s.signal(worker, "restarter", "crash");
+    if (tries === 0) {
+      await s.wait(RESTART_AFTER);
+      s.die("restarter", "too_many_restarts");
+      return;
+    }
+    tries -= 1;
+    s.note("restarter", `restarts ${TRIES - tries}/${TRIES}`);
+    await s.wait(RESTART_AFTER);
+    const next = `w${life + 2}`;
+    s.spawn(next);
+    s.link("restarter", next);
+    onRestart();
+  }
+}
+
+// The restarter, top left, beside a column of n worker boxes; only the first
+// is running at the start
+const restartLayout = (n) => {
+  const workers = Array.from({ length: n }, (_, i) => `w${i + 1}`);
+  return {
+    procs: ["restarter", ...workers],
+    columns: "minmax(0, 1.25fr) minmax(0, 1fr)",
+    place: Object.fromEntries([["restarter", "1 / 1"], ...workers.map((w, i) => [w, `${i + 1} / 2`])]),
+    labels: Object.fromEntries(workers.map((w) => [w, "worker"])),
+    pids: Object.fromEntries(workers.map((w, i) => [w, 110 + i])),
+    unborn: workers.slice(1),
+    links: [["restarter", "w1"]],
+    trap: ["restarter"],
+    notes: { restarter: `restarts 0/${TRIES}` },
+    dotLabels: false,
+    elbows: true,
+  };
+};
 
 // Each scene's processes, left to right, its links, who traps exits, whose
 // mailbox is shown, and what happens
@@ -272,6 +343,30 @@ const SETS = {
       },
     ],
   },
+  restart: {
+    key: ["link", "trap", "crash", "normal"],
+    scenes: [
+      {
+        title: "A restart",
+        ...restartLayout(2),
+        summary: "A restarter that traps exits, linked to a worker that counts. The worker crashes at 3. The restarter gets the exit as a message and starts a new worker, with a new pid, which counts from 1 to 5 and finishes. Then the restarter finishes too.",
+        async play(s) {
+          const fresh = "The new worker is a new process: a new pid, counting from 1.";
+          await restarts(s, [3], () => s.say(fresh));
+          s.say(`${fresh} It finishes, and then so does the restarter.`);
+        },
+      },
+      {
+        title: "Giving up",
+        ...restartLayout(4),
+        summary: "The same restarter and worker, but every worker crashes. The restarter starts a new one three times, and when the fourth crashes it gives up and exits with :too_many_restarts.",
+        async play(s) {
+          await restarts(s, [2, 4, 1, 3]);
+          s.say("After three restarts, the restarter gives up and exits.");
+        },
+      },
+    ],
+  },
 };
 
 const KEY = {
@@ -319,6 +414,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     display: grid;
     grid-template-columns: repeat(var(--procs), minmax(0, 1fr));
     column-gap: clamp(2rem, 18cqi, 4.5rem);
+    row-gap: .7rem;
     margin: .9rem 0 0;
   }
   /* Three boxes in a card a third of a phone wide: "RuntimeError" has to fit */
@@ -343,7 +439,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     overflow: visible;
     pointer-events: none;
   }
-  link-scenes .lines line {
+  link-scenes .lines line,
+  link-scenes .lines polyline {
+    fill: none;
     stroke: var(--ink);
     stroke-width: 2;
   }
@@ -357,6 +455,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes .proc {
     position: relative;
     z-index: 1;
+    align-self: start;
     display: grid;
     gap: .1rem;
     min-width: 0;
@@ -371,6 +470,10 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     box-shadow: inset 0 0 0 2px var(--brass);
   }
   link-scenes .proc.trapping .status { color: var(--brass); }
+  /* A box for a process that hasn't been started yet keeps its place */
+  link-scenes .proc.unborn {
+    visibility: hidden;
+  }
   link-scenes .proc.dead {
     color: var(--muted);
     border-style: dashed;
@@ -554,11 +657,14 @@ class Scene {
     for (const name of scene.procs) {
       const box = document.createElement("div");
       box.className = "proc";
-      box.innerHTML = `<span class="name">${name}</span><span class="status"></span><span class="status"></span>`;
+      const lines = scene.pids?.[name] ? 3 : 2;
+      box.innerHTML = `<span class="name">${scene.labels?.[name] ?? name}</span>${'<span class="status"></span>'.repeat(lines)}`;
+      if (scene.place?.[name]) box.style.gridArea = scene.place[name];
       this.stage.insertBefore(box, this.dots);
       this.procs[name] = { el: box };
     }
-    this.stage.classList.toggle("three", scene.procs.length === 3);
+    this.stage.classList.toggle("three", scene.procs.length === 3 && !scene.place);
+    this.reset();
   }
 
   cancel() {
@@ -575,7 +681,16 @@ class Scene {
     this.cancel();
     for (const [name, p] of Object.entries(this.procs)) {
       const reason = this.scene.dead?.[name] ?? null;
-      Object.assign(p, { alive: !reason, reason, trap: !!this.scene.trap?.includes(name) });
+      const pid = this.scene.pids?.[name] ?? null;
+      Object.assign(p, {
+        born: !this.scene.unborn?.includes(name),
+        alive: !reason,
+        reason,
+        trap: !!this.scene.trap?.includes(name),
+        pid,
+        count: pid ? 0 : null,
+        note: this.scene.notes?.[name] ?? "",
+      });
     }
     this.links = new Set((this.scene.links ?? []).map((pair) => pair.join("-")));
     // Each monitor: who watches whom, and its reference as the message shows it
@@ -625,6 +740,28 @@ class Scene {
     this.render();
   }
 
+  // A process in a box that's been waiting for it
+  spawn(name) {
+    Object.assign(this.procs[name], { born: true, alive: true, reason: null, count: 0 });
+    this.flash(name);
+    this.render();
+  }
+
+  link(a, b) {
+    this.links.add(`${a}-${b}`);
+    this.draw();
+  }
+
+  count(name, n) {
+    this.procs[name].count = n;
+    this.render();
+  }
+
+  note(name, text) {
+    this.procs[name].note = text;
+    this.render();
+  }
+
   monitor(from, to) {
     this.monitors.push({ from, to, ref: "ref" });
     this.draw();
@@ -663,16 +800,21 @@ class Scene {
     if (this.instant) return;
     const hop = reducedMotion.matches ? HOP_REDUCED : HOP;
     if (!reducedMotion.matches) {
-      const [p, q] = this.ends(from, to);
+      const points = this.route(from, to);
       const dot = document.createElement("div");
       dot.className = `dot ${kind}`;
-      dot.innerHTML = `<span>${REASONS[reason]}</span>`;
+      if (this.scene.dotLabels !== false) dot.innerHTML = `<span>${REASONS[reason]}</span>`;
       dot.style.setProperty("--below", `${this.box(from).hh + 4 - dy}px`);
       this.dots.append(dot);
-      const anim = dot.animate(
-        [{ transform: `translate(${p.x}px, ${p.y + dy}px)` }, { transform: `translate(${q.x}px, ${q.y + dy}px)` }],
-        { duration: hop, easing: "ease-in-out", fill: "forwards" },
-      );
+      // A keyframe at each corner, spaced by distance so the dot keeps one speed
+      const lengths = points.slice(1).map((q, i) => Math.hypot(q.x - points[i].x, q.y - points[i].y));
+      const total = lengths.reduce((sum, n) => sum + n, 0) || 1;
+      let along = 0;
+      const frames = points.map((q, i) => {
+        if (i) along += lengths[i - 1];
+        return { transform: `translate(${q.x}px, ${q.y + dy}px)`, offset: along / total };
+      });
+      const anim = dot.animate(frames, { duration: hop, easing: "ease-in-out", fill: "forwards" });
       anim.finished.then(() => dot.remove(), () => dot.remove());
     }
     await this.wait(hop);
@@ -688,15 +830,17 @@ class Scene {
 
   render() {
     for (const p of Object.values(this.procs)) {
-      const [one, two] = p.alive
-        ? [p.trap ? "traps exits" : "running", ""]
-        : ["exited:", REASONS[p.reason]];
+      // A process with a pid keeps it, and its count, after it exits
+      const lines = p.pid
+        ? [`#PID<0.${p.pid}.0>`, `count ${p.count}`, p.alive ? "running" : REASONS[p.reason]]
+        : p.alive
+          ? [p.trap ? "traps exits" : "running", p.note]
+          : ["exited:", REASONS[p.reason]];
+      p.el.classList.toggle("unborn", !p.born);
       p.el.classList.toggle("dead", !p.alive);
       p.el.classList.toggle("trapping", p.alive && p.trap);
       p.el.classList.toggle("crashed", !p.alive && VIOLENT.has(p.reason));
-      const [a, b] = p.el.querySelectorAll(".status");
-      a.textContent = one;
-      b.textContent = two;
+      p.el.querySelectorAll(".status").forEach((el, i) => (el.textContent = lines[i]));
     }
     if (this.mailboxEl) {
       const owner = this.scene.mailbox;
@@ -714,19 +858,40 @@ class Scene {
     return { x: r.left - g.left + r.width / 2, y: r.top - g.top + r.height / 2, hw: r.width / 2, hh: r.height / 2 };
   }
 
-  // The ends of the line between two boxes, side by side, with a gap
-  // before the second for an arrowhead
+  // The point where the line from a's centre towards b's leaves a's box,
+  // gap further on
+  edge(a, b, gap = 0) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.min(dx ? (a.hw + gap) / Math.abs(dx) : Infinity, dy ? (a.hh + gap) / Math.abs(dy) : Infinity);
+    return { x: a.x + dx * t, y: a.y + dy * t };
+  }
+
+  // The ends of the line between two boxes, with a gap before the second
+  // for an arrowhead
   ends(from, to, gap = 0) {
     const a = this.box(from);
     const b = this.box(to);
-    const dir = Math.sign(b.x - a.x);
-    return [{ x: a.x + dir * a.hw, y: a.y }, { x: b.x - dir * (b.hw + gap), y: b.y }];
+    return [this.edge(a, b), this.edge(b, a, gap)];
+  }
+
+  // The points a link's line goes through, from one box to the other. In a
+  // scene with elbows, a link between boxes in different rows goes down the
+  // left box's column, then across to the right one, clear of the boxes in
+  // between.
+  route(from, to) {
+    const a = this.box(from);
+    const b = this.box(to);
+    if (!this.scene.elbows || Math.abs(a.y - b.y) < a.hh) return [this.edge(a, b), this.edge(b, a)];
+    const [l, r] = a.x < b.x ? [a, b] : [b, a];
+    const points = [{ x: l.x, y: l.y + l.hh }, { x: l.x, y: r.y }, { x: r.x - r.hw, y: r.y }];
+    return a === l ? points : points.reverse();
   }
 
   draw() {
     const links = [...this.links].map((key) => {
-      const [p, q] = this.ends(...key.split("-"));
-      return `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
+      const points = this.route(...key.split("-")).map((p) => `${p.x},${p.y}`).join(" ");
+      return `<polyline points="${points}"/>`;
     });
     const monitors = this.monitors.map((m) => {
       const dy = this.offset(m);
@@ -761,7 +926,7 @@ customElements.define("link-scenes", class extends HTMLElement {
         ${set.scenes.map((scene) => `
           <figure class="scene" role="img" aria-label="${scene.title}. ${scene.summary}">
             <p class="title" aria-hidden="true">${scene.title}</p>
-            <div class="stage" aria-hidden="true" style="--procs: ${scene.procs.length}">
+            <div class="stage" aria-hidden="true" style="--procs: ${scene.procs.length}${scene.columns ? `; grid-template-columns: ${scene.columns}` : ""}">
               <svg class="lines"></svg>
               <div class="dots"></div>
             </div>

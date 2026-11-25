@@ -341,7 +341,9 @@ So the two fit different jobs:
 
 Armstrong's thesis lists Erlang's ideas about errors as slogans: "Let some other process do the error recovery. If you can't do what you want to do, die. Let it crash. Do not program defensively." Links and trapping exits are how the first one works. "If the process Pid1 fails and if the processes Pid1 and Pid2 are linked together and if process Pid2 is set to trap errors then a message of the form {'EXIT',Pid1,Why} will be delivered to Pid2 if Pid1 fails." Then "it is Pid2's job to correct the error", and the simplest way to correct it is to start the process again.
 
-Here's a restarter that does that. It traps exits, starts a worker linked to it, and whenever the worker exits with any reason but `:normal`, starts a new one. After three restarts it gives up and exits itself. The worker counts to 5, failing one time in four at each step ([restart.exs](restart.exs)):
+Here's a restarter that does that. It traps exits, starts a worker linked to it, and whenever the worker exits with any reason but `:normal`, starts a new one. After three restarts it gives up and exits itself. The worker counts to 5, failing one time in four at each step. Here are two ways a run of [restart.exs](restart.exs) can go:
+
+<link-scenes scenes="restart">
 
 ```elixir
 defmodule Restarter do
@@ -431,6 +433,10 @@ worker #PID<0.112.0>: 5
 restarter: the worker finished
 restarter exited: :normal
 ```
+
+*The live version of this needs JavaScript. In it, two runs play on a loop: one where a restart works, and one where the restarter gives up.*
+
+</link-scenes>
 
 The worker has no error handling at all. It does its job, and when something goes wrong it dies, and the restarter, which does nothing else, deals with it. Each new worker has a new pid and starts counting from 1, because a restart is a new process. Whatever the old one had built up died with it, the bad along with the good. A restart can only bring a process back to how it started.
 
