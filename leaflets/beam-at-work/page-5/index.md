@@ -248,7 +248,9 @@ In the chain, `b` trapping exits stopped the crash from spreading. It got a mess
 
 A link is for processes that live and die together. Sometimes a process just needs to know when another one dies, without dying with it, and without the other one having any say. That's a monitor.
 
-`Process.monitor(pid)` returns a reference, and when that process exits, for any reason, the BEAM sends any monitoring process a message: `{:DOWN, ref, :process, pid, reason}`. It's always a message, never an exit signal. ([monitor.exs](monitor.exs)):
+`Process.monitor(pid)` returns a reference, and when that process exits, for any reason, the BEAM sends any monitoring process a message: `{:DOWN, ref, :process, pid, reason}`. It's always a message, never an exit signal. Here are six scenes with monitors, from [monitor.exs](monitor.exs):
+
+<link-scenes scenes="monitors">
 
 ```elixir
 IO.puts("## Monitoring a process that crashes")
@@ -316,6 +318,10 @@ watcher alive? false, watched alive? true
 ## spawn_monitor, and Process.exit
 received {:DOWN, #Reference<0.2306361067.576454663.233754>, :process, #PID<0.109.0>, :shutdown}
 ```
+
+*The live version of this needs JavaScript. In it, the six scenes play on a loop, with their `:DOWN` messages travelling back along the monitors.*
+
+</link-scenes>
 
 A crash, a normal exit, and an exit with a reason of the process's own choosing (`exit(:done)`) all came as `:DOWN` messages with their reasons. Monitoring a process that was already gone got a `:DOWN` at once, with the reason `:noproc`, no such process, so there's no gap between checking whether a process is alive and starting to watch it. Each monitor is separate, with its own reference, and each sends its own `:DOWN`. And a monitor only goes one way: the watcher crashing did nothing to the process it was watching.
 

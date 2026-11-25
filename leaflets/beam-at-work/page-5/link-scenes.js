@@ -7,6 +7,12 @@
 // - scenes="trap", one per scene of trap.exs: a parent that traps exits
 //   whose two children crash and finish, a chain whose middle process traps
 //   exits, and :kill sent to a process that traps exits.
+// - scenes="monitors", one per scene of monitor.exs: a watcher monitoring a
+//   process that crashes, finishes normally, is already gone, or is
+//   monitored twice; the watcher crashing instead; and Process.exit with
+//   :shutdown. A monitor is a dashed arrow from the watcher; when the watched
+//   process exits, a :DOWN message travels back along it, and the monitor is
+//   gone. Nothing dies of a :DOWN, and nothing travels the other way.
 //
 // The processes are boxes with their links drawn between them; a process
 // that traps exits has a brass border. When a process exits, a dot carries
@@ -18,7 +24,7 @@
 // and becomes :killed. A line under each scene sums up what happened.
 //
 // The rules are the Erlang reference manual's (Links, Sending and Receiving
-// Exit Signals), as on the page, and each scene ends as its script's does.
+// Exit Signals, Monitors), as on the page, and each scene ends as its script's does.
 // It's slowed down so it can be followed; in the BEAM a signal takes
 // microseconds.
 //
@@ -42,9 +48,16 @@ const REASONS = {
   normal: ":normal",
   kill: ":kill",
   killed: ":killed",
+  noproc: ":noproc",
+  done: ":done",
+  shutdown: ":shutdown",
 };
 
+// The reasons a box outlines in red
+const VIOLENT = new Set(["crash", "killed"]);
+
 const exitMessage = (from, reason) => `{:EXIT, ${from}, ${REASONS[reason]}}`;
+const downMessage = (ref, from, reason) => `{:DOWN, ${ref}, :process, ${from}, ${REASONS[reason]}}`;
 
 // Each scene's processes, left to right, its links, who traps exits, whose
 // mailbox is shown, and what happens
@@ -170,6 +183,95 @@ const SETS = {
       },
     ],
   },
+  monitors: {
+    key: ["monitor", "down", "crash"],
+    scenes: [
+      {
+        title: "Watched crashes",
+        procs: ["watcher", "watched"],
+        monitors: [["watcher", "watched"]],
+        mailbox: "watcher",
+        summary: "A watcher monitors another process. The watched process crashes, and a :DOWN message with the error comes back to the watcher, which carries on.",
+        async play(s) {
+          await s.wait(1600);
+          s.die("watched", "crash");
+          await s.wait(600);
+          await s.down("watched", "watcher", "crash");
+          s.say("The watcher gets a <code>:DOWN</code> message and carries on.");
+        },
+      },
+      {
+        title: "Watched finishes normally",
+        procs: ["watcher", "watched"],
+        monitors: [["watcher", "watched"]],
+        mailbox: "watcher",
+        summary: "A watcher monitors another process, which finishes normally. A :DOWN message with the reason :normal comes back to the watcher.",
+        async play(s) {
+          await s.wait(1600);
+          s.die("watched", "normal");
+          await s.wait(600);
+          await s.down("watched", "watcher", "normal");
+          s.say("Unlike a link, a monitor reports a <code>:normal</code> exit too.");
+        },
+      },
+      {
+        title: "Already gone",
+        procs: ["watcher", "watched"],
+        dead: { watched: "crash" },
+        mailbox: "watcher",
+        summary: "The watcher starts monitoring a process that has already exited. A :DOWN message with the reason :noproc comes back at once.",
+        async play(s) {
+          await s.wait(1600);
+          s.monitor("watcher", "watched");
+          await s.wait(300);
+          await s.down("watched", "watcher", "noproc");
+          s.say("Monitoring a process that's gone gets <code>:noproc</code> at once.");
+        },
+      },
+      {
+        title: "Monitored twice",
+        procs: ["watcher", "watched"],
+        monitors: [["watcher", "watched", "ref1"], ["watcher", "watched", "ref2"]],
+        mailbox: "watcher",
+        summary: "The watcher monitors the same process twice. The watched process calls exit(:done), and two :DOWN messages come back, each with its own reference.",
+        async play(s) {
+          await s.wait(1600);
+          s.die("watched", "done");
+          await s.wait(600);
+          await Promise.all([s.down("watched", "watcher", "done", 0), s.down("watched", "watcher", "done", 1)]);
+          s.say("<code>exit(:done)</code> comes back twice, once per monitor, each with its own ref.");
+        },
+      },
+      {
+        title: "Watcher crashes",
+        procs: ["watcher", "watched"],
+        monitors: [["watcher", "watched"]],
+        summary: "The watcher, monitoring another process, crashes. Its monitor goes with it, and the watched process carries on, never told.",
+        async play(s) {
+          await s.wait(1600);
+          s.die("watcher", "crash");
+          await s.wait(900);
+          s.flash("watched");
+          s.say("Nothing reaches the watched process. A monitor goes one way.");
+        },
+      },
+      {
+        title: "Shut down by hand",
+        procs: ["watcher", "watched"],
+        monitors: [["watcher", "watched"]],
+        mailbox: "watcher",
+        summary: "The watcher started the watched process with spawn_monitor, then sends it Process.exit with the reason :shutdown. The watched process exits, and the :DOWN message says :shutdown.",
+        async play(s) {
+          await s.wait(1600);
+          await s.signal("watcher", "watched", "shutdown", { keepLink: true });
+          s.die("watched", "shutdown");
+          await s.wait(600);
+          await s.down("watched", "watcher", "shutdown");
+          s.say("Whatever the reason, the <code>:DOWN</code> carries it.");
+        },
+      },
+    ],
+  },
 };
 
 const KEY = {
@@ -177,7 +279,11 @@ const KEY = {
   trap: `<span><i class="trap-box"></i>traps exits</span>`,
   crash: `<span><i class="crash-dot"></i>exit signal</span>`,
   normal: `<span><i class="normal-dot"></i>exit signal: <code>:normal</code></span>`,
+  monitor: `<span><i class="monitor-line"></i>monitor</span>`,
+  down: `<span><i class="down-dot"></i><code>:DOWN</code> message</span>`,
 };
+
+let ids = 0;
 
 document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes:defined {
@@ -240,6 +346,13 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes .lines line {
     stroke: var(--ink);
     stroke-width: 2;
+  }
+  link-scenes .lines line.monitor {
+    stroke: var(--muted);
+    stroke-dasharray: 5 4;
+  }
+  link-scenes .lines marker path {
+    fill: var(--muted);
   }
   link-scenes .proc {
     position: relative;
@@ -310,6 +423,10 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     background: var(--bg);
     border: 2.5px solid var(--ink);
   }
+  link-scenes .dot.down {
+    background: var(--code-string);
+    border: 0;
+  }
   /* The reason rides under the row of boxes, clear of their names */
   link-scenes .dot span {
     position: absolute;
@@ -334,7 +451,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   }
   link-scenes .mailbox code {
     display: inline-block;
+    max-width: 100%;
     margin: .15rem .3rem 0 0;
+    overflow-wrap: anywhere;
   }
   link-scenes .mailbox code.new {
     animation: link-scenes-new 1s;
@@ -376,6 +495,8 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   link-scenes .key .crash-dot,
   link-scenes .key .normal-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--code-error); }
   link-scenes .key .normal-dot { background: none; border: 2.5px solid var(--ink); }
+  link-scenes .key .monitor-line { width: 1.6rem; border-top: 2px dashed var(--muted); }
+  link-scenes .key .down-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--code-string); }
   link-scenes .key .trap-box { width: 1rem; height: .8rem; border: 2px solid var(--brass); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--brass); }
   link-scenes .replay {
     justify-self: center;
@@ -428,6 +549,7 @@ class Scene {
     this.sayEl = el.querySelector(".say");
     this.mailboxEl = el.querySelector(".mailbox");
     this.timers = new Map(); // timeout -> its promise's reject
+    this.uid = `link-scenes-${++ids}`;
     this.procs = {};
     for (const name of scene.procs) {
       const box = document.createElement("div");
@@ -452,9 +574,12 @@ class Scene {
   reset() {
     this.cancel();
     for (const [name, p] of Object.entries(this.procs)) {
-      Object.assign(p, { alive: true, reason: null, trap: !!this.scene.trap?.includes(name) });
+      const reason = this.scene.dead?.[name] ?? null;
+      Object.assign(p, { alive: !reason, reason, trap: !!this.scene.trap?.includes(name) });
     }
-    this.links = new Set(this.scene.links.map((pair) => pair.join("-")));
+    this.links = new Set((this.scene.links ?? []).map((pair) => pair.join("-")));
+    // Each monitor: who watches whom, and its reference as the message shows it
+    this.monitors = (this.scene.monitors ?? []).map(([from, to, ref = "ref"]) => ({ from, to, ref }));
     this.messages = [];
     this.sayEl.innerHTML = "";
     this.render();
@@ -491,10 +616,34 @@ class Scene {
     });
   }
 
+  // A process exits. Monitors it held go with it; monitors on it stay
+  // until their :DOWN messages are sent.
   die(name, reason) {
     Object.assign(this.procs[name], { alive: false, reason });
+    this.monitors = this.monitors.filter((m) => m.from !== name);
     this.flash(name);
     this.render();
+  }
+
+  monitor(from, to) {
+    this.monitors.push({ from, to, ref: "ref" });
+    this.draw();
+  }
+
+  // The nth monitor that watcher holds on watched sends its :DOWN back along
+  // it, and is gone
+  async down(watched, watcher, reason, n = 0) {
+    const m = this.monitors.filter((x) => x.from === watcher && x.to === watched)[n];
+    const offset = this.offset(m);
+    await this.travel(watched, watcher, "down", reason, offset);
+    this.monitors = this.monitors.filter((x) => x !== m);
+    this.message(watcher, downMessage(m.ref, watched, reason));
+  }
+
+  // How far a monitor's line sits from the middle, when there's more than one
+  offset(m) {
+    const pair = this.monitors.filter((x) => x.from === m.from && x.to === m.to);
+    return (pair.indexOf(m) - (pair.length - 1) / 2) * 12;
   }
 
   // A trapped exit signal, now a message in the process's mailbox
@@ -507,6 +656,26 @@ class Scene {
 
   say(html) {
     this.sayEl.innerHTML = html;
+  }
+
+  // A dot, of a kind, labelled with a reason, from one box to the other
+  async travel(from, to, kind, reason, dy = 0) {
+    if (this.instant) return;
+    const hop = reducedMotion.matches ? HOP_REDUCED : HOP;
+    if (!reducedMotion.matches) {
+      const [p, q] = this.ends(from, to);
+      const dot = document.createElement("div");
+      dot.className = `dot ${kind}`;
+      dot.innerHTML = `<span>${REASONS[reason]}</span>`;
+      dot.style.setProperty("--below", `${this.box(from).hh + 4 - dy}px`);
+      this.dots.append(dot);
+      const anim = dot.animate(
+        [{ transform: `translate(${p.x}px, ${p.y + dy}px)` }, { transform: `translate(${q.x}px, ${q.y + dy}px)` }],
+        { duration: hop, easing: "ease-in-out", fill: "forwards" },
+      );
+      anim.finished.then(() => dot.remove(), () => dot.remove());
+    }
+    await this.wait(hop);
   }
 
   flash(name) {
@@ -524,7 +693,7 @@ class Scene {
         : ["exited:", REASONS[p.reason]];
       p.el.classList.toggle("dead", !p.alive);
       p.el.classList.toggle("trapping", p.alive && p.trap);
-      p.el.classList.toggle("crashed", !p.alive && p.reason !== "normal");
+      p.el.classList.toggle("crashed", !p.alive && VIOLENT.has(p.reason));
       const [a, b] = p.el.querySelectorAll(".status");
       a.textContent = one;
       b.textContent = two;
@@ -545,42 +714,33 @@ class Scene {
     return { x: r.left - g.left + r.width / 2, y: r.top - g.top + r.height / 2, hw: r.width / 2, hh: r.height / 2 };
   }
 
-  // The ends of the line between two boxes, side by side
-  ends(from, to) {
+  // The ends of the line between two boxes, side by side, with a gap
+  // before the second for an arrowhead
+  ends(from, to, gap = 0) {
     const a = this.box(from);
     const b = this.box(to);
     const dir = Math.sign(b.x - a.x);
-    return [{ x: a.x + dir * a.hw, y: a.y }, { x: b.x - dir * b.hw, y: b.y }];
+    return [{ x: a.x + dir * a.hw, y: a.y }, { x: b.x - dir * (b.hw + gap), y: b.y }];
   }
 
   draw() {
-    this.lines.innerHTML = [...this.links].map((key) => {
+    const links = [...this.links].map((key) => {
       const [p, q] = this.ends(...key.split("-"));
       return `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
-    }).join("");
+    });
+    const monitors = this.monitors.map((m) => {
+      const dy = this.offset(m);
+      const [p, q] = this.ends(m.from, m.to, 3);
+      return `<line class="monitor" x1="${p.x}" y1="${p.y + dy}" x2="${q.x}" y2="${q.y + dy}" marker-end="url(#${this.uid}-arrow)"/>`;
+    });
+    this.lines.innerHTML = `<defs><marker id="${this.uid}-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>${links.join("")}${monitors.join("")}`;
   }
 
   // An exit signal travelling from one process to the other. One that a
   // process sends because it exited goes along their link, which is gone once
   // it arrives; one sent by hand (keepLink) leaves the link alone.
   async signal(from, to, reason, { keepLink = false } = {}) {
-    if (!this.instant) {
-      const hop = reducedMotion.matches ? HOP_REDUCED : HOP;
-      if (!reducedMotion.matches) {
-        const [p, q] = this.ends(from, to);
-        const dot = document.createElement("div");
-        dot.className = `dot ${reason}`;
-        dot.innerHTML = `<span>${REASONS[reason]}</span>`;
-        dot.style.setProperty("--below", `${this.box(from).hh + 4}px`);
-        this.dots.append(dot);
-        const anim = dot.animate(
-          [{ transform: `translate(${p.x}px, ${p.y}px)` }, { transform: `translate(${q.x}px, ${q.y}px)` }],
-          { duration: hop, easing: "ease-in-out", fill: "forwards" },
-        );
-        anim.finished.then(() => dot.remove(), () => dot.remove());
-      }
-      await this.wait(hop);
-    }
+    await this.travel(from, to, reason, reason);
     if (!keepLink) {
       this.links.delete(`${from}-${to}`);
       this.links.delete(`${to}-${from}`);
@@ -610,7 +770,7 @@ customElements.define("link-scenes", class extends HTMLElement {
           </figure>`).join("")}
       </div>
       <p class="key" aria-hidden="true">${set.key.map((k) => KEY[k]).join("")}</p>
-      <button type="button" class="replay" hidden>Play the ${["", "", "two", "three", "four"][set.scenes.length]} scenes</button>`;
+      <button type="button" class="replay" hidden>Play the ${["", "", "two", "three", "four", "five", "six"][set.scenes.length]} scenes</button>`;
 
     const figures = [...this.querySelectorAll(".scene")];
     this.scenes = set.scenes.map((scene, i) => new Scene(figures[i], scene));
