@@ -22,6 +22,15 @@
 //   box stays, and each restart adds a new process below it, starting from
 //   1. restart.exs's worker fails at random; these runs are fixed so each
 //   makes its point.
+// - scenes="node", uncaught.mjs's three counters in Node, run three ways:
+//   an uncaught throw, an unhandled rejection, and with an
+//   'uncaughtException' handler. The process is a frame around the counters,
+//   which are callbacks in it, not processes: by default one counter's error
+//   ends the frame and every counter in it; with the handler the others
+//   carry on, in what Node's docs call an undefined state.
+// - scenes="node-worker", worker-exit.mjs: a main thread and a worker
+//   thread in one process. The worker throws and ends; 'error' and 'exit'
+//   events travel to the main thread, which carries on counting.
 //
 // The processes are boxes with their links drawn between them; a process
 // that traps exits has a brass border. When a process exits, a dot carries
@@ -61,10 +70,15 @@ const REASONS = {
   done: ":done",
   shutdown: ":shutdown",
   too_many_restarts: ":too_many_restarts",
+  threw: "threw",
+  rejected: "rejected",
+  stopped: "stopped",
+  error: "'error'",
+  exit: "'exit'",
 };
 
 // The reasons a box outlines in red
-const VIOLENT = new Set(["crash", "killed"]);
+const VIOLENT = new Set(["crash", "killed", "threw", "rejected"]);
 
 const exitMessage = (from, reason) => `{:EXIT, ${from}, ${REASONS[reason]}}`;
 const downMessage = (ref, from, reason) => `{:DOWN, ${ref}, :process, ${from}, ${REASONS[reason]}}`;
@@ -109,6 +123,32 @@ async function restarts(s, crashes, onRestart = () => {}) {
     s.link("restarter", next);
     onRestart();
   }
+}
+
+// uncaught.mjs's three counters, callbacks in one Node process
+const counters = () => ({
+  procs: ["a", "b", "c"],
+  frame: "one node process, one heap",
+  lines: (p) => [`count ${p.count}`, p.alive ? "running" : REASONS[p.reason]],
+});
+
+// a, b, and c count together until b fails at 3, as it throws or rejects
+async function countUntilBFails(s, how) {
+  for (let n = 1; ; n++) {
+    await s.wait(COUNT_EVERY);
+    if (n === 3) {
+      s.count("a", n);
+      s.die("b", how);
+      return;
+    }
+    for (const name of ["a", "b", "c"]) s.count(name, n);
+  }
+}
+
+// The process exits, and every counter in it stops where it was
+function processExits(s) {
+  s.frame("exited, code 1", "dead");
+  for (const name of ["a", "c"]) s.die(name, "stopped");
 }
 
 // The restarter, top left, beside a column of n worker boxes; only the first
@@ -367,6 +407,84 @@ const SETS = {
       },
     ],
   },
+  node: {
+    key: [],
+    scenes: [
+      {
+        ...counters(),
+        title: "Uncaught error",
+        summary: "Three counters, a, b, and c, in one Node process. b throws an error at 3 that nothing catches, and the whole process exits with code 1, taking a and c with it.",
+        async play(s) {
+          await countUntilBFails(s, "threw");
+          await s.wait(500);
+          processExits(s);
+          s.say("One uncaught error ends the whole process, and every counter in it.");
+        },
+      },
+      {
+        ...counters(),
+        title: "Rejected promise",
+        summary: "The same three counters. This time b fails in an await, a rejected promise that nothing handles, and the whole process exits with code 1 just the same.",
+        async play(s) {
+          await countUntilBFails(s, "rejected");
+          await s.wait(500);
+          processExits(s);
+          s.say("A rejected promise that nothing handles ends it the same way.");
+        },
+      },
+      {
+        ...counters(),
+        title: "With a handler",
+        summary: "The same three counters, with an uncaughtException handler. b throws at 3, the handler catches it, and a and c carry on counting, in a process whose state Node's docs call undefined.",
+        async play(s) {
+          await countUntilBFails(s, "threw");
+          await s.wait(500);
+          s.frame("running, state undefined", "warn");
+          s.say("<code>a</code> and <code>c</code> carry on, but Node's docs say it isn't safe to.");
+          for (let i = 0; i < 2; i++) {
+            await s.wait(COUNT_EVERY);
+            s.count("a", s.procs.a.count + 1);
+            s.count("c", s.procs.c.count + 1);
+          }
+        },
+      },
+    ],
+  },
+  "node-worker": {
+    key: ["event"],
+    scenes: [
+      {
+        title: "A worker thread throws",
+        procs: ["main", "worker"],
+        frame: "one node process, two threads",
+        roomy: true,
+        lines: (p) => p.name === "main"
+          ? [`count ${p.count}`, "running"]
+          : p.alive ? ["running", ""] : ["threw", "exit code 1"],
+        mailbox: "main",
+        mailboxLabel: "events on main:",
+        summary: "A main thread and a worker thread in one Node process. The worker throws and ends. The main thread gets an 'error' event and an 'exit' event, and carries on counting.",
+        async play(s) {
+          for (let n = 1; n <= 2; n++) {
+            await s.wait(COUNT_EVERY);
+            s.count("main", n);
+          }
+          await s.wait(COUNT_EVERY / 2);
+          s.die("worker", "threw");
+          await s.travel("worker", "main", "down", "error");
+          s.message("main", "'error': oops");
+          s.count("main", 3);
+          await s.travel("worker", "main", "down", "exit");
+          s.message("main", "'exit': code 1");
+          for (let n = 4; n <= 5; n++) {
+            await s.wait(COUNT_EVERY);
+            s.count("main", n);
+          }
+          s.say("Like a monitor: one way, a notification, and the main thread carries on.");
+        },
+      },
+    ],
+  },
 };
 
 const KEY = {
@@ -376,6 +494,7 @@ const KEY = {
   normal: `<span><i class="normal-dot"></i>exit signal: <code>:normal</code></span>`,
   monitor: `<span><i class="monitor-line"></i>monitor</span>`,
   down: `<span><i class="down-dot"></i><code>:DOWN</code> message</span>`,
+  event: `<span><i class="down-dot"></i>event</span>`,
 };
 
 let ids = 0;
@@ -394,6 +513,7 @@ document.head.insertAdjacentHTML("beforeend", `<style>
   }
   @container link-scenes (min-width: 36rem) {
     link-scenes .scenes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    link-scenes .scenes:has(> .scene:only-child) { grid-template-columns: minmax(0, 28rem); justify-content: center; }
   }
   link-scenes .scene {
     margin: 0;
@@ -470,6 +590,33 @@ document.head.insertAdjacentHTML("beforeend", `<style>
     box-shadow: inset 0 0 0 2px var(--brass);
   }
   link-scenes .proc.trapping .status { color: var(--brass); }
+  /* A Node process, drawn around the callbacks or threads in it */
+  link-scenes .stage.framed {
+    padding: .5rem .6rem .7rem;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius);
+  }
+  /* Room under the boxes for the labels on the dots */
+  link-scenes .stage.framed.roomy {
+    padding-bottom: 1.9rem;
+  }
+  link-scenes .stage.framed.dead {
+    border-style: dashed;
+    border-color: var(--code-error);
+  }
+  link-scenes .stage.framed.warn {
+    border-color: var(--brass);
+  }
+  link-scenes .frame {
+    grid-column: 1 / -1;
+    margin: 0 0 .5rem;
+    font-family: var(--code);
+    font-size: .8rem;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  link-scenes .dead > .frame { color: var(--code-error); }
+  link-scenes .warn > .frame { color: var(--brass); }
   /* A box for a process that hasn't been started yet keeps its place */
   link-scenes .proc.unborn {
     visibility: hidden;
@@ -651,6 +798,7 @@ class Scene {
     this.dots = el.querySelector(".dots");
     this.sayEl = el.querySelector(".say");
     this.mailboxEl = el.querySelector(".mailbox");
+    this.frameEl = el.querySelector(".frame");
     this.timers = new Map(); // timeout -> its promise's reject
     this.uid = `link-scenes-${++ids}`;
     this.procs = {};
@@ -683,12 +831,13 @@ class Scene {
       const reason = this.scene.dead?.[name] ?? null;
       const pid = this.scene.pids?.[name] ?? null;
       Object.assign(p, {
+        name,
         born: !this.scene.unborn?.includes(name),
         alive: !reason,
         reason,
         trap: !!this.scene.trap?.includes(name),
         pid,
-        count: pid ? 0 : null,
+        count: 0,
         note: this.scene.notes?.[name] ?? "",
       });
     }
@@ -697,6 +846,7 @@ class Scene {
     this.monitors = (this.scene.monitors ?? []).map(([from, to, ref = "ref"]) => ({ from, to, ref }));
     this.messages = [];
     this.sayEl.innerHTML = "";
+    if (this.scene.frame) this.frame(this.scene.frame);
     this.render();
   }
 
@@ -738,6 +888,14 @@ class Scene {
     this.monitors = this.monitors.filter((m) => m.from !== name);
     this.flash(name);
     this.render();
+  }
+
+  // The label on the frame around a Node process, and its state: "dead",
+  // "warn", or none
+  frame(text, state = "") {
+    this.stage.classList.toggle("dead", state === "dead");
+    this.stage.classList.toggle("warn", state === "warn");
+    this.frameEl.textContent = text;
   }
 
   // A process in a box that's been waiting for it
@@ -831,7 +989,9 @@ class Scene {
   render() {
     for (const p of Object.values(this.procs)) {
       // A process with a pid keeps it, and its count, after it exits
-      const lines = p.pid
+      const lines = this.scene.lines
+        ? this.scene.lines(p)
+        : p.pid
         ? [`#PID<0.${p.pid}.0>`, `count ${p.count}`, p.alive ? "running" : REASONS[p.reason]]
         : p.alive
           ? [p.trap ? "traps exits" : "running", p.note]
@@ -844,8 +1004,8 @@ class Scene {
     }
     if (this.mailboxEl) {
       const owner = this.scene.mailbox;
-      this.mailboxEl.innerHTML = `${owner}'s mailbox: ${
-        this.messages.length ? this.messages.map((m) => `<code>${m}</code>`).join("") : "empty"
+      this.mailboxEl.innerHTML = `${this.scene.mailboxLabel ?? `${owner}'s mailbox:`} ${
+        this.messages.length ? this.messages.map((m) => `<code>${m}</code>`).join("") : this.scene.mailboxLabel ? "none" : "empty"
       }`;
     }
     this.draw();
@@ -926,7 +1086,8 @@ customElements.define("link-scenes", class extends HTMLElement {
         ${set.scenes.map((scene) => `
           <figure class="scene" role="img" aria-label="${scene.title}. ${scene.summary}">
             <p class="title" aria-hidden="true">${scene.title}</p>
-            <div class="stage" aria-hidden="true" style="--procs: ${scene.procs.length}${scene.columns ? `; grid-template-columns: ${scene.columns}` : ""}">
+            <div class="stage${scene.frame ? " framed" : ""}${scene.roomy ? " roomy" : ""}" aria-hidden="true" style="--procs: ${scene.procs.length}${scene.columns ? `; grid-template-columns: ${scene.columns}` : ""}">
+              ${scene.frame ? `<p class="frame"></p>` : ""}
               <svg class="lines"></svg>
               <div class="dots"></div>
             </div>
@@ -934,8 +1095,8 @@ customElements.define("link-scenes", class extends HTMLElement {
             <p class="say" aria-hidden="true"></p>
           </figure>`).join("")}
       </div>
-      <p class="key" aria-hidden="true">${set.key.map((k) => KEY[k]).join("")}</p>
-      <button type="button" class="replay" hidden>Play the ${["", "", "two", "three", "four", "five", "six"][set.scenes.length]} scenes</button>`;
+      ${set.key.length ? `<p class="key" aria-hidden="true">${set.key.map((k) => KEY[k]).join("")}</p>` : ""}
+      <button type="button" class="replay" hidden>${set.scenes.length === 1 ? "Play the scene" : `Play the ${["", "", "two", "three", "four", "five", "six"][set.scenes.length]} scenes`}</button>`;
 
     const figures = [...this.querySelectorAll(".scene")];
     this.scenes = set.scenes.map((scene, i) => new Scene(figures[i], scene));

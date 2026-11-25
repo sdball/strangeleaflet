@@ -446,7 +446,9 @@ This is a small, hand-written version of a supervisor. A real supervisor handles
 
 ## And in Node?
 
-In Node, a whole program runs in one process, and its callbacks share one heap. Here's alone.exs again, as three intervals ([uncaught.mjs](uncaught.mjs)):
+In Node, a whole program runs in one process, and its callbacks share one heap. Here's alone.exs again, as three intervals, run three ways: throwing an error, with `b` failing in an `await` instead of a `throw`, and with an `'uncaughtException'` handler ([uncaught.mjs](uncaught.mjs)):
+
+<link-scenes scenes="node">
 
 ```javascript
 const mode = process.argv[2] ?? "default";
@@ -479,7 +481,7 @@ setTimeout(() => {
 }, 550);
 ```
 
-It's run three ways: throwing an error, with `b` failing in an `await` instead of a `throw`, and with an `'uncaughtException'` handler. The first two also print `b`'s stack trace, which goes to the terminal's error output, omitted here:
+The first two runs also print `b`'s stack trace, which goes to the terminal's error output, omitted here:
 
 ```text
 $ node uncaught.mjs 2>/dev/null; node uncaught.mjs async 2>/dev/null; node uncaught.mjs handler
@@ -519,6 +521,10 @@ still running at 550 ms
 process exiting, code 0
 ```
 
+*The live version of this needs JavaScript. In it, the three runs play on a loop, with the counters inside one Node process.*
+
+</link-scenes>
+
 By default, one counter's error ended all three, and the whole program dies with them. The Node docs: "By default, Node.js handles such exceptions by printing the stack trace to `stderr` and exiting with code 1". A rejected promise that nothing handles goes the same way, and has since Node 15.
 
 With a handler, the other two carried on. But the docs are blunt about that: "Unhandled exceptions inherently mean that an application is in an undefined state," and "**It is not safe to resume normal operation after `'uncaughtException'`.**" That's Armstrong's point from the other side. Everything in a Node process shares one heap, so a callback that throws halfway through changing something leaves it half-changed, and the rest of the program can't know what's still safe to depend on. The BEAM can carry on safely after a crash because whatever the process was changing when it crashed dies with it.
@@ -526,6 +532,8 @@ With a handler, the other two carried on. But the docs are blunt about that: "Un
 What the Node docs recommend instead is the BEAM's idea but external to the language or application: "To restart a crashed application in a more reliable way, whether `'uncaughtException'` is emitted or not, an external monitor should be employed in a separate process to detect application failures and recover or restart as needed." Let it crash, and have something else restart it, where the thing that crashes is an entire operating system process, with every connection and every piece of work it had going down entirely.
 
 Inside a NodeJS process, worker threads are the closest thing to BEAM processes. A worker that throws ends only itself, and the main thread hears about it through the worker's `'error'` and `'exit'` events ([worker-exit.mjs](worker-exit.mjs)):
+
+<link-scenes scenes="node-worker">
 
 ```javascript
 const worker = new Worker(
@@ -554,6 +562,10 @@ main: 3
 main: 4
 main: 5
 ```
+
+*The live version of this needs JavaScript. In it, the worker throws on a loop, and its events travel to the main thread.*
+
+</link-scenes>
 
 That's a monitor: one way, a notification, and the main thread carries on. There's nothing like a link, though; if two workers should go down together, you have to hand write the code that terminates one when the other exits. And workers cost about 9 MB of memory each, so they're for a few big jobs, not for every individual request like you'd do with BEAM processes.
 
