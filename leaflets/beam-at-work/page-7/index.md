@@ -1,4 +1,5 @@
 ---
+title: Changing code while it runs
 tags: elixir, beam, nodejs
 publish: false
 meta_description: The BEAM can load a new version of a module into a running system. Processes move to it at their next call, keeping what they hold, and nothing stops. Node starts a new process. And why most Elixir teams restart anyway.

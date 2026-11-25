@@ -1,4 +1,5 @@
 ---
+title: When a process dies
 tags: elixir, beam, nodejs
 publish: false
 meta_description: A BEAM process that crashes takes nothing else down with it, unless it was told to. Links, trapping exits, and monitors, and the restarter they add up to.

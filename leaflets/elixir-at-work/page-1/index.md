@@ -1,4 +1,5 @@
 ---
+title: GenServer
 tags: elixir, beam, nodejs
 publish: false
 meta_description: GenServer, where most Elixir programs keep their state, isn't part of the BEAM. It's a small library built from sends, receives, references, and monitors, and every piece of it is there because of something that can go wrong.

@@ -144,9 +144,12 @@ build adds the dates, the page count, and a contents list. The first image on
 a cover is its picture on `/leaflets/`. A cover can reference its pages' files
 (`page-1/picture.webp`).
 
-A page needs no `title` or `slug`: its number comes from its folder, and its
-`meta_description` is the line under "Page N", its entry in the contents, and
-the end of its feed title ("Programming Videos, page 2: …"). It gets a
+A page needs no `slug`: its number comes from its folder. Its `title` is
+optional, and short: the heading, under a small "Page N", and its name in the
+contents, the page turns, and the end of its feed title ("The BEAM at Work,
+page 8: The BEAM's tradeoffs"). Its `meta_description` is the line under the
+heading. A page with no title is headed "Page N", and its `meta_description`
+stands in for the title everywhere else. It gets a
 `published_date` the same way a post does. The build adds the running head
 (the leaflet's name and its pages) and the page turn at the foot, so don't
 write those by hand.

@@ -579,6 +579,15 @@ mark.draft {
   font-size: clamp(1.9rem, 6vw, 2.4rem);
   line-height: 1.12;
 }
+.page-number { /* above a leaflet page's title */
+  display: block;
+  margin-bottom: .3rem;
+  font-family: var(--type);
+  font-size: .95rem;
+  font-weight: normal;
+  letter-spacing: .02em;
+  color: var(--muted);
+}
 .dek {
   margin: 0 0 .4rem;
   font-size: 1.1em;

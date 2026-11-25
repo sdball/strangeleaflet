@@ -1,4 +1,5 @@
 ---
+title: Processes
 tags: elixir, beam, nodejs
 publish: false
 meta_description: What a BEAM process is (not an operating system process), what one costs, and how the schedulers share thousands of them out

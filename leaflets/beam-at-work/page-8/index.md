@@ -1,4 +1,5 @@
 ---
+title: The BEAM's tradeoffs
 tags: elixir, beam, nodejs
 publish: false
 meta_description: Where the BEAM doesn't help. Native code it calls can hold a scheduler the way a busy loop holds Node's thread, a huge heap is slow to collect, a mailbox has no limit, and what Node needs to match the rest.

@@ -1,4 +1,5 @@
 ---
+title: Other machines
 tags: elixir, beam, nodejs
 publish: false
 meta_description: A BEAM can connect to other BEAMs, and a send to a process on another machine looks just like a local one. What changes is what can go wrong, and what a monitor can and can't tell you when it does.

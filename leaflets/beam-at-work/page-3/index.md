@@ -1,4 +1,5 @@
 ---
+title: Garbage Collection
 tags: elixir, beam, nodejs
 publish: false
 meta_description: Every BEAM process has its own heap and collects its own garbage, so a collection only ever pauses the one process that needed it

@@ -183,9 +183,10 @@ def new_leaflet_page(name):
     previous_tags = split(frontmatter(last).get("tags", "")) if last else []
     cover = frontmatter(folder / "index.md").get("title", name)
     print(f"{cover}, page {n}")
-    fields = {"tags": ask_tags(previous_tags),
-              "meta_description": ask("Meta description (the line under \"Page "
-                                      f"{n}\", and its contents and feed title)")}
+    fields = {"title": ask("Title (its heading, under \"Page "
+                           f"{n}\", and its name in the contents and the feed)"),
+              "tags": ask_tags(previous_tags),
+              "meta_description": ask("Meta description (the line under the title)")}
     path = folder / f"page-{n}" / "index.md"
     write_draft(path, fields)
     return path

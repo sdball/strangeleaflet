@@ -1,4 +1,5 @@
 ---
+title: Supervisors
 tags: elixir, beam, nodejs
 publish: false
 meta_description: A supervisor is a restarter written as a GenServer. It starts processes, restarts them when they crash, and gives up when restarting isn't working, and supervisors of supervisors make a tree.

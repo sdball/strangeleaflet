@@ -149,8 +149,9 @@ def load_leaflets(folder, drafts=False):
     """Each leaflets/<name>/ has a cover (index.md) and pages (page-N/index.md or page-N.md).
 
     A cover gets "pages", its published pages in order, and each page gets
-    "leaflet" (its cover) and "number". A leaflet with no published pages is
-    left out. With drafts, unpublished covers and pages count as published.
+    "leaflet" (its cover), "number", and "name" (its own title, if it has one;
+    its "title" is the leaflet's and its number). A leaflet with no published
+    pages is left out. With drafts, unpublished covers and pages count as published.
     """
     leaflets = []
     for home in sorted(p for p in folder.iterdir() if p.is_dir()):
@@ -166,7 +167,9 @@ def load_leaflets(folder, drafts=False):
                 continue
             n = int(match.group(1))
             page = load(source, home, "leaflet page", f"{url}page-{n}/")
-            page.update(leaflet=cover, number=n, title=f"{cover['title']}, page {n}")
+            name = page["title"]
+            title = f"{cover['title']}, page {n}" + (f": {name}" if name else "")
+            page.update(leaflet=cover, number=n, name=name, title=title)
             pages.append(page)
         cover["pages"] = sorted((p for p in pages if p["publish"] or drafts), key=lambda p: p["number"])
         if (cover["publish"] or drafts) and cover["pages"]:
@@ -177,6 +180,11 @@ def load_leaflets(folder, drafts=False):
 
 
 # Pieces of markup shared by the pages
+
+def page_label(page):
+    """What a leaflet page is called in the contents, the page turns, and the eyelets."""
+    return page["name"] or page["description"] or page["title"]
+
 
 def esc(text):
     return html.escape(text, quote=True)
@@ -272,7 +280,7 @@ def leaflet_months(cover):
 def cover_main(cover, content):
     first = cover["pages"][0]
     items = "\n".join(
-        f'<li><span>page {p["number"]}</span><a href="{p["url"]}">{esc(p["description"] or p["title"])}</a>{draft_mark(p)}</li>'
+        f'<li><span>page {p["number"]}</span><a href="{p["url"]}">{esc(page_label(p))}</a>{draft_mark(p)}</li>'
         for p in cover["pages"]
     )
     return (
@@ -292,7 +300,7 @@ def leaflet_page_main(page, content):
     eyelets = []
     for p in pages:
         current = ' aria-current="page"' if p is page else ""
-        eyelets.append(f'    <li><a href="{p["url"]}"{current} title="{esc(p["description"])}"><span>{p["number"]}</span></a></li>')
+        eyelets.append(f'    <li><a href="{p["url"]}"{current} title="{esc(page_label(p))}"><span>{p["number"]}</span></a></li>')
     eyelets = "\n".join(eyelets)
     head = (
         f'<div class="leaflet-head">\n'
@@ -304,11 +312,11 @@ def leaflet_page_main(page, content):
     # Page 1 turns back to the cover, and the last page closes the leaflet
     i = pages.index(page)
     if i > 0:
-        back = (pages[i - 1]["url"], f'« back to page {pages[i - 1]["number"]}', pages[i - 1]["description"])
+        back = (pages[i - 1]["url"], f'« back to page {pages[i - 1]["number"]}', page_label(pages[i - 1]))
     else:
         back = (cover["url"], "« back to the cover", cover["title"])
     if i < len(pages) - 1:
-        ahead = (pages[i + 1]["url"], f'turn to page {pages[i + 1]["number"]} »', pages[i + 1]["description"])
+        ahead = (pages[i + 1]["url"], f'turn to page {pages[i + 1]["number"]} »', page_label(pages[i + 1]))
     else:
         ahead = (cover["url"], "close the leaflet »", "Back to the cover")
     turn = "\n".join(
@@ -316,9 +324,13 @@ def leaflet_page_main(page, content):
         for css, (href, direction, what) in (("prev", back), ("next", ahead))
     )
 
+    if page["name"]:
+        heading = f'<h1><span class="page-number">Page {page["number"]}</span> {esc(page["name"])}</h1>'
+    else:
+        heading = f'<h1>Page {page["number"]}</h1>'
     dek = f'<p class="dek">{esc(page["description"])}</p>\n' if page["description"] else ""
     return (
-        f'{head}\n<h1>Page {page["number"]}</h1>\n{dek}<p><i>{time_tag(page["date"])}</i></p>\n{content}'
+        f'{head}\n{heading}\n{dek}<p><i>{time_tag(page["date"])}</i></p>\n{content}'
         f'<nav class="page-turn" aria-label="Turn the page">\n{turn}\n</nav>'
     )
 
@@ -469,7 +481,7 @@ def write_search_index(entries, contents):
             continue
         date = e["pages"][0]["date"] if e["kind"] == "cover" else e["date"]
         title = e["title"]
-        if e["kind"] == "leaflet page" and e["description"]:
+        if e["kind"] == "leaflet page" and not e["name"] and e["description"]:
             title += ": " + e["description"]
         utc = date.astimezone(timezone.utc)
         found.append({
@@ -499,7 +511,7 @@ def write_feed(posts, contents):
         # A page that moved keeps the id it was first in the feed with, so readers don't see it twice
         entry_id = SITE_URL + p["feed_id"] if p["feed_id"] else url
         title = p["title"]
-        if p["kind"] == "leaflet page" and p["description"]:
+        if p["kind"] == "leaflet page" and not p["name"] and p["description"]:
             title += ": " + p["description"]
         content = absolute_urls(feed_code(p, contents[p["url"]]), p["url"])
         categories = "".join(f'\n    <category term="{esc(t)}"/>' for t in p["tags"])

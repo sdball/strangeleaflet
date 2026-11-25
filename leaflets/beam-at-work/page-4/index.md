@@ -1,4 +1,5 @@
 ---
+title: Messages
 tags: elixir, beam, nodejs
 publish: false
 meta_description: A BEAM process's data is its own, and the only way in is a message, read one at a time. So a process can stop and wait in the middle of a job, and nothing else gets in. What a send costs, and how receive picks a message.
