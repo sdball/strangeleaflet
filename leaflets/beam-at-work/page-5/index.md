@@ -78,7 +78,22 @@ That's the isolation Armstrong was after, but not the monitoring. Nothing observ
 
 A link ties two processes together. When either one dies, the BEAM sends the other an *exit signal* carrying the reason it died, and by default a process that gets an exit signal dies too, with the same reason. `spawn_link` starts a process already linked to the one that started it, and `Process.link` links two that are already running.
 
-Each scene in this script starts some processes, gives them 200 ms, and checks which are still alive. `idle` is a process that waits forever ([link.exs](link.exs)):
+Here are four scenes from a script, [link.exs](link.exs). Each starts some processes, gives them 200 ms, and checks which are still alive. They share two helpers:
+
+```elixir
+# A process that sleeps until it's killed
+idle = fn -> Process.sleep(:infinity) end
+
+# Each scene starts its processes from here, and checks on them after
+# they've had 200 ms to die.
+check = fn pids ->
+  Process.sleep(200)
+  Enum.map_join(pids, ", ", fn {name, pid} -> "#{name} alive? #{Process.alive?(pid)}" end)
+  |> IO.puts()
+end
+```
+
+<link-scenes>
 
 ```elixir
 IO.puts("## A linked process crashes")
@@ -119,8 +134,20 @@ check.(parent: parent)
 
 IO.puts("\n## A chain: a is linked to b, b to c, and c crashes")
 a = spawn(idle)
-b = spawn(fn -> Process.link(a); idle.() end)
-c = spawn(fn -> Process.link(b); Process.sleep(100); raise "oops" end)
+
+b =
+  spawn(fn ->
+    Process.link(a)
+    idle.()
+  end)
+
+c =
+  spawn(fn ->
+    Process.link(b)
+    Process.sleep(100)
+    raise "oops"
+  end)
+
 check.(a: a, b: b, c: c)
 ```
 
@@ -138,6 +165,12 @@ parent alive? true
 ## A chain: a is linked to b, b to c, and c crashes
 a alive? false, b alive? false, c alive? false
 ```
+
+*The live version of this needs JavaScript. In it, each scene plays out step by step, with its exit signals travelling along the links.*
+
+</link-scenes>
+
+<script type="module" src="link-scenes.js"></script>
 
 A link works both ways: the child's crash took down its parent, and the parent's crash took down its child. It doesn't care which process made it.
 

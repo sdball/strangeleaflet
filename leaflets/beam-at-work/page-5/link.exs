@@ -53,6 +53,18 @@ check.(parent: parent)
 
 IO.puts("\n## A chain: a is linked to b, b to c, and c crashes")
 a = spawn(idle)
-b = spawn(fn -> Process.link(a); idle.() end)
-c = spawn(fn -> Process.link(b); Process.sleep(100); raise "oops" end)
+
+b =
+  spawn(fn ->
+    Process.link(a)
+    idle.()
+  end)
+
+c =
+  spawn(fn ->
+    Process.link(b)
+    Process.sleep(100)
+    raise "oops"
+  end)
+
 check.(a: a, b: b, c: c)
